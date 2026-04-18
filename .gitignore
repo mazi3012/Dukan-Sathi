@@ -1,0 +1,35 @@
+# Build and dependencies
+.dart_tool/
+.packages
+build/
+pubspec.lock
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+service-account.json
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Log files
+*.log
+logs/
+
+# OS files
+Thumbs.db
+.DS_Store
+.env*
+!.env.example
+
