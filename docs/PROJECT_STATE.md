@@ -75,6 +75,78 @@ GOOGLE_APPLICATION_CREDENTIALS=/tmp/dukansathi-vertex-sa.json \
 - Bot replies to inventory and billing prompts
 - `dart analyze bin/telegram_bot.dart` reports no issues
 
+## Operations Runbook
+
+### 1) Start All Services
+```bash
+cd /workspaces/dukansathi-new
+
+# Start Genkit UI (port 4000)
+/tmp/dart-sdk/bin/dart run bin/genkit_ui.dart
+```
+
+In a second terminal:
+```bash
+cd /workspaces/dukansathi-new
+
+# Start Telegram listener
+TELEGRAM_BOT_TOKEN=<token> \
+GCLOUD_PROJECT=peppy-avatar-429012-q2 \
+GOOGLE_APPLICATION_CREDENTIALS=/tmp/dukansathi-vertex-sa.json \
+/tmp/dart-sdk/bin/dart run bin/telegram_bot.dart
+```
+
+### 2) One-Line Health Checks
+```bash
+# UI endpoint
+curl -sS http://localhost:4000 | head -5
+
+# UI actions endpoint
+curl -sS http://localhost:4000/api/listActions
+
+# Telegram bot process
+ps aux | grep "bin/telegram_bot.dart" | grep -v grep
+
+# Telegram bot token validity
+curl -s "https://api.telegram.org/bot<token>/getMe"
+```
+
+### 3) Restart Services
+```bash
+# Restart UI
+pkill -f "bin/genkit_ui.dart" || true
+cd /workspaces/dukansathi-new && /tmp/dart-sdk/bin/dart run bin/genkit_ui.dart
+```
+
+In a second terminal:
+```bash
+# Restart Telegram listener
+pkill -f "bin/telegram_bot.dart" || true
+cd /workspaces/dukansathi-new && \
+TELEGRAM_BOT_TOKEN=<token> \
+GCLOUD_PROJECT=peppy-avatar-429012-q2 \
+GOOGLE_APPLICATION_CREDENTIALS=/tmp/dukansathi-vertex-sa.json \
+/tmp/dart-sdk/bin/dart run bin/telegram_bot.dart
+```
+
+### 4) Stop Services
+```bash
+pkill -f "bin/genkit_ui.dart" || true
+pkill -f "bin/telegram_bot.dart" || true
+```
+
+### 5) Fast Troubleshooting
+```bash
+# Missing credentials file
+ls -la /tmp/dukansathi-vertex-sa.json
+
+# Analyzer check
+/tmp/dart-sdk/bin/dart analyze /workspaces/dukansathi-new/bin/telegram_bot.dart
+
+# Check bound ports
+lsof -i -P -n 2>/dev/null | grep LISTEN | grep -E ":4000|:3100"
+```
+
 ## Next Recommended Work
 - Persist sessions across restarts (Redis or database)
 - Add explicit session timeout eviction strategy

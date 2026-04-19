@@ -27,6 +27,9 @@ service-account.json
 *.log
 logs/
 
+# Genkit runtime artifacts
+.genkit/
+
 # OS files
 Thumbs.db
 .DS_Store
