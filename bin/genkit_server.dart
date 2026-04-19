@@ -49,8 +49,8 @@ Future<void> main(List<String> arguments) async {
           ..write(jsonEncode({
             'status': 'running',
             'genkit_version': '0.12.1',
-            'ai_provider': 'Vertex AI',
-            'model': 'gemini-2.5-flash',
+            'ai_provider': aiProvider,
+            'model': modelId,
             'endpoints': {
               'listActions': '/api/listActions',
               'runAction': '/api/runAction',

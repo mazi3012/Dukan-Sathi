@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:dukansathi_new/bootstrap.dart';
+import 'package:dukansathi_new/runtime/genkit_runtime.dart';
 
 void main(List<String> arguments) {
   // Initialize all tools and flows
@@ -18,7 +19,7 @@ void main(List<String> arguments) {
   print('📊 UI Dashboard:');
   print('   http://localhost:4000');
   print('');
-  print('🤖 Model: Vertex AI (gemini-1.5-flash)');
+  print('🤖 Model: $aiProvider ($modelId)');
   print('💬 Telegram: @Sathiaibeta_bot');
   print('');
   print('The Genkit reflection server is running.');

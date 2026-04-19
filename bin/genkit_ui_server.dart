@@ -19,7 +19,7 @@ Future<void> main(List<String> arguments) async {
   print('   http://localhost:$port');
   print('');
   print('📊 Dashboard Features:');
-  print('   • Models: Vertex AI (gemini-1.5-flash)');
+    print('   • Models: Google GenAI SDK (MODEL_ID from env)');
   print('   • Flows: retailAssistantFlow');
   print('   • Tools: checkInventory, createDraftInvoice');
   print('   • Trace history & telemetry');

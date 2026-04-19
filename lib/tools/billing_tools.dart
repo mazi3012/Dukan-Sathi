@@ -1,5 +1,6 @@
 import 'package:schemantic/schemantic.dart';
 
+import '../core/database.dart';
 import '../models/cart_item.dart';
 import '../models/draft_invoice.dart';
 import '../runtime/genkit_runtime.dart';
@@ -22,7 +23,7 @@ final SchemanticType<Map<String, dynamic>> createDraftInvoiceInputSchema =
   parse: (json) => Map<String, dynamic>.from(json as Map),
 );
 
-final createDraftInvoice = ai.defineTool<Map<String, dynamic>, DraftInvoice>(
+final createDraftInvoiceTool = ai.defineTool<Map<String, dynamic>, DraftInvoice>(
   name: 'createDraftInvoice',
   description: 'Create a draft invoice from requested product quantities.',
   inputSchema: createDraftInvoiceInputSchema,
@@ -33,36 +34,55 @@ final createDraftInvoice = ai.defineTool<Map<String, dynamic>, DraftInvoice>(
       input['requestedItems'] as Map,
     );
 
-    final catalog = <String, double>{
-      'atta': 420.0,
-      'rice': 575.0,
-      'sugar': 48.0,
-      'oil': 170.0,
-      'salt': 22.0,
-    };
-
     final items = <CartItem>[];
     double totalAmount = 0;
 
-    requestedItems.forEach((productName, quantityValue) {
-      final quantity = (quantityValue as num).toInt();
-      final unitPrice = catalog[productName.toLowerCase()] ?? 0.0;
+    for (final entry in requestedItems.entries) {
+      final productName = entry.key;
+      final quantity = (entry.value as num).toInt();
+
+      final rows = await supabase
+          .from('products')
+          .select('id, price, name, shop_id')
+          .eq('shop_id', shopId)
+          .ilike('name', '%$productName%')
+          .limit(1);
+
+      final productList = rows as List<dynamic>;
+      if (productList.isEmpty) {
+        throw StateError('Not in inventory');
+      }
+
+      final product = Map<String, dynamic>.from(productList.first as Map);
+      final unitPrice = (product['price'] as num).toDouble();
+      final productId = product['id'] as String;
+
       items.add(
         CartItem(
-          productId: 'mock-${productName.toLowerCase()}',
+          productId: productId,
           quantity: quantity,
           unitPrice: unitPrice,
         ),
       );
       totalAmount += unitPrice * quantity;
-    });
+    }
 
-    return DraftInvoice(
-      id: 'draft-${DateTime.now().microsecondsSinceEpoch}',
-      shopId: shopId,
-      customerId: customerId,
-      items: items,
-      totalAmount: totalAmount,
+    final inserted = await supabase
+        .from('draft_invoices')
+        .insert({
+          'shop_id': shopId,
+          'customer_id': customerId,
+          'items': items.map((item) => item.toJson()).toList(),
+          'total_amount': totalAmount,
+          'status': 'draft',
+        })
+        .select('id, shop_id, customer_id, items, total_amount, status')
+        .single();
+
+    return DraftInvoice.fromJson(
+      Map<String, dynamic>.from(inserted as Map),
     );
   },
 );
+
+final createDraftInvoice = createDraftInvoiceTool;

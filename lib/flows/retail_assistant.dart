@@ -1,6 +1,5 @@
 import 'package:genkit/genkit.dart';
 import 'package:schemantic/schemantic.dart';
-import 'package:genkit_vertexai/genkit_vertexai.dart';
 
 import '../runtime/genkit_runtime.dart';
 
@@ -22,7 +21,7 @@ final retailAssistantFlow = ai.defineFlow(
     }
 
     final response = await ai.generate(
-      model: vertexAI.gemini('gemini-2.5-flash'),
+      model: appModel(),
       messages: [
         Message(
           role: Role.system,

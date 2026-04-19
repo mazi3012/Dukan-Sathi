@@ -1,257 +1,95 @@
 # Dukan Sathi Pro - Genkit Backend
 
-A headless AI-powered retail assistant backend built with Dart, Genkit, and Vertex AI. This project provides intelligent inventory management, billing, and customer interaction through a Genkit flow architecture.
+AI retail backend built with Dart, Genkit, Google GenAI SDK, Supabase, and Telegram integration.
 
-## Current State
+## Current Status
 
-- Live project/session handoff: [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md)
-- Includes current architecture diagram, runtime commands, constraints, and Phase 3 session notes.
+- Phase 4.5 completed: Supabase-backed tools + RLS policies + catalog + analytics.
+- Live state and runbook: [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md)
 
-## 🚀 Quick Start
+## Quick Start
 
-### Prerequisites
-- Dart SDK 3.10.0 or higher
-- Google Cloud project with Vertex AI enabled
-- Service account credentials (optional, but recommended)
+1. Install dependencies
 
-### Installation
-
-1. **Clone and setup dependencies:**
 ```bash
 dart pub get
 ```
 
-2. **Configure environment variables:**
+2. Create `.env` (never commit this file)
 
-Create a `.env` file in the project root:
-```
-GCLOUD_PROJECT=your-gcp-project-id
-GCLOUD_LOCATION=us-central1
+```env
+MODEL_ID=gemini-3.1-flash-lite-preview
+GOOGLE_API_KEY=<your-google-genai-api-key>
+TELEGRAM_BOT_TOKEN=<your-telegram-bot-token>
+SUPABASE_URL=<your-supabase-url>
+SUPABASE_ANON_KEY=<your-supabase-anon-key>
 ```
 
-Or set environment variables:
+3. Run Genkit dashboard
+
 ```bash
-export GCLOUD_PROJECT="your-gcp-project-id"
-export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
+dart run bin/genkit_ui.dart
 ```
 
-3. **Run the development server:**
+4. Run Telegram bot
+
 ```bash
-dart bin/genkit_dev.dart
+dart run bin/telegram_bot.dart
 ```
 
-The Genkit UI will be available at: **http://localhost:4000**
+## Runtime Components
 
-## 📋 Project Structure
+- `bin/genkit_ui.dart`: No-code dashboard and flow playground.
+- `bin/genkit_server.dart`: JSON API server.
+- `bin/telegram_bot.dart`: Telegram listener with tool-intent routing.
+- `lib/runtime/genkit_runtime.dart`: Google GenAI runtime + unified `MODEL_ID`.
 
-```
-bin/
-├── dukansathi_new.dart      # Main entry point (initializes backend)
-├── genkit_dev.dart          # Development server with web UI
-├── genkit_ui.dart           # Custom Genkit UI dashboard
-├── genkit_server.dart       # Custom HTTP reflection server
-├── genkit_ui_server.dart    # Alternative UI server implementation
-└── telegram_bot.dart        # Telegram bot integration
+## Tools
 
-lib/
-├── bootstrap.dart           # Backend initialization
-├── runtime/
-│   └── genkit_runtime.dart  # Genkit + Vertex AI configuration
-├── flows/
-│   └── retail_assistant.dart # Main AI flow for retail operations
-├── tools/
-│   ├── inventory_tools.dart # Inventory management tools
-│   └── billing_tools.dart   # Billing & invoice tools
-├── models/
-│   ├── cart_item.dart
-│   ├── draft_invoice.dart
-│   └── product.dart
-└── bootstrap.dart           # Initialization module
-```
+- `checkInventory`: Price/stock lookup from Supabase `products`.
+- `browseCatalogTool`: Lists available products, optional category filter.
+- `createDraftInvoice`: Creates draft invoices in `draft_invoices`.
+- `businessInsightsTool`: Revenue and invoice count analytics.
 
-## 🤖 AI Components
+## Supabase Schema & Security
 
-### Model
-- **Provider:** Vertex AI (Google Cloud)
-- **Model:** gemini-2.5-flash
-- **Location:** us-central1 (configurable)
+Migrations in `supabase/migrations/` include:
 
-### Flow: retailAssistantFlow
-An intelligent retail assistant that:
-- Understands customer queries about products and inventory
-- Routes requests to appropriate tools (checkInventory, createDraftInvoice)
-- Generates natural language responses
-- Maintains context-aware conversations
+- `init_core_schema`: `products`, `draft_invoices`
+- `add_products_read_policy`: base RLS policies
+- `fix_invoice_policies`: explicit anonymous `INSERT`/`SELECT` policies for `draft_invoices`
 
-**Input:** String (customer message)
-**Output:** String (AI response)
+Apply migrations:
 
-### Tools
-
-#### 1. checkInventory
-Check product availability and pricing
-- Queries product database
-- Returns stock levels and prices
-- Integrated with Supabase backend
-
-#### 2. createDraftInvoice
-Create draft bills/invoices
-- Accumulates cart items
-- Calculates totals
-- Generates invoice data
-- Ready for payment processing
-
-## 🔧 Configuration
-
-### Environment Variables
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `GCLOUD_PROJECT` | Google Cloud Project ID | (Required) |
-| `GOOGLE_CLOUD_PROJECT` | Alternative GCP Project ID | (Optional) |
-| `GCLOUD_LOCATION` | Vertex AI location | us-central1 |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account JSON | (Optional) |
-
-### Credentials Resolution
-The system resolves credentials in this order:
-1. Platform environment variables (`GCLOUD_PROJECT`, `GOOGLE_CLOUD_PROJECT`)
-2. `.env` file (`GCLOUD_PROJECT`, `GOOGLE_CLOUD_PROJECT`)
-3. Service account file path from `GOOGLE_APPLICATION_CREDENTIALS`
-4. Project ID extracted from service account JSON
-
-## 📊 Running Different Servers
-
-### Development Server (Recommended)
 ```bash
-dart bin/genkit_dev.dart
+npx -y supabase@latest db push
 ```
-- Includes Genkit reflection UI
-- Port: 4000
-- Best for development and testing
 
-### Main Backend (No UI)
-```bash
-dart bin/dukansathi_new.dart
-```
-- Initializes backend only
-- No HTTP server
-- Use for headless operations or integration
+## API Test
 
-### Custom Genkit UI
-```bash
-dart bin/genkit_ui.dart
-```
-- Custom HTML dashboard
-- Port: 4000
-- Flow executor with trace history
-
-### JSON API Server
-```bash
-dart bin/genkit_server.dart
-```
-- HTTP REST endpoints
-- Port: 3100
-- Programmatic flow execution
-
-## 🧪 Testing the System
-
-### Via Web UI
-1. Open http://localhost:4000
-2. Enter a query in the flow executor
-3. Examples:
-   - "Check inventory for items"
-   - "Create a bill with 5 items"
-   - "What products do we have?"
-
-### Via REST API
 ```bash
 curl -X POST http://localhost:4000/api/runAction \
   -H "Content-Type: application/json" \
-  -d '{
-    "key": "/flow/retailAssistantFlow",
-    "input": "Check inventory status"
-  }'
+  -d '{"key":"/flow/retailAssistantFlow","input":"What item do you sell?"}'
 ```
 
-### Via Telegram (when configured)
-Send a message to the configured Telegram bot for instant AI responses.
+## Security
 
-## 💬 Integration Points
+- `.env` is gitignored.
+- `.secrets/` is gitignored.
+- Supabase local secret variants are gitignored in `supabase/.gitignore`.
+- Do not commit tokens, API keys, or credential JSON files.
 
-### Telegram Bot
-The project includes TeleDart integration for Telegram messaging:
-- Bot token configuration (in `.env`)
-- Message forwarding to retailAssistantFlow
-- Real-time response delivery
+## Troubleshooting
 
-### Supabase Backend
-Optional Supabase integration for:
-- Product database
-- Inventory management
-- Customer data
+- Port conflict on dashboard:
 
-## 📚 Dependencies
-
-**Core:** Genkit 0.12.1, Vertex AI plugin 0.2.4
-**Database:** Supabase 2.10.6
-**Schema:** Schemantic 0.1.1
-**Messaging:** TeleDart 0.6.1
-**Utilities:** DotEnv 4.2.0, Freezed 3.2.5, JSON Serializable 6.13.1
-
-## 🔐 Security Notes
-
-- Never commit `.env` or credentials to version control
-- Service account credentials should be restricted to necessary APIs
-- Use environment variables in production
-- Rotate credentials regularly
-
-## 📝 Development Workflow
-
-1. **Initialize:**
-   ```bash
-   dart pub get
-   ```
-
-2. **Configure:**
-   - Set up `.env` with GCP credentials
-   - Configure Supabase if using database features
-
-3. **Run:**
-   ```bash
-   dart bin/genkit_dev.dart
-   ```
-
-4. **Test:**
-   - Access UI at http://localhost:4000
-   - Test flows and tools
-   - Check logs for debugging
-
-5. **Deploy:**
-   - Use appropriate server binary (genkit_dev.dart for UI, or headless)
-   - Set production environment variables
-   - Configure firewall rules
-
-## 🐛 Troubleshooting
-
-### "Vertex AI requires GCLOUD_PROJECT..."
-- Ensure `.env` file exists with `GCLOUD_PROJECT` set
-- Or set `GCLOUD_PROJECT` environment variable
-- Or provide service account JSON file path in `GOOGLE_APPLICATION_CREDENTIALS`
-
-### Port 4000 already in use
 ```bash
-lsof -i :4000  # Find process
-kill -9 <PID>  # Kill process
+PORT=4010 dart run bin/genkit_ui.dart
 ```
 
-### No response from Genkit
-- Check internet connection
-- Verify Vertex AI is enabled in GCP project
-- Confirm credentials have required permissions
-- Check logs for specific error messages
+- Check running listeners:
 
-## 📞 Support
-
-For issues or questions about Genkit integration:
-- [Genkit Documentation](https://firebase.google.com/docs/genkit)
-- [Vertex AI Documentation](https://cloud.google.com/vertex-ai/docs)
-- [Dart Documentation](https://dart.dev/guides)
+```bash
+ps aux | grep "bin/telegram_bot.dart" | grep -v grep
+```

@@ -8,6 +8,7 @@ pubspec.lock
 .env
 .env.local
 .env.*.local
+.secrets/
 *.key
 *.pem
 *.p12
