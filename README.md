@@ -2,6 +2,11 @@
 
 A headless AI-powered retail assistant backend built with Dart, Genkit, and Vertex AI. This project provides intelligent inventory management, billing, and customer interaction through a Genkit flow architecture.
 
+## Current State
+
+- Live project/session handoff: [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md)
+- Includes current architecture diagram, runtime commands, constraints, and Phase 3 session notes.
+
 ## 🚀 Quick Start
 
 ### Prerequisites

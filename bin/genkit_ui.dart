@@ -5,8 +5,16 @@ import 'package:dukansathi_new/bootstrap.dart';
 import 'package:dukansathi_new/flows/retail_assistant.dart';
 
 Future<void> main(List<String> arguments) async {
-  // Initialize all tools and flows
-  initializeBackend();
+    // Initialize all tools and flows. If credentials are missing, keep UI up
+    // so users can still access diagnostics and setup instructions.
+    var backendReady = true;
+    String? backendInitError;
+    try {
+        initializeBackend();
+    } catch (e) {
+        backendReady = false;
+        backendInitError = e.toString();
+    }
   
   final port = int.tryParse(Platform.environment['PORT'] ?? '4000') ?? 4000;
   final server = await HttpServer.bind('localhost', port);
@@ -30,7 +38,10 @@ Future<void> main(List<String> arguments) async {
     try {
       if (request.method == 'GET' && request.uri.path == '/') {
         // Serve the HTML UI
-        final html = getGenkitHTML();
+                final html = getGenkitHTML(
+                    backendReady: backendReady,
+                    backendInitError: backendInitError,
+                );
         request.response
           ..statusCode = 200
           ..headers.contentType = ContentType.html
@@ -51,6 +62,18 @@ Future<void> main(List<String> arguments) async {
           }))
           ..close();
       } else if (request.method == 'POST' && request.uri.path == '/api/runAction') {
+                if (!backendReady) {
+                    request.response
+                        ..statusCode = 503
+                        ..headers.contentType = ContentType.json
+                        ..write(jsonEncode({
+                            'error': 'Backend not initialized. Configure GCLOUD_PROJECT and GOOGLE_APPLICATION_CREDENTIALS, then restart server.',
+                            'details': backendInitError,
+                        }))
+                        ..close();
+                    return;
+                }
+
         var body = await utf8.decodeStream(request);
         try {
           final data = jsonDecode(body) as Map<String, dynamic>;
@@ -102,7 +125,19 @@ Future<void> main(List<String> arguments) async {
   });
 }
 
-String getGenkitHTML() {
+String getGenkitHTML({
+    required bool backendReady,
+    String? backendInitError,
+}) {
+    final banner = backendReady
+            ? ''
+            : '''
+        <div style="background:#7f1d1d;border:1px solid #b91c1c;color:#fecaca;padding:12px;border-radius:8px;margin-bottom:20px;">
+            <strong>Backend Unavailable:</strong> Configure <code>GCLOUD_PROJECT</code> and <code>GOOGLE_APPLICATION_CREDENTIALS</code>, then restart.
+            <div style="margin-top:8px;font-size:12px;opacity:.9;">${backendInitError ?? 'Initialization failed.'}</div>
+        </div>
+    ''';
+
   return '''<!DOCTYPE html>
 <html>
 <head>
@@ -207,6 +242,7 @@ String getGenkitHTML() {
         <h1>🧬 Genkit AI</h1>
         <p>Dukan Sathi Pro - Run, test & debug your AI flows</p>
     </div>
+    $banner
     
     <div class="container">
         <div class="card">

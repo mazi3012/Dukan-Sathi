@@ -7,6 +7,24 @@ import 'package:genkit_vertexai/genkit_vertexai.dart';
 
 final DotEnv _env = DotEnv(includePlatformEnvironment: true);
 
+bool _isLikelyManagedGcpRuntime() {
+	const managedEnvKeys = [
+		'K_SERVICE',
+		'FUNCTION_TARGET',
+		'GAE_SERVICE',
+		'GCE_METADATA_HOST',
+	];
+
+	for (final key in managedEnvKeys) {
+		final value = Platform.environment[key];
+		if (value != null && value.trim().isNotEmpty) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 String? _envValue(String key) {
 	final fromPlatform = Platform.environment[key];
 	if (fromPlatform != null && fromPlatform.trim().isNotEmpty) {
@@ -55,6 +73,21 @@ Genkit _createGenkit() {
 		throw StateError(
 			'Vertex AI requires GCLOUD_PROJECT, GOOGLE_CLOUD_PROJECT, or a GOOGLE_APPLICATION_CREDENTIALS file containing project_id.',
 		);
+	}
+
+	final credentialsPath = _envValue('GOOGLE_APPLICATION_CREDENTIALS');
+	if (!_isLikelyManagedGcpRuntime()) {
+		if (credentialsPath == null || credentialsPath.isEmpty) {
+			throw StateError(
+				'Local runtime detected. Set GOOGLE_APPLICATION_CREDENTIALS to a service account JSON path to avoid metadata.google.internal auth failures.',
+			);
+		}
+
+		if (!File(credentialsPath).existsSync()) {
+			throw StateError(
+				'GOOGLE_APPLICATION_CREDENTIALS points to a missing file: $credentialsPath',
+			);
+		}
 	}
 
 	return Genkit(
