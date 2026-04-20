@@ -3,6 +3,13 @@
 .packages
 build/
 pubspec.lock
+.tooling/
+
+# Flutter local artifacts
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.metadata
+**/flutter_export_environment.sh
 
 # Environment and secrets
 .env
@@ -19,6 +26,7 @@ service-account.json
 # IDE and editor files
 .vscode/
 .idea/
+*.iml
 *.swp
 *.swo
 *~

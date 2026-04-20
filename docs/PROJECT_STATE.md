@@ -1,6 +1,6 @@
 # Project State and Session Handoff
 
-Last updated: 2026-04-19
+Last updated: 2026-04-20
 
 ## Current Phase
 - Phase 2: Completed
@@ -12,6 +12,14 @@ Last updated: 2026-04-19
   - Supabase-backed `browseCatalogTool` and `businessInsightsTool` are active
   - `draft_invoices` RLS policies allow anon insert/select for operational writes and analytics reads
   - Genkit dashboard upgraded for no-code usage (settings panel, action explorer, quick prompts, trace view)
+- Phase 5: Admin Dashboard Runtime Stabilization (Implemented)
+  - Flutter web admin dashboard build is stable on port `5000`
+  - Backend admin API is stable on port `3100`
+  - Codespaces browser issues resolved:
+    - removed manifest-triggered auth/CORS loop from web bootstrap
+    - added stale service-worker unregister and cache cleanup on startup
+    - added CORS-enabled frontend serving via `serve_with_cors.py`
+  - API base URL logic updated for forwarded Codespaces domains (`*-3100.app.github.dev`)
 
 ## Architecture Diagram
 
@@ -37,6 +45,7 @@ flowchart LR
 - UI Server: `bin/genkit_ui.dart` on port `4000`
 - API Server: `bin/genkit_server.dart` on port `3100`
 - Telegram Listener: `bin/telegram_bot.dart`
+- Admin Web Dashboard: `flutter_admin_dashboard/build/web` served on port `5000`
 
 ## Unified Environment
 Use `.env` with:
@@ -59,6 +68,19 @@ cd /workspaces/dukansathi-new
 /tmp/dart-sdk/bin/dart run bin/genkit_ui.dart
 ```
 
+### Admin API Server (port 3100)
+```bash
+cd /workspaces/dukansathi-new
+/workspaces/dukansathi-new/.tooling/dart-sdk/bin/dart run bin/genkit_server.dart
+```
+
+### Admin Dashboard Web (port 5000)
+```bash
+cd /workspaces/dukansathi-new/flutter_admin_dashboard
+/opt/flutter/bin/flutter build web --web-renderer html --release
+python3 serve_with_cors.py
+```
+
 ### Telegram Listener
 ```bash
 cd /workspaces/dukansathi-new
@@ -69,6 +91,18 @@ GOOGLE_API_KEY=<your-google-genai-api-key> \
 ```
 
 ## Operations Runbook
+
+### Admin Dashboard Health Checks
+```bash
+curl -sI http://localhost:5000/ | head -5
+curl -sI http://localhost:5000/manifest.json | grep Access-Control-Allow-Origin
+curl -s http://localhost:3100/api/admin/roles | jq -r '.data | length'
+```
+
+Expected:
+- `5000` responds `HTTP 200`
+- CORS header present for static assets
+- roles endpoint returns `4` seeded roles
 
 ### 1) Start All Services
 ```bash
