@@ -27,5 +27,8 @@ void main(List<String> arguments) {
   print('');
   
   // Keep the process alive
-  stdin.readLineSync();
+  ProcessSignal.sigint.watch().first.then((_) => exit(0));
+  while(true) {
+    sleep(Duration(hours: 1));
+  }
 }

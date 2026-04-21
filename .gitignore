@@ -32,9 +32,14 @@ service-account.json
 *~
 .DS_Store
 
-# Log files
+# Log and process files
 *.log
+*.pid
 logs/
+
+# Test and scratch scripts
+bin/test_billing.dart
+bin/test_*.dart
 
 # Genkit runtime artifacts
 .genkit/
@@ -44,4 +49,3 @@ Thumbs.db
 .DS_Store
 .env*
 !.env.example
-

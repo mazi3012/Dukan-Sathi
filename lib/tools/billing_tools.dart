@@ -75,12 +75,12 @@ final createDraftInvoiceTool = ai.defineTool<Map<String, dynamic>, Map<String, d
           .from('products')
           .select('id, price, name, shop_id')
           .eq('shop_id', shopId)
-          .ilike('name', '%$productName%')
+          .or('id.eq.$productName,name.ilike.%$productName%')
           .limit(1);
 
       final productList = rows as List<dynamic>;
       if (productList.isEmpty) {
-        throw StateError('Product "$productName" not in inventory');
+        throw StateError('Product "$productName" not in inventory. Please ensure you are using the correct name or ID.');
       }
 
       final product = Map<String, dynamic>.from(productList.first as Map);
@@ -145,7 +145,7 @@ final createDraftInvoiceTool = ai.defineTool<Map<String, dynamic>, Map<String, d
         'totalAmount': taxBreakdown.totalAmount,
       },
       'requiresApproval': true,
-      'message': 'Draft invoice created with tax calculation. Awaiting your approval to finalize.',
+      'message': 'Draft invoice created with tax calculation. Awaiting your approval to finalize.\n\nApproval ID: $approvalId',
     };
   },
 );

@@ -2,102 +2,64 @@ import '../models/draft_approval.dart';
 import '../models/tax_breakdown.dart';
 
 class ApprovalFormatter {
-  /// Format approval message for Telegram (with tax breakdown)
+  static String _formatPrice(double v) => v.toStringAsFixed(2);
+
+  /// Main formatted invoice for Telegram
   static String formatApprovalMessage({
     required DraftApproval approval,
     required String customerName,
     required List<String> itemDescriptions,
+    String gstType = 'CGST_SGST', // 'CGST_SGST' or 'IGST'
   }) {
-    final taxBreakdown = approval.proposedTaxBreakdown;
-    final state = taxBreakdown.applicableState;
+    final tax = approval.proposedTaxBreakdown;
+    final isUnregistered = tax.gstMode == 'UNREGISTERED';
+    final isComposite = tax.gstMode == 'COMPOSITE';
+    final isIGST = tax.igstAmount > 0;
 
-    // Format items
     final itemsText = itemDescriptions.isNotEmpty
-        ? itemDescriptions.join('\n  ')
-        : 'No items';
+        ? itemDescriptions.map((i) => '  • $i').join('\n')
+        : '  No items';
 
-    // Format tax breakdown based on GST mode
-    String taxBreakdownText;
+    final StringBuffer taxLines = StringBuffer();
+    taxLines.writeln('Subtotal: ₹${_formatPrice(tax.subtotal)}');
 
-    if (taxBreakdown.gstMode == 'REGISTERED') {
-      if (taxBreakdown.igstAmount > 0) {
-        // Inter-state (IGST)
-        taxBreakdownText = '''
-Subtotal: ₹${approval.proposedTaxBreakdown.subtotal.toStringAsFixed(2)}
-Tax ($state, Inter-State):
-  IGST (18%): ₹${taxBreakdown.igstAmount.toStringAsFixed(2)}
-  ✅ TOTAL: ₹${approval.proposedTotal.toStringAsFixed(2)}''';
-      } else {
-        // Intra-state (CGST + SGST)
-        taxBreakdownText = '''
-Subtotal: ₹${approval.proposedTaxBreakdown.subtotal.toStringAsFixed(2)}
-Tax ($state, Registered):
-  CGST (9%): ₹${taxBreakdown.cgstAmount.toStringAsFixed(2)}
-  SGST (9%): ₹${taxBreakdown.sgstAmount.toStringAsFixed(2)}
-  ✅ TOTAL: ₹${approval.proposedTotal.toStringAsFixed(2)}''';
-      }
-    } else if (taxBreakdown.gstMode == 'UNREGISTERED') {
-      taxBreakdownText = '''
-Subtotal: ₹${approval.proposedTaxBreakdown.subtotal.toStringAsFixed(2)}
-(No GST - Unregistered)
-  ✅ TOTAL: ₹${approval.proposedTotal.toStringAsFixed(2)}''';
-    } else if (taxBreakdown.gstMode == 'COMPOSITE') {
-      taxBreakdownText = '''
-Subtotal: ₹${approval.proposedTaxBreakdown.subtotal.toStringAsFixed(2)}
-Composite GST (3%): ₹${(approval.proposedTotal - approval.proposedTaxBreakdown.subtotal).toStringAsFixed(2)}
-  ✅ TOTAL: ₹${approval.proposedTotal.toStringAsFixed(2)}''';
+    if (isUnregistered) {
+      taxLines.writeln('GST: None (Unregistered Seller)');
+    } else if (isComposite) {
+      final taxAmt = approval.proposedTotal - tax.subtotal;
+      taxLines.writeln('Composite GST (3%): ₹${_formatPrice(taxAmt)}');
+    } else if (isIGST) {
+      taxLines.writeln('IGST (18% — Inter-State): ₹${_formatPrice(tax.igstAmount)}');
     } else {
-      taxBreakdownText = '''
-Subtotal: ₹${approval.proposedTaxBreakdown.subtotal.toStringAsFixed(2)}
-Tax: ₹${(approval.proposedTotal - approval.proposedTaxBreakdown.subtotal).toStringAsFixed(2)}
-  ✅ TOTAL: ₹${approval.proposedTotal.toStringAsFixed(2)}''';
+      taxLines.writeln('CGST (9%): ₹${_formatPrice(tax.cgstAmount)}');
+      taxLines.writeln('SGST (9%): ₹${_formatPrice(tax.sgstAmount)}');
     }
 
-    return '''📋 **INVOICE FOR APPROVAL**
+    final stateLabel = isIGST ? 'Inter-State (IGST)' : '${tax.applicableState} — Intra-State';
+
+    return '''🧾 *INVOICE FOR APPROVAL*
 
 👤 Customer: $customerName
 📦 Items:
-  $itemsText
+$itemsText
 
-$taxBreakdownText
+💰 *Billing Summary*
+━━━━━━━━━━━━━━━━━
+${taxLines.toString().trim()}
+━━━━━━━━━━━━━━━━━
+*TOTAL: ₹${_formatPrice(approval.proposedTotal)}*
 
-⏳ Status: Awaiting Your Approval
-ID: `${{approval.approvalId}}`''';
-  }
-
-  /// Format compact approval message for quick actions
-  static String formatCompactApprovalMessage({
-    required String customerName,
-    required double subtotal,
-    required double total,
-    required String taxDescription,
-    required String approvalId,
-  }) {
-    final taxAmount = total - subtotal;
-
-    return '''🧾 Draft Invoice Ready
-
-👤 $customerName
-💰 Subtotal: ₹${subtotal.toStringAsFixed(2)}
-📊 $taxDescription
-✅ **TOTAL: ₹${total.toStringAsFixed(2)}**
-
-Awaiting approval...''';
+📍 State: $stateLabel
+⏳ Status: Awaiting Approval
+🆔 `${approval.approvalId}`''';
   }
 
   /// Format approval confirmation message
   static String formatApprovalConfirmation({
-    required String approvalId,
     required String saleId,
     required double totalAmount,
   }) {
-    return '''✅ **INVOICE FINALIZED**
-
-✓ Approval ID: `$approvalId`
-✓ Sale ID: `$saleId`
-✓ Amount: ₹${totalAmount.toStringAsFixed(2)}
-
-The invoice has been saved to your records.''';
+    return '✅ *Invoice Approved & Finalized!*\n\n🧾 Sale ID: `$saleId`\n💰 Amount: ₹${_formatPrice(totalAmount)}\n\n_Invoice saved to records._';
   }
 
   /// Format rejection message
@@ -105,59 +67,18 @@ The invoice has been saved to your records.''';
     required String approvalId,
     required String rejectionReason,
   }) {
-    return '''❌ **INVOICE REJECTED**
-
-Approval ID: `$approvalId`
-Reason: $rejectionReason
-
-The draft has been discarded. A new invoice can be created.''';
-  }
-
-  /// Format error message
-  static String formatErrorMessage(String error) {
-    return '''⚠️ **ERROR**
-
-$error
-
-Please try again or contact support.''';
-  }
-
-  /// Format pending approvals list
-  static String formatPendingApprovalsList(
-      List<Map<String, dynamic>> approvals) {
-    if (approvals.isEmpty) {
-      return '✅ No pending approvals!';
-    }
-
-    final buffer = StringBuffer('📋 **PENDING APPROVALS** (${approvals.length})\n\n');
-
-    for (int i = 0; i < approvals.length && i < 5; i++) {
-      final approval = approvals[i];
-      final id = approval['approval_id'] as String;
-      final total = approval['proposed_total'] as num;
-      final createdAt = approval['created_at'] as String;
-
-      buffer.writeln('${i + 1}. ₹${total.toStringAsFixed(2)} - ID: `${id.substring(0, 8)}`');
-      buffer.writeln('   Created: $createdAt\n');
-    }
-
-    if (approvals.length > 5) {
-      buffer.writeln('... and ${approvals.length - 5} more');
-    }
-
-    return buffer.toString();
+    return '❌ *Invoice Rejected*\n\nReason: $rejectionReason\n\n_Draft discarded. Create a new invoice anytime._';
   }
 
   /// Extract summary for AI response
   static String extractTaxSummary(TaxBreakdown breakdown) {
     if (breakdown.gstMode == 'UNREGISTERED') {
-      return '₹${breakdown.totalAmount.toStringAsFixed(2)} (No tax)';
+      return '₹${_formatPrice(breakdown.totalAmount)} (No tax)';
     } else if (breakdown.igstAmount > 0) {
-      return 'Subtotal: ₹${breakdown.subtotal.toStringAsFixed(2)}, IGST (18%): ₹${breakdown.igstAmount.toStringAsFixed(2)}, Total: ₹${breakdown.totalAmount.toStringAsFixed(2)}';
+      return 'Subtotal ₹${_formatPrice(breakdown.subtotal)} + IGST ₹${_formatPrice(breakdown.igstAmount)} = ₹${_formatPrice(breakdown.totalAmount)}';
     } else if (breakdown.cgstAmount > 0) {
-      return 'Subtotal: ₹${breakdown.subtotal.toStringAsFixed(2)}, CGST+SGST (18%): ₹${(breakdown.cgstAmount + breakdown.sgstAmount).toStringAsFixed(2)}, Total: ₹${breakdown.totalAmount.toStringAsFixed(2)}';
-    } else {
-      return '₹${breakdown.totalAmount.toStringAsFixed(2)}';
+      return 'Subtotal ₹${_formatPrice(breakdown.subtotal)} + CGST+SGST ₹${_formatPrice(breakdown.cgstAmount + breakdown.sgstAmount)} = ₹${_formatPrice(breakdown.totalAmount)}';
     }
+    return '₹${_formatPrice(breakdown.totalAmount)}';
   }
 }

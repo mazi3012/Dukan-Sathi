@@ -1,12 +1,13 @@
+import 'package:uuid/uuid.dart';
 import '../data/state_tax_slabs.dart';
 import '../models/cart_item.dart';
 import '../models/shop_config.dart';
 import '../models/tax_breakdown.dart';
 
 class GSTCalculator {
-  /// Generate a simple ID from timestamp
+  /// Generate a unique UUID for approval
   static String generateApprovalId() {
-    return 'approval_${DateTime.now().millisecondsSinceEpoch}_${DateTime.now().microsecond}';
+    return const Uuid().v4();
   }
 
   /// Calculate complete tax breakdown for items based on shop config
