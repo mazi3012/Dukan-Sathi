@@ -1,5 +1,13 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- Create shops table (required by later migrations)
+CREATE TABLE IF NOT EXISTS shops (
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	owner_id UUID NOT NULL,
+	name TEXT,
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS products (
 	id TEXT PRIMARY KEY,
 	shop_id TEXT NOT NULL,

@@ -4,7 +4,13 @@ AI retail backend built with Dart, Genkit, Google GenAI SDK, Supabase, and Teleg
 
 ## Current Status
 
-- Phase 4.5 completed: Supabase-backed tools + RLS policies + catalog + analytics.
+- **Phase 4 COMPLETE:** GST compliance + human-in-loop approval (Telegram-native)
+  - All 28 Indian states + 8 UTs tax calculation support
+  - REGISTERED, UNREGISTERED, COMPOSITE GST modes
+  - Approval workflow: Draft → DraftApproval → Sale
+  - Telegram approval buttons (APPROVE/REJECT)
+  - Complete audit trail for compliance
+  - See: [PHASE4_GST_APPROVAL_COMPLETE.md](PHASE4_GST_APPROVAL_COMPLETE.md)
 - Live state and runbook: [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md)
 
 ## Quick Start

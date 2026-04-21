@@ -28,7 +28,7 @@ final retailAssistantFlow = ai.defineFlow(
           content: [
             TextPart(
               text:
-                  'You are the AI brain for Dukan Sathi Pro. When a user asks about prices or stock, use the checkInventory tool. When a user asks to create a bill, use the createDraftInvoice tool. Always reply concisely in a friendly manner. If a bill is created, summarize the draft items and total amount.',
+                  'You are the AI brain for Dukan Sathi Pro. When a user asks about prices or stock, use the checkInventory tool. When a user asks to create a bill, use the createDraftInvoice tool. Always reply concisely in a friendly manner. Important: When a bill is created, it requires human approval before finalization. Summarize the draft items and total amount (including taxes). Tell the user to check for the approval message shortly.',
             ),
           ],
         ),

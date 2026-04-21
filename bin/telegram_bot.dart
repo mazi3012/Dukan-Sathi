@@ -4,13 +4,18 @@ import 'package:dotenv/dotenv.dart';
 import 'package:dukansathi_new/bootstrap.dart';
 import 'package:dukansathi_new/runtime/genkit_runtime.dart';
 import 'package:dukansathi_new/models/product.dart';
+import 'package:dukansathi_new/services/approval_formatter.dart';
 import 'package:dukansathi_new/tools/analytics_tools.dart';
+import 'package:dukansathi_new/tools/approval_tools.dart';
 import 'package:dukansathi_new/tools/billing_tools.dart';
 import 'package:dukansathi_new/tools/inventory_tools.dart';
 import 'package:genkit/genkit.dart';
 import 'package:teledart/teledart.dart' as tg;
 
 final Map<int, Chat> activeSessions = {};
+
+// Track pending approvals by user: userId -> approvalId -> approval response data
+final Map<int, Map<String, Map<String, dynamic>>> pendingApprovals = {};
 
 const String _systemPrompt =
   "You are the AI brain for Dukan Sathi Pro. Shop ID is 'shop_001'. CRITICAL RULES: 1. No narration (never say 'I am checking' or 'Using tool'). 2. Use tools silently. 3. Output final result only. 4. For specific items use checkInventory. 5. If the user asks for a list of products or what you sell, use browseCatalogTool. 6. If the user asks for total sales or analytics, use businessInsightsTool.";
@@ -262,6 +267,57 @@ Future<void> main(List<String> arguments) async {
   }
 
   final bot = tg.TeleDart(token, tg.Event(''));
+  
+  // Handle callback queries for approval buttons
+  bot.onCallbackQuery().listen((query) async {
+    final chatId = query.from!.id;
+    final data = query.data ?? '';
+    
+    if (data.startsWith('approve_')) {
+      final approvalId = data.replaceFirst('approve_', '');
+      try {
+        final result = await approveDraftInvoice(
+          approvalId: approvalId,
+          reviewedBy: chatId.toString(),
+        );
+        
+        if (result['success'] == true) {
+          await bot.editMessageText(
+            result['message'],
+            chatId: chatId,
+            messageId: query.message!.messageId,
+          );
+          await bot.answerCallbackQuery(query.id, text: '✅ Approved!');
+        } else {
+          await bot.answerCallbackQuery(
+            query.id,
+            text: 'Error: ${result['error']}',
+            showAlert: true,
+          );
+        }
+      } catch (e) {
+        stderr.writeln('Error approving draft: $e');
+        await bot.answerCallbackQuery(
+          query.id,
+          text: 'Error approving draft',
+          showAlert: true,
+        );
+      }
+    } else if (data.startsWith('reject_')) {
+      final approvalId = data.replaceFirst('reject_', '');
+      // For now, send a prompt to user for rejection reason
+      await bot.sendMessage(
+        chatId,
+        'Why are you rejecting this invoice? Reply with the reason.',
+      );
+      // Store the approvalId for the next message as rejection reason
+      pendingApprovals.putIfAbsent(chatId, () => {})['reject_pending'] = {
+        'approvalId': approvalId,
+      };
+      await bot.answerCallbackQuery(query.id);
+    }
+  });
+  
   bot.onMessage().listen((message) async {
     final text = message.text?.trim();
     if (text == null || text.isEmpty) {
@@ -269,6 +325,40 @@ Future<void> main(List<String> arguments) async {
     }
 
     final chatId = message.chat.id;
+    final userName = message.from?.username ?? 'Customer';
+
+    // Check if this is a rejection reason message
+    if (pendingApprovals.containsKey(chatId) &&
+        pendingApprovals[chatId]!.containsKey('reject_pending')) {
+      final rejectionData = pendingApprovals[chatId]!['reject_pending']!;
+      final approvalId = rejectionData['approvalId'] as String;
+      
+      try {
+        final result = await rejectDraftInvoice(
+          approvalId: approvalId,
+          reviewedBy: chatId.toString(),
+          rejectionReason: text,
+        );
+        
+        if (result['success'] == true) {
+          await bot.sendMessage(
+            chatId,
+            ApprovalFormatter.formatRejectionMessage(
+              approvalId: approvalId,
+              rejectionReason: text,
+            ),
+          );
+        }
+      } catch (e) {
+        stderr.writeln('Error rejecting draft: $e');
+        await bot.sendMessage(chatId, 'Error processing rejection. Please try again.');
+      }
+      
+      // Clean up
+      pendingApprovals[chatId]!.remove('reject_pending');
+      return;
+    }
+
     final session = activeSessions.putIfAbsent(
       chatId,
       () => Chat(
@@ -285,7 +375,27 @@ Future<void> main(List<String> arguments) async {
 
     try {
       final reply = await session.sendMessage(message.text);
-      await bot.sendMessage(chatId, reply.isEmpty ? 'Not in inventory' : reply);
+      
+      // Check if reply indicates an approval is pending
+      if (reply.contains('requiresApproval') || reply.toLowerCase().contains('approval pending')) {
+        // This is a special response from createDraftInvoice tool
+        // Format the approval message with buttons
+        await bot.sendMessage(chatId, reply.isEmpty ? 'Not in inventory' : reply);
+        
+        // Create approval message with buttons
+        // Note: InlineKeyboardButton will be sent in a simplified format
+        // The approval buttons will be handled via callback_query listener
+        final approvalMessage = '✅ *Invoice Ready for Approval*\n\n'
+            'Your invoice is pending approval. Please wait for the formatted approval message.\n\n'
+            'Approval pending: Approve or Reject?';
+        
+        await bot.sendMessage(
+          chatId,
+          approvalMessage,
+        );
+      } else {
+        await bot.sendMessage(chatId, reply.isEmpty ? 'Not in inventory' : reply);
+      }
     } catch (e) {
       await bot.sendMessage(
         chatId,
