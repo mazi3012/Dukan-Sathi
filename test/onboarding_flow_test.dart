@@ -7,18 +7,21 @@ void main() {
     final startedBy = 'unittest';
 
     final p1 = await startOnboarding(chatId, startedBy);
-    expect(p1.toLowerCase(), contains('what is the name of your shop'));
+    expect(p1.text.toLowerCase(), contains('what is the name of your shop'));
 
     final p2 = await processOnboardingInput(chatId, 'My Test Shop');
-    expect(p2.toLowerCase(), contains('which state'));
+    expect(p2.text.toLowerCase(), contains('which state'));
 
     final p3 = await processOnboardingInput(chatId, 'Karnataka');
-    expect(p3.toLowerCase(), contains('are you registered for gst'));
+    expect(p3.text.toLowerCase(), contains('are you registered for gst'));
+    expect(p3.keyboard, isNotNull, reason: 'GST step should have keyboard buttons');
 
     final p4 = await processOnboardingInput(chatId, 'no');
-    expect(p4.toLowerCase(), contains('what is your business type'));
+    expect(p4.text.toLowerCase(), contains('what is your business type'));
+    expect(p4.keyboard, isNotNull, reason: 'Business type step should have keyboard buttons');
 
     final p5 = await processOnboardingInput(chatId, 'Retail');
-    expect(p5.toLowerCase(), contains('please confirm the details'));
+    expect(p5.text.toLowerCase(), contains('please confirm the details'));
   });
 }
+

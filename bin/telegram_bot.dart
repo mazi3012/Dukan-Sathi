@@ -258,6 +258,56 @@ Future<void> main(List<String> arguments) async {
     final data = query.data ?? '';
     final msgId = query.message!.messageId;
 
+    // ── ONBOARDING: GST BUTTON ──────────────────────────────────────────
+    if (data.startsWith('onboard_gst_')) {
+      final isYes = data.contains('_yes_');
+      await bot.answerCallbackQuery(query.id);
+      try {
+        final prompt = await handleGstButtonPress(chatId, isYes);
+        await bot.editMessageText(
+          prompt.text,
+          chatId: chatId,
+          messageId: msgId,
+          parseMode: 'Markdown',
+          replyMarkup: prompt.keyboard,
+        );
+      } catch (e) {
+        stderr.writeln('Error handling GST button: $e');
+        await bot.answerCallbackQuery(query.id, text: 'Error processing choice.', showAlert: true);
+      }
+      return;
+    }
+
+    // ── ONBOARDING: BUSINESS TYPE BUTTON ────────────────────────────────
+    if (data.startsWith('onboard_biz_')) {
+      await bot.answerCallbackQuery(query.id);
+      try {
+        final bizType = data
+            .replaceFirst('onboard_biz_', '')
+            .split('_')
+            .first; // Extract type (retail, wholesale, etc.)
+        final bizWords = {
+          'retail': 'Retail',
+          'wholesale': 'Wholesale', 
+          'manufacturer': 'Manufacturer',
+          'other': 'Other',
+        };
+        final bizLabel = bizWords[bizType] ?? bizType;
+        final prompt = await handleBusinessTypeButtonPress(chatId, bizLabel);
+        await bot.editMessageText(
+          prompt.text,
+          chatId: chatId,
+          messageId: msgId,
+          parseMode: 'Markdown',
+          replyMarkup: prompt.keyboard,
+        );
+      } catch (e) {
+        stderr.writeln('Error handling business type button: $e');
+        await bot.answerCallbackQuery(query.id, text: 'Error processing choice.', showAlert: true);
+      }
+      return;
+    }
+
     // ── APPROVE ──────────────────────────────────────────────────────────
     if (data.startsWith('approve_')) {
       final approvalId = data.replaceFirst('approve_', '');
@@ -363,13 +413,13 @@ Future<void> main(List<String> arguments) async {
     if (text == '/start' || text.toLowerCase() == 'join') {
       final startedBy = userIdentifier;
       final prompt = await startOnboarding(chatId, startedBy);
-      await bot.sendMessage(chatId, prompt, parseMode: 'Markdown');
+      await bot.sendMessage(chatId, prompt.text, parseMode: 'Markdown', replyMarkup: prompt.keyboard);
       return;
     }
 
     if (isInOnboarding(chatId)) {
       final resp = await processOnboardingInput(chatId, text);
-      await bot.sendMessage(chatId, resp, parseMode: 'Markdown');
+      await bot.sendMessage(chatId, resp.text, parseMode: 'Markdown', replyMarkup: resp.keyboard);
       return;
     }
 
@@ -377,7 +427,7 @@ Future<void> main(List<String> arguments) async {
     final isOnboarded = await _isUserOnboarded(userIdentifier);
     if (!isOnboarded) {
       final prompt = await startOnboarding(chatId, userIdentifier);
-      await bot.sendMessage(chatId, prompt, parseMode: 'Markdown');
+      await bot.sendMessage(chatId, prompt.text, parseMode: 'Markdown', replyMarkup: prompt.keyboard);
       return;
     }
 
@@ -477,7 +527,7 @@ Future<void> main(List<String> arguments) async {
       if (chatId != 0) {
         final startedBy = Platform.environment['BOT_OWNER'] ?? env['BOT_OWNER'] ?? me.username ?? chatId.toString();
         final prompt = await startOnboarding(chatId, startedBy);
-        await bot.sendMessage(chatId, prompt, parseMode: 'Markdown');
+        await bot.sendMessage(chatId, prompt.text, parseMode: 'Markdown', replyMarkup: prompt.keyboard);
         print('✅ Started onboarding for test chat $chatId');
       } else {
         print('ONBOARD_TEST_CHAT_ID is set but not an integer. Skipping auto-onboard.');
