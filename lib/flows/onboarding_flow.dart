@@ -27,13 +27,26 @@ String _askForState(OnboardingSession s) => 'Which state is your shop located in
 String _askForGstRegistered(OnboardingSession s) => 'Are you registered for GST?';
 String _askForGstNumber(OnboardingSession s) => 'Please enter your GSTIN (15 characters).';
 String _askForBusinessType(OnboardingSession s) => 'What is your business type?';
+String _askForPhoneNumber(OnboardingSession s) => 'What is your business phone number?';
 String _confirmSummary(OnboardingSession s) {
   final name = s.data['shop_name'] ?? '<unknown>';
   final state = s.data['state'] ?? '<unknown>';
   final gstMode = s.data['gst_mode'] ?? 'UNREGISTERED';
   final gst = s.data['gst_registration_number'] ?? 'N/A';
   final biz = s.data['business_type'] ?? '<unknown>';
-  return 'Please confirm the details:\n\n*Shop:* $name\n*State:* $state\n*GST Mode:* $gstMode\n*GSTIN:* $gst\n*Business Type:* $biz\n\nReply with *confirm* to finish or *cancel* to abort.';
+  final phone = s.data['phone_number'] ?? '<unknown>';
+  return 'Please confirm the details:\n\n*Shop:* $name\n*State:* $state\n*GST Mode:* $gstMode\n*GSTIN:* $gst\n*Business Type:* $biz\n*Phone:* $phone\n\nAre you happy?';
+}
+
+tg.InlineKeyboardMarkup _buildConfirmationKeyboard(int chatId) {
+  return tg.InlineKeyboardMarkup(
+    inlineKeyboard: [
+      [
+        tg.InlineKeyboardButton(text: '❌ Cancel', callbackData: 'onboard_cancel_$chatId'),
+        tg.InlineKeyboardButton(text: '✅ Submit', callbackData: 'onboard_submit_$chatId'),
+      ]
+    ],
+  );
 }
 
 tg.InlineKeyboardMarkup _buildGstKeyboard(int chatId) {
@@ -124,8 +137,15 @@ Future<OnboardingPrompt> processOnboardingInput(int chatId, String input) async 
     case 4:
       s.data['business_type'] = text;
       s.step = 5;
-      return OnboardingPrompt(text: _confirmSummary(s));
+      return OnboardingPrompt(text: _askForPhoneNumber(s));
     case 5:
+      s.data['phone_number'] = text;
+      s.step = 6;
+      return OnboardingPrompt(
+        text: _confirmSummary(s),
+        keyboard: _buildConfirmationKeyboard(chatId),
+      );
+    case 6:
       final t = text.toLowerCase();
       if (t == 'confirm' || t == 'yes' || t == 'y') {
         // Persist shop record
@@ -137,6 +157,7 @@ Future<OnboardingPrompt> processOnboardingInput(int chatId, String input) async 
           'gst_mode': s.data['gst_mode'] ?? 'UNREGISTERED',
           'gst_registration_number': s.data['gst_registration_number'],
           'business_type': s.data['business_type'],
+          'phone_number': s.data['phone_number'],
           'created_by': s.startedBy,
         }..removeWhere((k, v) => v == null);
 
@@ -181,7 +202,41 @@ Future<OnboardingPrompt> handleBusinessTypeButtonPress(int chatId, String bizTyp
   
   s.data['business_type'] = bizType;
   s.step = 5;
-  return OnboardingPrompt(text: _confirmSummary(s));
+  return OnboardingPrompt(text: _askForPhoneNumber(s));
+}
+
+Future<OnboardingPrompt> handleConfirmationButtonPress(int chatId, bool isSubmit) async {
+  final s = _sessions[chatId];
+  if (s == null || s.step != 6) return OnboardingPrompt(text: 'Onboarding session expired.');
+
+  if (!isSubmit) {
+    // Cancel
+    _sessions.remove(chatId);
+    return OnboardingPrompt(text: 'Onboarding cancelled.');
+  }
+
+  // Submit
+  final shopId = _uuid.v4();
+  final insert = {
+    'id': shopId,
+    'name': s.data['shop_name'],
+    'state': s.data['state'],
+    'gst_mode': s.data['gst_mode'] ?? 'UNREGISTERED',
+    'gst_registration_number': s.data['gst_registration_number'],
+    'business_type': s.data['business_type'],
+    'phone_number': s.data['phone_number'],
+    'created_by': s.startedBy,
+  }..removeWhere((k, v) => v == null);
+
+  try {
+    await supabase.from('shops').insert(insert).select().single();
+    _sessions.remove(chatId);
+    return OnboardingPrompt(
+      text: '✅ Onboarding complete. Your shop has been created and set as the active shop. You can now create bills.'
+    );
+  } catch (e) {
+    return OnboardingPrompt(text: 'Failed to create shop: $e');
+  }
 }
 
 bool _validateGstin(String gst) {

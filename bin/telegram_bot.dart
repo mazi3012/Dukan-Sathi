@@ -308,6 +308,26 @@ Future<void> main(List<String> arguments) async {
       return;
     }
 
+    // ── ONBOARDING: CONFIRMATION BUTTON ────────────────────────────────
+    if (data.startsWith('onboard_submit_') || data.startsWith('onboard_cancel_')) {
+      final isSubmit = data.startsWith('onboard_submit_');
+      await bot.answerCallbackQuery(query.id);
+      try {
+        final prompt = await handleConfirmationButtonPress(chatId, isSubmit);
+        await bot.editMessageText(
+          prompt.text,
+          chatId: chatId,
+          messageId: msgId,
+          parseMode: 'Markdown',
+          replyMarkup: prompt.keyboard,
+        );
+      } catch (e) {
+        stderr.writeln('Error handling confirmation button: $e');
+        await bot.answerCallbackQuery(query.id, text: 'Error processing choice.', showAlert: true);
+      }
+      return;
+    }
+
     // ── APPROVE ──────────────────────────────────────────────────────────
     if (data.startsWith('approve_')) {
       final approvalId = data.replaceFirst('approve_', '');

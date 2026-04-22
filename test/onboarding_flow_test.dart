@@ -21,7 +21,12 @@ void main() {
     expect(p4.keyboard, isNotNull, reason: 'Business type step should have keyboard buttons');
 
     final p5 = await processOnboardingInput(chatId, 'Retail');
-    expect(p5.text.toLowerCase(), contains('please confirm the details'));
+    expect(p5.text.toLowerCase(), contains('what is your business phone number'));
+
+    final p6 = await processOnboardingInput(chatId, '9876543210');
+    expect(p6.text.toLowerCase(), contains('please confirm the details'));
+    expect(p6.keyboard, isNotNull, reason: 'Confirmation step should have submit/cancel buttons');
   });
 }
+
 
