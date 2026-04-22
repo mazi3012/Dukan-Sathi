@@ -8,6 +8,7 @@ import 'package:dukansathi_new/services/approval_formatter.dart';
 import 'package:dukansathi_new/services/invoice_pdf_generator.dart';
 import 'package:dukansathi_new/tools/analytics_tools.dart';
 import 'package:dukansathi_new/tools/approval_tools.dart';
+import 'package:dukansathi_new/flows/onboarding_flow.dart';
 import 'package:dukansathi_new/tools/billing_tools.dart';
 import 'package:dukansathi_new/core/database.dart';
 import 'package:dukansathi_new/models/draft_approval.dart';
@@ -28,6 +29,22 @@ final checkInventoryTool = checkInventory;
 final catalogTool = browseCatalog;
 final createDraftInvoiceTool = createDraftInvoice;
 final analyticsTool = businessInsightsTool;
+
+// ─── HELPER: check if user has already completed onboarding ────────────────
+Future<bool> _isUserOnboarded(String userIdentifier) async {
+  try {
+    await supabase
+        .from('shops')
+        .select('id')
+        .eq('created_by', userIdentifier)
+        .eq('onboarding_completed', true)
+        .single();
+    return true;
+  } catch (e) {
+    // No onboarded shop found for this user
+    return false;
+  }
+}
 
 // ─── HELPER: build invoice keyboard ───────────────────────────────────────────
 tg.InlineKeyboardMarkup _buildInvoiceKeyboard(String approvalId, String currentGstType, bool isRegistered) {
@@ -340,6 +357,29 @@ Future<void> main(List<String> arguments) async {
 
     final chatId = message.chat.id;
     final customerName = message.from?.firstName ?? 'Customer';
+    final userIdentifier = message.from?.username ?? message.from?.firstName ?? chatId.toString();
+
+    // ── Onboarding hooks ────────────────────────────────────────────
+    if (text == '/start' || text.toLowerCase() == 'join') {
+      final startedBy = userIdentifier;
+      final prompt = await startOnboarding(chatId, startedBy);
+      await bot.sendMessage(chatId, prompt, parseMode: 'Markdown');
+      return;
+    }
+
+    if (isInOnboarding(chatId)) {
+      final resp = await processOnboardingInput(chatId, text);
+      await bot.sendMessage(chatId, resp, parseMode: 'Markdown');
+      return;
+    }
+
+    // ── Auto-start onboarding if user is not yet onboarded ────────────
+    final isOnboarded = await _isUserOnboarded(userIdentifier);
+    if (!isOnboarded) {
+      final prompt = await startOnboarding(chatId, userIdentifier);
+      await bot.sendMessage(chatId, prompt, parseMode: 'Markdown');
+      return;
+    }
 
     // ── Handle pending rejection reason ─────────────────────────────────
     if (pendingRejections.containsKey(chatId)) {
@@ -428,4 +468,22 @@ Future<void> main(List<String> arguments) async {
   print('✅ Telegram Bot is running as @${me.username}');
 
   bot.start();
+
+  // If ONBOARD_TEST_CHAT_ID env var is set, automatically start onboarding
+  final onboardTestChat = Platform.environment['ONBOARD_TEST_CHAT_ID'] ?? env['ONBOARD_TEST_CHAT_ID'];
+  if (onboardTestChat != null && onboardTestChat.isNotEmpty) {
+    try {
+      final chatId = int.tryParse(onboardTestChat) ?? 0;
+      if (chatId != 0) {
+        final startedBy = Platform.environment['BOT_OWNER'] ?? env['BOT_OWNER'] ?? me.username ?? chatId.toString();
+        final prompt = await startOnboarding(chatId, startedBy);
+        await bot.sendMessage(chatId, prompt, parseMode: 'Markdown');
+        print('✅ Started onboarding for test chat $chatId');
+      } else {
+        print('ONBOARD_TEST_CHAT_ID is set but not an integer. Skipping auto-onboard.');
+      }
+    } catch (e) {
+      stderr.writeln('Failed to auto-start onboarding: $e');
+    }
+  }
 }
