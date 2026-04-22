@@ -2,7 +2,12 @@
 # Dukan Sathi Pro - App Starter Script
 
 # Ensure Dart is in PATH
-export PATH="$HOME/dart-sdk/bin:$PATH"
+for dart_dir in "/workspaces/dukansathi-new/.tooling/dart-sdk/bin" "$HOME/dart-sdk/bin" "/tmp/dart-sdk/bin" "/opt/flutter/bin/cache/dart-sdk/bin"; do
+	if [ -x "$dart_dir/dart" ]; then
+		export PATH="$dart_dir:$PATH"
+		break
+	fi
+done
 
 # Navigate to project root
 cd "$(dirname "$0")"
@@ -19,9 +24,9 @@ echo "🧹 Cleaning up old processes..."
 [ -f telegram_bot.pid ] && kill $(cat telegram_bot.pid) 2>/dev/null
 fuser -k 4000/tcp 2>/dev/null
 
-# 3. Start Genkit Dev Server
-echo "📊 Starting Genkit Dev Server (Port 4000)..."
-nohup dart bin/genkit_dev.dart > genkit_dev.log 2>&1 &
+# 3. Start Genkit UI Server
+echo "📊 Starting Genkit UI Server (Port 4000)..."
+nohup dart bin/genkit_ui.dart > genkit_dev.log 2>&1 &
 echo $! > genkit_dev.pid
 
 # 4. Start Telegram Bot

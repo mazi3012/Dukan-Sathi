@@ -18,7 +18,7 @@ Future<void> main(List<String> arguments) async {
     }
   
   final port = int.tryParse(Platform.environment['PORT'] ?? '4000') ?? 4000;
-  final server = await HttpServer.bind('localhost', port);
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
   
   print('');
   print('🚀 Genkit UI Dashboard');

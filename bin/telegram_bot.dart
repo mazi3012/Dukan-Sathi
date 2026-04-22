@@ -5,6 +5,7 @@ import 'package:dukansathi_new/bootstrap.dart';
 import 'package:dukansathi_new/runtime/genkit_runtime.dart';
 import 'package:dukansathi_new/models/product.dart';
 import 'package:dukansathi_new/services/approval_formatter.dart';
+import 'package:dukansathi_new/services/invoice_pdf_generator.dart';
 import 'package:dukansathi_new/tools/analytics_tools.dart';
 import 'package:dukansathi_new/tools/approval_tools.dart';
 import 'package:dukansathi_new/tools/billing_tools.dart';
@@ -247,8 +248,25 @@ Future<void> main(List<String> arguments) async {
       try {
         final result = await approveDraftInvoice(approvalId: approvalId, reviewedBy: chatId.toString());
         if (result['success'] == true) {
+          try {
+            final pdf = await InvoicePdfGenerator.generateApprovedInvoicePdf(
+              approvalId: approvalId,
+              invoiceNumber: result['invoiceNumber'] as String,
+            );
+            await bot.sendDocument(
+              chatId,
+              pdf.file,
+              caption: pdf.caption,
+            );
+          } catch (pdfError) {
+            stderr.writeln('Error generating/sending invoice PDF: $pdfError');
+            await bot.sendMessage(
+              chatId,
+              'Invoice was approved and saved, but the PDF could not be generated right now.',
+            );
+          }
           await bot.editMessageText(
-            result['message'] as String,
+            '${result['message'] as String}\n\n📄 PDF invoice sent.',
             chatId: chatId,
             messageId: msgId,
             parseMode: 'Markdown',
@@ -282,7 +300,7 @@ Future<void> main(List<String> arguments) async {
         if (result['success'] == true) {
           final draftData = await getApprovalDetails(approvalId);
           if (draftData != null) {
-            final msg = await _buildInvoiceMessage(draftData, query.from?.firstName ?? 'Customer');
+            final msg = await _buildInvoiceMessage(draftData, query.from.firstName);
             await bot.editMessageText(msg, chatId: chatId, messageId: msgId,
               parseMode: 'Markdown',
               replyMarkup: _buildInvoiceKeyboard(approvalId, 'IGST', true));
@@ -302,7 +320,7 @@ Future<void> main(List<String> arguments) async {
         if (result['success'] == true) {
           final draftData = await getApprovalDetails(approvalId);
           if (draftData != null) {
-            final msg = await _buildInvoiceMessage(draftData, query.from?.firstName ?? 'Customer');
+            final msg = await _buildInvoiceMessage(draftData, query.from.firstName);
             await bot.editMessageText(msg, chatId: chatId, messageId: msgId,
               parseMode: 'Markdown',
               replyMarkup: _buildInvoiceKeyboard(approvalId, 'CGST_SGST', true));
