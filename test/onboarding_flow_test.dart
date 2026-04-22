@@ -2,6 +2,19 @@ import 'package:test/test.dart';
 import 'package:dukansathi_new/flows/onboarding_flow.dart';
 
 void main() {
+  test('onboarding rejects greeting as shop name', () async {
+    final chatId = 999998;
+    final startedBy = 'unittest';
+
+    await startOnboarding(chatId, startedBy);
+
+    final bad = await processOnboardingInput(chatId, 'Hello');
+    expect(bad.text.toLowerCase(), contains('actual shop/business name'));
+
+    final good = await processOnboardingInput(chatId, 'My Real Shop');
+    expect(good.text.toLowerCase(), contains('which state'));
+  });
+
   test('onboarding sequence prompts and advances steps', () async {
     final chatId = 999999;
     final startedBy = 'unittest';
@@ -21,11 +34,22 @@ void main() {
     expect(p4.keyboard, isNotNull, reason: 'Business type step should have keyboard buttons');
 
     final p5 = await processOnboardingInput(chatId, 'Retail');
-    expect(p5.text.toLowerCase(), contains('what is your business phone number'));
+    expect(p5.text.toLowerCase(), contains('please confirm the details'));
+    expect(p5.keyboard, isNotNull, reason: 'Confirmation step should have submit/cancel buttons');
+  });
 
-    final p6 = await processOnboardingInput(chatId, '9876543210');
-    expect(p6.text.toLowerCase(), contains('please confirm the details'));
-    expect(p6.keyboard, isNotNull, reason: 'Confirmation step should have submit/cancel buttons');
+  test('onboarding rejects invalid state and accepts valid code', () async {
+    final chatId = 999997;
+    final startedBy = 'unittest';
+
+    await startOnboarding(chatId, startedBy);
+    await processOnboardingInput(chatId, 'My Test Shop');
+
+    final badState = await processOnboardingInput(chatId, 'Atlantis');
+    expect(badState.text.toLowerCase(), contains('valid indian state'));
+
+    final goodStateCode = await processOnboardingInput(chatId, 'AS');
+    expect(goodStateCode.text.toLowerCase(), contains('are you registered for gst'));
   });
 }
 

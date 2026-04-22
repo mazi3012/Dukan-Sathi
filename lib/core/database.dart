@@ -21,6 +21,7 @@ String _readEnv(String key) {
 
 final String _supabaseUrl = _readEnv('SUPABASE_URL');
 final String _supabaseAnonKey = _readEnv('SUPABASE_ANON_KEY');
+final String _supabaseServiceRoleKey = _readEnv('SUPABASE_SERVICE_ROLE_KEY');
 
 void _validateSupabaseEnv() {
   if (_supabaseUrl.isEmpty || _supabaseAnonKey.isEmpty) {
@@ -32,5 +33,6 @@ void _validateSupabaseEnv() {
 
 final SupabaseClient supabase = (() {
   _validateSupabaseEnv();
-  return SupabaseClient(_supabaseUrl, _supabaseAnonKey);
+  final key = _supabaseServiceRoleKey.isNotEmpty ? _supabaseServiceRoleKey : _supabaseAnonKey;
+  return SupabaseClient(_supabaseUrl, key);
 })();

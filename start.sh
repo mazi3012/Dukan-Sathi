@@ -26,12 +26,20 @@ fuser -k 4000/tcp 2>/dev/null
 
 # 3. Start Genkit UI Server
 echo "📊 Starting Genkit UI Server (Port 4000)..."
-nohup dart bin/genkit_ui.dart > genkit_dev.log 2>&1 &
+if command -v stdbuf >/dev/null 2>&1; then
+	nohup stdbuf -oL -eL dart bin/genkit_ui.dart > genkit_dev.log 2>&1 &
+else
+	nohup dart bin/genkit_ui.dart > genkit_dev.log 2>&1 &
+fi
 echo $! > genkit_dev.pid
 
 # 4. Start Telegram Bot
 echo "🤖 Starting Telegram Bot..."
-nohup dart bin/telegram_bot.dart > telegram_bot.log 2>&1 &
+if command -v stdbuf >/dev/null 2>&1; then
+	nohup stdbuf -oL -eL dart bin/telegram_bot.dart > telegram_bot.log 2>&1 &
+else
+	nohup dart bin/telegram_bot.dart > telegram_bot.log 2>&1 &
+fi
 echo $! > telegram_bot.pid
 
 echo "✅ Services started!"

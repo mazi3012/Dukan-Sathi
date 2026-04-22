@@ -29,7 +29,10 @@ GOOGLE_API_KEY=<your-google-genai-api-key>
 TELEGRAM_BOT_TOKEN=<your-telegram-bot-token>
 SUPABASE_URL=<your-supabase-url>
 SUPABASE_ANON_KEY=<your-supabase-anon-key>
+SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
 ```
+
+The onboarding flow accepts either a full Indian state name or a GST code and normalizes it before saving.
 
 3. Run Genkit dashboard
 
@@ -84,7 +87,7 @@ curl -X POST http://localhost:4000/api/runAction \
 - `.env` is gitignored.
 - `.secrets/` is gitignored.
 - Supabase local secret variants are gitignored in `supabase/.gitignore`.
-- Do not commit tokens, API keys, or credential JSON files.
+- Do not commit tokens, API keys, service-role keys, or credential JSON files.
 
 ## Troubleshooting
 

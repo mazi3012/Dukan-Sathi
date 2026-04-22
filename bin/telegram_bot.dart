@@ -268,7 +268,6 @@ Future<void> main(List<String> arguments) async {
           prompt.text,
           chatId: chatId,
           messageId: msgId,
-          parseMode: 'Markdown',
           replyMarkup: prompt.keyboard,
         );
       } catch (e) {
@@ -298,7 +297,6 @@ Future<void> main(List<String> arguments) async {
           prompt.text,
           chatId: chatId,
           messageId: msgId,
-          parseMode: 'Markdown',
           replyMarkup: prompt.keyboard,
         );
       } catch (e) {
@@ -318,7 +316,6 @@ Future<void> main(List<String> arguments) async {
           prompt.text,
           chatId: chatId,
           messageId: msgId,
-          parseMode: 'Markdown',
           replyMarkup: prompt.keyboard,
         );
       } catch (e) {
@@ -431,23 +428,38 @@ Future<void> main(List<String> arguments) async {
 
     // ── Onboarding hooks ────────────────────────────────────────────
     if (text == '/start' || text.toLowerCase() == 'join') {
-      final startedBy = userIdentifier;
-      final prompt = await startOnboarding(chatId, startedBy);
-      await bot.sendMessage(chatId, prompt.text, parseMode: 'Markdown', replyMarkup: prompt.keyboard);
+      try {
+        final startedBy = userIdentifier;
+        final prompt = await startOnboarding(chatId, startedBy);
+        await bot.sendMessage(chatId, prompt.text, replyMarkup: prompt.keyboard);
+      } catch (e) {
+        stderr.writeln('[telegram][onboarding-start] chat=$chatId error: $e');
+        await bot.sendMessage(chatId, 'Onboarding could not start right now. Please try /start again.');
+      }
       return;
     }
 
     if (isInOnboarding(chatId)) {
-      final resp = await processOnboardingInput(chatId, text);
-      await bot.sendMessage(chatId, resp.text, parseMode: 'Markdown', replyMarkup: resp.keyboard);
+      try {
+        final resp = await processOnboardingInput(chatId, text);
+        await bot.sendMessage(chatId, resp.text, replyMarkup: resp.keyboard);
+      } catch (e) {
+        stderr.writeln('[telegram][onboarding-step] chat=$chatId error: $e');
+        await bot.sendMessage(chatId, 'There was an onboarding error. Please send /start to restart onboarding.');
+      }
       return;
     }
 
     // ── Auto-start onboarding if user is not yet onboarded ────────────
     final isOnboarded = await _isUserOnboarded(userIdentifier);
     if (!isOnboarded) {
-      final prompt = await startOnboarding(chatId, userIdentifier);
-      await bot.sendMessage(chatId, prompt.text, parseMode: 'Markdown', replyMarkup: prompt.keyboard);
+      try {
+        final prompt = await startOnboarding(chatId, userIdentifier);
+        await bot.sendMessage(chatId, prompt.text, replyMarkup: prompt.keyboard);
+      } catch (e) {
+        stderr.writeln('[telegram][onboarding-autostart] chat=$chatId error: $e');
+        await bot.sendMessage(chatId, 'Could not start onboarding automatically. Please send /start.');
+      }
       return;
     }
 
@@ -538,22 +550,4 @@ Future<void> main(List<String> arguments) async {
   print('✅ Telegram Bot is running as @${me.username}');
 
   bot.start();
-
-  // If ONBOARD_TEST_CHAT_ID env var is set, automatically start onboarding
-  final onboardTestChat = Platform.environment['ONBOARD_TEST_CHAT_ID'] ?? env['ONBOARD_TEST_CHAT_ID'];
-  if (onboardTestChat != null && onboardTestChat.isNotEmpty) {
-    try {
-      final chatId = int.tryParse(onboardTestChat) ?? 0;
-      if (chatId != 0) {
-        final startedBy = Platform.environment['BOT_OWNER'] ?? env['BOT_OWNER'] ?? me.username ?? chatId.toString();
-        final prompt = await startOnboarding(chatId, startedBy);
-        await bot.sendMessage(chatId, prompt.text, parseMode: 'Markdown', replyMarkup: prompt.keyboard);
-        print('✅ Started onboarding for test chat $chatId');
-      } else {
-        print('ONBOARD_TEST_CHAT_ID is set but not an integer. Skipping auto-onboard.');
-      }
-    } catch (e) {
-      stderr.writeln('Failed to auto-start onboarding: $e');
-    }
-  }
 }

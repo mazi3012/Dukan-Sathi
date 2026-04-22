@@ -54,11 +54,16 @@ Use `.env` with:
 MODEL_ID=gemini-3.1-flash-lite-preview
 GOOGLE_API_KEY=<your-google-genai-api-key>
 TELEGRAM_BOT_TOKEN=<your-telegram-bot-token>
+SUPABASE_URL=<your-supabase-url>
+SUPABASE_ANON_KEY=<your-supabase-anon-key>
+SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
 ```
 
 Notes:
 - `MODEL_ID` is unified across the app (flows + listener + status output)
 - `GEMINI_API_KEY` can be used instead of `GOOGLE_API_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` is only required for server-side inserts in the onboarding flow
+- Onboarding normalizes Indian state names to GST state codes before persistence
 
 ## Start Commands
 

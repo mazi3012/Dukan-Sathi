@@ -146,6 +146,11 @@ grep -r "TELEGRAM_BOT_TOKEN\|GOOGLE_APPLICATION_CREDENTIALS" lib/ bin/
 **Tracked in Git:** ❌ NO (correctly ignored)  
 **Development Only:** ✅ YES
 
+### Supabase Service Role Handling
+- `SUPABASE_SERVICE_ROLE_KEY` is read from the environment for server-side onboarding inserts.
+- The key must remain outside git; example files should only contain placeholders.
+- The onboarding flow uses the service role only on the backend when it needs to create a shop row.
+
 ### Current .env Content
 ```
 GCLOUD_PROJECT=demo-project
