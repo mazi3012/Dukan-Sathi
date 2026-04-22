@@ -21,7 +21,7 @@ final SchemanticType<Map<String, dynamic>> createDraftInvoiceInputSchema =
         'additionalProperties': {'type': 'integer'},
       },
     },
-    'required': ['shopId', 'requestedItems'],
+    'required': ['requestedItems'],
     'additionalProperties': false,
   },
   parse: (json) => Map<String, dynamic>.from(json as Map),
@@ -32,7 +32,7 @@ final createDraftInvoiceTool = ai.defineTool<Map<String, dynamic>, Map<String, d
   description: 'Create a draft invoice with GST tax calculations. Requires human approval before finalization.',
   inputSchema: createDraftInvoiceInputSchema,
   fn: (input, context) async {
-    final shopId = input['shopId'] as String;
+    final shopId = (input['shopId'] as String?) ?? await getShopIdForUser(context.context?['userIdentifier'] as String?);
     final customerId = input['customerId'] as String?;
     final customerState = input['customerState'] as String?;
     final requestedItems = Map<String, dynamic>.from(

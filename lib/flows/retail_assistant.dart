@@ -14,10 +14,16 @@ final retailAssistantFlow = ai.defineFlow(
         normalizedPrompt.contains('invoice') ||
         normalizedPrompt.contains('draft')) {
       toolNames.add('createDraftInvoice');
-    } else if (normalizedPrompt.contains('price') ||
+    }
+    if (normalizedPrompt.contains('price') ||
         normalizedPrompt.contains('stock') ||
         normalizedPrompt.contains('inventory')) {
       toolNames.add('checkInventory');
+    }
+    if (normalizedPrompt.contains('add') ||
+        normalizedPrompt.contains('create') ||
+        normalizedPrompt.contains('new product')) {
+      toolNames.add('proposeProducts');
     }
 
     final response = await ai.generate(
@@ -28,7 +34,7 @@ final retailAssistantFlow = ai.defineFlow(
           content: [
             TextPart(
               text:
-                  'You are the AI brain for Dukan Sathi Pro. Shop ID is \'71a343a4-2e91-4e11-85b3-3a15f013d5a4\'. When a user asks about prices or stock, use the checkInventory tool. When a user asks to create a bill, use the createDraftInvoice tool. Always reply concisely in a friendly manner. Important: When a bill is created, it requires human approval before finalization. Summarize the draft items and total amount (including taxes). Tell the user to check for the approval message shortly.',
+                  'You are the AI brain for Dukan Sathi Pro. Shop ID is \'b6ff658b-c750-4c9a-b9ce-909ef6c52674\'. When a user asks about prices or stock, use the checkInventory tool. When a user asks to create a bill, use the createDraftInvoice tool. Always reply concisely in a friendly manner. Important: When a bill is created, it requires human approval before finalization. Summarize the draft items and total amount (including taxes). Tell the user to check for the approval message shortly.',
             ),
           ],
         ),

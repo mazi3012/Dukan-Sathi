@@ -36,3 +36,23 @@ final SupabaseClient supabase = (() {
   final key = _supabaseServiceRoleKey.isNotEmpty ? _supabaseServiceRoleKey : _supabaseAnonKey;
   return SupabaseClient(_supabaseUrl, key);
 })();
+
+/// Helper to get the shop ID for a given user identifier.
+Future<String> getShopIdForUser(String? userIdentifier) async {
+  if (userIdentifier == null || userIdentifier.isEmpty) {
+    throw StateError('Missing userIdentifier');
+  }
+
+  final response = await supabase
+      .from('shops')
+      .select('id')
+      .eq('created_by', userIdentifier)
+      .eq('onboarding_completed', true)
+      .maybeSingle();
+
+  if (response == null) {
+    throw StateError('No active shop found for user $userIdentifier. Please complete /start onboarding first.');
+  }
+
+  return response['id'] as String;
+}

@@ -10,7 +10,7 @@ final SchemanticType<Map<String, dynamic>> businessInsightsInputSchema =
     'properties': {
       'shopId': {'type': 'string'},
     },
-    'required': ['shopId'],
+    'required': [],
     'additionalProperties': false,
   },
   parse: (json) => Map<String, dynamic>.from(json as Map),
@@ -22,7 +22,7 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
       'Use this ONLY for calculating total sales, revenue, or business analytics.',
   inputSchema: businessInsightsInputSchema,
   fn: (input, context) async {
-    final shopId = (input['shopId'] as String?)?.trim() ?? '';
+    final shopId = (input['shopId'] as String?) ?? await getShopIdForUser(context.context?['userIdentifier'] as String?);
     if (shopId.isEmpty) {
       return {
         'total_revenue': 0.0,

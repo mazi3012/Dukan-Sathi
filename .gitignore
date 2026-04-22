@@ -2,7 +2,6 @@
 .dart_tool/
 .packages
 build/
-pubspec.lock
 .tooling/
 
 # Flutter local artifacts
@@ -46,6 +45,5 @@ bin/test_*.dart
 
 # OS files
 Thumbs.db
-.DS_Store
 .env*
 !.env.example

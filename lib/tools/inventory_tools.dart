@@ -13,19 +13,30 @@ Product _productFromRow(Map row) {
     'price': (data['price'] as num?)?.toDouble() ?? 0.0,
     'stock_quantity': (data['stock_quantity'] as num?)?.toInt() ?? 0,
     'category': data['category']?.toString() ?? '',
+    'description': data['description']?.toString(),
+    'is_service': data['is_service'] as bool? ?? false,
+    'gst_rate': (data['gst_rate'] as num?)?.toDouble() ?? 0.0,
+    'hsn_sac_code': data['hsn_sac_code']?.toString(),
+    'metadata': data['metadata'] as Map<String, dynamic>? ?? {},
   });
 }
 
-Future<List<Product>> findInventoryProducts(String rawQuery) async {
+Future<List<Product>> findInventoryProducts(String rawQuery, [String? shopId]) async {
   final query = rawQuery.trim();
   if (query.isEmpty) {
     return <Product>[];
   }
 
-  final response = await supabase
+  var select = supabase
       .from('products')
       .select('id, shop_id, name, price, stock_quantity, category')
       .ilike('name', '%$query%');
+
+  if (shopId != null) {
+    select = select.eq('shop_id', shopId);
+  }
+
+  final response = await select;
 
   if ((response as List).isNotEmpty) {
     return response
@@ -46,10 +57,16 @@ Future<List<Product>> findInventoryProducts(String rawQuery) async {
 
   final byId = <String, Product>{};
   for (final token in tokens) {
-    final tokenResponse = await supabase
+    var tokenSelect = supabase
         .from('products')
         .select('id, shop_id, name, price, stock_quantity, category')
         .ilike('name', '%$token%');
+
+    if (shopId != null) {
+      tokenSelect = tokenSelect.eq('shop_id', shopId);
+    }
+
+    final tokenResponse = await tokenSelect;
 
     for (final row in (tokenResponse as List<dynamic>)) {
       final product = _productFromRow(row as Map);
@@ -79,7 +96,8 @@ final checkInventoryTool = ai.defineTool<Map<String, dynamic>, List<Product>>(
   inputSchema: checkInventoryInputSchema,
   fn: (input, context) async {
     final query = (input['productName'] as String?) ?? '';
-    return findInventoryProducts(query);
+    final shopId = await getShopIdForUser(context.context?['userIdentifier'] as String?);
+    return findInventoryProducts(query, shopId);
   },
 );
 
@@ -105,9 +123,12 @@ final browseCatalogTool =
   inputSchema: browseCatalogInputSchema,
   fn: (input, context) async {
     final category = (input['category'] as String?)?.trim();
-    final query = supabase
+    final shopId = await getShopIdForUser(context.context?['userIdentifier'] as String?);
+    
+    var query = supabase
         .from('products')
-        .select('id, shop_id, name, price, stock_quantity, category');
+        .select('id, shop_id, name, price, stock_quantity, category')
+        .eq('shop_id', shopId);
 
     final rows = (category != null && category.isNotEmpty)
         ? await query.eq('category', category).limit(20)
@@ -132,3 +153,63 @@ final browseCatalogTool =
 );
 
 final browseCatalog = browseCatalogTool;
+
+final SchemanticType<Map<String, dynamic>> proposeProductsInputSchema =
+    SchemanticType.from<Map<String, dynamic>>(
+  jsonSchema: {
+    'type': 'object',
+    'properties': {
+      'products': {
+        'type': 'array',
+        'items': {
+          'type': 'object',
+          'properties': {
+            'name': {'type': 'string'},
+            'price': {'type': 'number'},
+            'stock_quantity': {'type': 'integer', 'default': 0},
+            'category': {'type': 'string'},
+            'description': {'type': 'string'},
+            'is_service': {'type': 'boolean', 'default': false},
+            'gst_rate': {'type': 'number', 'default': 0},
+            'hsn_sac_code': {'type': 'string'},
+            'metadata': {'type': 'object'},
+          },
+          'required': ['name', 'price', 'category'],
+        },
+      },
+    },
+    'required': ['products'],
+    'additionalProperties': false,
+  },
+  parse: (json) => Map<String, dynamic>.from(json as Map),
+);
+
+final proposeProductsTool =
+    ai.defineTool<Map<String, dynamic>, Map<String, dynamic>>(
+  name: 'proposeProducts',
+  description:
+      'Propose one or more products or services to be added to the inventory. This creates a draft that REQUIRES human approval.',
+  inputSchema: proposeProductsInputSchema,
+  fn: (input, context) async {
+    final products = (input['products'] as List<dynamic>)
+        .map((p) => Map<String, dynamic>.from(p as Map))
+        .toList();
+
+    final shopId = await getShopIdForUser(context.context?['userIdentifier'] as String?);
+
+    final response = await supabase.from('draft_product_batches').insert({
+      'shop_id': shopId,
+      'proposed_products': products,
+      'status': 'PENDING',
+    }).select('id').single();
+
+    return {
+      'message':
+          'Product draft created. Human approval is required to finalize.',
+      'batchId': response['id'],
+      'itemCount': products.length,
+    };
+  },
+);
+
+final proposeProducts = proposeProductsTool;

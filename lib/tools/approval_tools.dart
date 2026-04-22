@@ -218,3 +218,97 @@ Future<Map<String, dynamic>?> getApprovalDetails(String approvalId) async {
     return null;
   }
 }
+
+/// Approve a product batch and insert items into the products table
+Future<Map<String, dynamic>> approveProductBatch({
+  required String batchId,
+  required String reviewedBy,
+}) async {
+  try {
+    final batchRows = await supabase
+        .from('draft_product_batches')
+        .select()
+        .eq('id', batchId)
+        .eq('status', 'PENDING')
+        .single();
+
+    final batchData = Map<String, dynamic>.from(batchRows as Map);
+    final shopId = batchData['shop_id'] as String;
+    final proposedProducts = batchData['proposed_products'] as List;
+
+    final List<Map<String, dynamic>> productsToInsert = [];
+    for (final p in proposedProducts) {
+      final data = Map<String, dynamic>.from(p as Map);
+      productsToInsert.add({
+        'id': const Uuid().v4(),
+        'shop_id': shopId,
+        'name': data['name'],
+        'price': data['price'],
+        'stock_quantity': data['stock_quantity'] ?? 0,
+        'category': data['category'],
+        'description': data['description'],
+        'is_service': data['is_service'] ?? false,
+        'gst_rate': data['gst_rate'] ?? 0,
+        'hsn_sac_code': data['hsn_sac_code'],
+        'metadata': data['metadata'] ?? {},
+      });
+    }
+
+    await supabase.from('products').insert(productsToInsert);
+
+    await supabase
+        .from('draft_product_batches')
+        .update({
+          'status': 'APPROVED',
+          'reviewed_by': reviewedBy,
+          'reviewed_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', batchId);
+
+    return {
+      'success': true,
+      'message': '✅ *Inventory Updated!*\n\n${proposedProducts.length} items added to your catalog.',
+    };
+  } catch (e) {
+    print('Error in approveProductBatch: $e');
+    return {'success': false, 'error': 'Failed to approve batch: $e'};
+  }
+}
+
+/// Reject a product batch
+Future<Map<String, dynamic>> rejectProductBatch({
+  required String batchId,
+  required String reviewedBy,
+}) async {
+  try {
+    await supabase
+        .from('draft_product_batches')
+        .update({
+          'status': 'REJECTED',
+          'reviewed_by': reviewedBy,
+          'reviewed_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', batchId);
+
+    return {
+      'success': true,
+      'message': '❌ *Batch Rejected*\n\nItems were not added to inventory.',
+    };
+  } catch (e) {
+    return {'success': false, 'error': 'Failed to reject batch: $e'};
+  }
+}
+
+/// Get product batch details
+Future<Map<String, dynamic>?> getProductBatchDetails(String batchId) async {
+  try {
+    final result = await supabase
+        .from('draft_product_batches')
+        .select()
+        .eq('id', batchId)
+        .single();
+    return Map<String, dynamic>.from(result as Map);
+  } catch (e) {
+    return null;
+  }
+}

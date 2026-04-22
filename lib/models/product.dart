@@ -12,6 +12,11 @@ abstract class Product with _$Product {
     required double price,
     @JsonKey(name: 'stock_quantity') required int stockQuantity,
     required String category,
+    String? description,
+    @JsonKey(name: 'is_service') @Default(false) bool isService,
+    @JsonKey(name: 'gst_rate') @Default(0) double gstRate,
+    @JsonKey(name: 'hsn_sac_code') String? hsnSacCode,
+    @Default({}) Map<String, dynamic> metadata,
   }) = _Product;
 
   factory Product.fromJson(Map<String, dynamic> json) => _$ProductFromJson(json);

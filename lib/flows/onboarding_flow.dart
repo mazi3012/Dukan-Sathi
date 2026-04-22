@@ -1,342 +1,433 @@
-import 'dart:async';
-
-import 'package:uuid/uuid.dart';
 import 'package:dukansathi_new/core/database.dart';
 import 'package:teledart/model.dart' as tg;
+import 'package:uuid/uuid.dart';
 
+// ─── STEP ENUM ────────────────────────────────────────────────────────────────
+enum OnboardingStep {
+  shopName,    // 0 – text
+  state,       // 1 – text
+  gstChoice,   // 2 – buttons
+  gstin,       // 3 – text (only if registered)
+  bizType,     // 4 – buttons
+  upiId,       // 5 – text or skip
+  review,      // 6 – summary with approve/reject
+}
+
+// ─── SESSION (in-memory) ──────────────────────────────────────────────────────
 class OnboardingSession {
-  OnboardingSession({required this.chatId, required this.startedBy}) : step = 0;
+  OnboardingSession({required this.chatId, required this.createdBy})
+      : step = OnboardingStep.shopName;
 
   final int chatId;
-  final String startedBy;
-  int step;
-  final Map<String, String> data = {};
+  final String createdBy;
+  OnboardingStep step;
+
+  String? shopName;
+  String? state;
+  String gstMode = 'UNREGISTERED';
+  String? gstin;
+  String? bizType;
+  String? upiId;
+
+  // Supabase draft row ID
+  String? draftId;
 }
 
-class OnboardingPrompt {
-  OnboardingPrompt({required this.text, this.keyboard});
-  final String text;
-  final tg.InlineKeyboardMarkup? keyboard;
-}
-
+// ─── SESSION STORE ────────────────────────────────────────────────────────────
 final Map<int, OnboardingSession> _sessions = {};
+// Track last processed callback data per chat to avoid duplicate handling
+final Map<int, String> _lastCallback = {};
 final _uuid = Uuid();
-
-String _askForShopName(OnboardingSession s) => 'Welcome to Dukan Sathi! What is the name of your shop?';
-String _askForState(OnboardingSession s) => 'Which state is your shop located in? (example: Assam or AS)';
-String _askForGstRegistered(OnboardingSession s) => 'Are you registered for GST?';
-String _askForGstNumber(OnboardingSession s) => 'Please enter your GSTIN (15 characters).';
-String _askForBusinessType(OnboardingSession s) => 'What is your business type?';
-String _confirmSummary(OnboardingSession s) {
-  final name = s.data['shop_name'] ?? '<unknown>';
-  final state = s.data['state'] ?? '<unknown>';
-  final gstMode = s.data['gst_mode'] ?? 'UNREGISTERED';
-  final gst = s.data['gst_registration_number'] ?? 'N/A';
-  final biz = s.data['business_type'] ?? '<unknown>';
-  return 'Please confirm the details:\n\n*Shop:* $name\n*State:* $state\n*GST Mode:* $gstMode\n*GSTIN:* $gst\n*Business Type:* $biz\n\nAre you happy?';
-}
-
-tg.InlineKeyboardMarkup _buildConfirmationKeyboard(int chatId) {
-  return tg.InlineKeyboardMarkup(
-    inlineKeyboard: [
-      [
-        tg.InlineKeyboardButton(text: '❌ Cancel', callbackData: 'onboard_cancel_$chatId'),
-        tg.InlineKeyboardButton(text: '✅ Submit', callbackData: 'onboard_submit_$chatId'),
-      ]
-    ],
-  );
-}
-
-tg.InlineKeyboardMarkup _buildGstKeyboard(int chatId) {
-  return tg.InlineKeyboardMarkup(
-    inlineKeyboard: [
-      [
-        tg.InlineKeyboardButton(text: '✅ Yes', callbackData: 'onboard_gst_yes_$chatId'),
-        tg.InlineKeyboardButton(text: '❌ No', callbackData: 'onboard_gst_no_$chatId'),
-      ]
-    ],
-  );
-}
-
-tg.InlineKeyboardMarkup _buildBusinessTypeKeyboard(int chatId) {
-  return tg.InlineKeyboardMarkup(
-    inlineKeyboard: [
-      [
-        tg.InlineKeyboardButton(text: 'Retail', callbackData: 'onboard_biz_retail_$chatId'),
-        tg.InlineKeyboardButton(text: 'Wholesale', callbackData: 'onboard_biz_wholesale_$chatId'),
-      ],
-      [
-        tg.InlineKeyboardButton(text: 'Manufacturer', callbackData: 'onboard_biz_manufacturer_$chatId'),
-        tg.InlineKeyboardButton(text: 'Other', callbackData: 'onboard_biz_other_$chatId'),
-      ]
-    ],
-  );
-}
-
-Future<OnboardingPrompt> startOnboarding(int chatId, String startedBy) async {
-  final s = OnboardingSession(chatId: chatId, startedBy: startedBy);
-  _sessions[chatId] = s;
-  return OnboardingPrompt(text: _askForShopName(s));
-}
 
 bool isInOnboarding(int chatId) => _sessions.containsKey(chatId);
 
-bool _looksLikeGreeting(String text) {
-  final t = text.toLowerCase().trim();
-  const greetings = {
-    'hi',
-    'hello',
-    'hey',
-    'hii',
-    'hiii',
-    'yo',
-    'start',
-    '/start',
-  };
-  return greetings.contains(t);
+// ─── RESULT TYPE ──────────────────────────────────────────────────────────────
+class OnboardingResult {
+  OnboardingResult({required this.text, this.keyboard, this.done = false});
+  final String text;
+  final tg.InlineKeyboardMarkup? keyboard;
+  final bool done;
 }
 
+// ─── INLINE KEYBOARDS ─────────────────────────────────────────────────────────
+tg.InlineKeyboardMarkup _gstKeyboard() => tg.InlineKeyboardMarkup(
+      inlineKeyboard: [
+        [
+          tg.InlineKeyboardButton(text: '✅ Yes, I have GSTIN', callbackData: 'ob_gst_yes'),
+          tg.InlineKeyboardButton(text: '❌ No GST',            callbackData: 'ob_gst_no'),
+        ]
+      ],
+    );
+
+tg.InlineKeyboardMarkup _bizKeyboard() => tg.InlineKeyboardMarkup(
+      inlineKeyboard: [
+        [
+          tg.InlineKeyboardButton(text: '🛍 Retail',       callbackData: 'ob_biz_Retail'),
+          tg.InlineKeyboardButton(text: '📦 Wholesale',    callbackData: 'ob_biz_Wholesale'),
+        ],
+        [
+          tg.InlineKeyboardButton(text: '🏭 Manufacturer', callbackData: 'ob_biz_Manufacturer'),
+          tg.InlineKeyboardButton(text: '🔧 Other',        callbackData: 'ob_biz_Other'),
+        ],
+      ],
+    );
+
+tg.InlineKeyboardMarkup _upiKeyboard() => tg.InlineKeyboardMarkup(
+      inlineKeyboard: [
+        [
+          tg.InlineKeyboardButton(text: '⏭ Skip UPI', callbackData: 'ob_upi_skip'),
+        ]
+      ],
+    );
+
+tg.InlineKeyboardMarkup _reviewKeyboard() => tg.InlineKeyboardMarkup(
+      inlineKeyboard: [
+        [
+          tg.InlineKeyboardButton(text: '❌ Cancel',  callbackData: 'ob_cancel'),
+          tg.InlineKeyboardButton(text: '✅ Approve', callbackData: 'ob_approve'),
+        ]
+      ],
+    );
+
+// ─── SUMMARY TEXT ─────────────────────────────────────────────────────────────
+String _summaryText(OnboardingSession s) =>
+    '📋 *Please review your shop details:*\n\n'
+    '🏪 *Shop Name:* ${s.shopName}\n'
+    '📍 *State:* ${s.state}\n'
+    '🧾 *GST Mode:* ${s.gstMode}${s.gstin != null ? '\n🆔 *GSTIN:* ${s.gstin}' : ''}\n'
+    '💼 *Business Type:* ${s.bizType}\n'
+    '💳 *UPI ID:* ${s.upiId ?? 'Not set'}\n\n'
+    'Press *Approve* to save, or *Cancel* to discard.';
+
+// ─── PERSIST DRAFT TO SUPABASE ────────────────────────────────────────────────
+Future<void> _upsertDraft(OnboardingSession s) async {
+  try {
+    final data = <String, dynamic>{
+      'telegram_chat_id': s.chatId,
+      'created_by':       s.createdBy,
+      'shop_name':        s.shopName,
+      'state':            s.state,
+      'gst_mode':         s.gstMode,
+      'gst_registration_number': s.gstin,
+      'business_type':    s.bizType,
+      'upi_id':           s.upiId,
+      'current_step':     s.step.index,
+      'updated_at':       DateTime.now().toIso8601String(),
+    }..removeWhere((_, v) => v == null);
+
+    if (s.draftId == null) {
+      final row = await supabase
+          .from('onboarding_drafts')
+          .insert(data)
+          .select('id')
+          .single();
+      s.draftId = (row as Map<String, dynamic>)['id'] as String;
+    } else {
+      await supabase
+          .from('onboarding_drafts')
+          .update(data)
+          .eq('id', s.draftId!);
+    }
+  } catch (e) {
+    // Non-fatal: session stays in memory even if DB save fails
+    print('[onboarding][upsert-draft] WARNING: DB save failed (chat=${s.chatId}): $e');
+  }
+}
+
+// ─── STATE CODE HELPERS ───────────────────────────────────────────────────────
 const Set<String> _validStateCodes = {
-  'AP', 'AR', 'AS', 'BR', 'CG', 'GA', 'GJ', 'HR', 'HP', 'JK', 'JH', 'KA',
-  'KL', 'MP', 'MH', 'MN', 'ML', 'MZ', 'OD', 'PB', 'RJ', 'SK', 'TN', 'TS',
-  'TR', 'UP', 'UK', 'WB', 'AN', 'CH', 'DL', 'DD', 'DH', 'JL', 'LA', 'LD', 'PY'
+  'AP','AR','AS','BR','CG','GA','GJ','HR','HP','JK','JH','KA',
+  'KL','MP','MH','MN','ML','MZ','OD','PB','RJ','SK','TN','TS',
+  'TR','UP','UK','WB','AN','CH','DL','DD','DH','JL','LA','LD','PY',
 };
 
 const Map<String, String> _stateNameToCode = {
-  'andhra pradesh': 'AP',
-  'arunachal pradesh': 'AR',
-  'assam': 'AS',
-  'bihar': 'BR',
-  'chhattisgarh': 'CG',
-  'goa': 'GA',
-  'gujarat': 'GJ',
-  'haryana': 'HR',
-  'himachal pradesh': 'HP',
-  'jammu and kashmir': 'JK',
-  'jharkhand': 'JH',
-  'karnataka': 'KA',
-  'kerala': 'KL',
-  'madhya pradesh': 'MP',
-  'maharashtra': 'MH',
-  'manipur': 'MN',
-  'meghalaya': 'ML',
-  'mizoram': 'MZ',
-  'odisha': 'OD',
-  'orissa': 'OD',
-  'punjab': 'PB',
-  'rajasthan': 'RJ',
-  'sikkim': 'SK',
-  'tamil nadu': 'TN',
-  'telangana': 'TS',
-  'tripura': 'TR',
-  'uttar pradesh': 'UP',
-  'uttarakhand': 'UK',
-  'west bengal': 'WB',
-  'andaman and nicobar islands': 'AN',
-  'chandigarh': 'CH',
-  'delhi': 'DL',
+  'andhra pradesh': 'AP', 'arunachal pradesh': 'AR', 'assam': 'AS',
+  'bihar': 'BR', 'chhattisgarh': 'CG', 'goa': 'GA', 'gujarat': 'GJ',
+  'haryana': 'HR', 'himachal pradesh': 'HP', 'jammu and kashmir': 'JK',
+  'jharkhand': 'JH', 'karnataka': 'KA', 'kerala': 'KL',
+  'madhya pradesh': 'MP', 'maharashtra': 'MH', 'manipur': 'MN',
+  'meghalaya': 'ML', 'mizoram': 'MZ', 'odisha': 'OD', 'orissa': 'OD',
+  'punjab': 'PB', 'rajasthan': 'RJ', 'sikkim': 'SK', 'tamil nadu': 'TN',
+  'telangana': 'TS', 'tripura': 'TR', 'uttar pradesh': 'UP',
+  'uttarakhand': 'UK', 'west bengal': 'WB',
+  'andaman and nicobar islands': 'AN', 'chandigarh': 'CH', 'delhi': 'DL',
+  'daman and diu': 'DD', 'dadra and nagar haveli': 'DH',
   'dadra and nagar haveli and daman and diu': 'DH',
-  'daman and diu': 'DD',
-  'dadra and nagar haveli': 'DH',
-  'ladakh': 'LA',
-  'lakshadweep': 'LD',
-  'puducherry': 'PY',
+  'ladakh': 'LA', 'lakshadweep': 'LD', 'puducherry': 'PY',
 };
 
-String? _normalizeStateCode(String raw) {
-  final trimmed = raw.trim();
-  if (trimmed.isEmpty) return null;
-
-  final upper = trimmed.toUpperCase();
-  if (_validStateCodes.contains(upper)) {
-    return upper;
-  }
-
-  final normalizedName = trimmed.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-  return _stateNameToCode[normalizedName];
+String? _normalizeState(String raw) {
+  final upper = raw.trim().toUpperCase();
+  if (_validStateCodes.contains(upper)) return upper;
+  final lower = raw.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  return _stateNameToCode[lower];
 }
 
-Future<OnboardingPrompt> processOnboardingInput(int chatId, String input) async {
-  final s = _sessions[chatId];
-  if (s == null) return OnboardingPrompt(text: '');
-  final text = input.trim();
+bool _validGstin(String v) =>
+    v.length == 15 && RegExp(r'^[0-9A-Z]+$').hasMatch(v);
 
-  // Allow cancel at any time
-  if (text.toLowerCase() == 'cancel') {
-    _sessions.remove(chatId);
-    return OnboardingPrompt(text: 'Onboarding cancelled.');
-  }
+// ─── PUBLIC API ───────────────────────────────────────────────────────────────
 
-  switch (s.step) {
-    case 0:
-      if (text.length < 3 || _looksLikeGreeting(text)) {
-        return OnboardingPrompt(
-          text: 'Please enter your actual shop/business name (example: Mazi Shop).',
-        );
-      }
-      s.data['shop_name'] = text;
-      s.step = 1;
-      return OnboardingPrompt(text: _askForState(s));
-    case 1:
-      final stateCode = _normalizeStateCode(text);
-      if (stateCode == null) {
-        return OnboardingPrompt(
-          text: 'Please enter a valid Indian state name or code (example: Assam or AS).',
-        );
-      }
-      s.data['state'] = stateCode;
-      s.step = 2;
-      return OnboardingPrompt(
-        text: _askForGstRegistered(s),
-        keyboard: _buildGstKeyboard(chatId),
+/// Start a new onboarding session.
+Future<OnboardingResult> startOnboarding(int chatId, String createdBy) async {
+  _sessions.remove(chatId);
+  _lastCallback.remove(chatId);
+
+  try {
+    final existing = await supabase
+        .from('shops')
+        .select('id,name')
+        .eq('created_by', createdBy)
+        .eq('onboarding_completed', true)
+        .maybeSingle();
+    if (existing != null) {
+      return OnboardingResult(
+        text: '👋 *Welcome back!* Your shop *${existing['name']}* is already set up.\n\nHow can I help you today?',
+        done: true,
       );
-    case 2:
-      // Text fallback for GST (in case user types instead of clicking)
-      final n = text.toLowerCase();
-      if (n == 'yes' || n == 'y') {
-        s.data['gst_mode'] = 'REGISTERED';
-        s.step = 3;
-        return OnboardingPrompt(text: _askForGstNumber(s));
-      } else if (n == 'no' || n == 'n') {
-        s.data['gst_mode'] = 'UNREGISTERED';
-        s.step = 4;
-        return OnboardingPrompt(
-          text: _askForBusinessType(s),
-          keyboard: _buildBusinessTypeKeyboard(chatId),
-        );
-      } else {
-        return OnboardingPrompt(text: 'Please reply with *yes* or *no*, or use the buttons.');
-      }
-    case 3:
-      final gst = text.toUpperCase();
-      if (_validateGstin(gst)) {
-        s.data['gst_registration_number'] = gst;
-        s.step = 4;
-        return OnboardingPrompt(
-          text: _askForBusinessType(s),
-          keyboard: _buildBusinessTypeKeyboard(chatId),
-        );
-      }
-      return OnboardingPrompt(text: 'GSTIN does not look valid. Please re-enter the 15-character GSTIN in uppercase.');
-    case 4:
-      s.data['business_type'] = text;
-      s.step = 5;
-      return OnboardingPrompt(
-        text: _confirmSummary(s),
-        keyboard: _buildConfirmationKeyboard(chatId),
-      );
-    case 5:
-      final t = text.toLowerCase();
-      if (t == 'confirm' || t == 'yes' || t == 'y') {
-        // Persist shop record
-        final shopId = _uuid.v4();
-        final ownerId = _uuid.v5(Uuid.NAMESPACE_URL, 'telegram:${s.startedBy}');
-        final insert = {
-          'id': shopId,
-          'owner_id': ownerId,
-          'name': s.data['shop_name'],
-          'state': s.data['state'],
-          'gst_mode': s.data['gst_mode'] ?? 'UNREGISTERED',
-          'gst_registration_number': s.data['gst_registration_number'],
-          'business_type': s.data['business_type'],
-          'onboarding_started_at': DateTime.now().toIso8601String(),
-          'onboarding_completed': true,
-          'created_by': s.startedBy,
-        }..removeWhere((k, v) => v == null);
+    }
+  } catch (_) {}
 
-        try {
-          await supabase.from('shops').insert(insert).select().single();
-          _sessions.remove(chatId);
-          return OnboardingPrompt(text: '✅ Onboarding complete. Your shop has been created and set as the active shop. You can now create bills.');
-        } catch (e) {
-          return OnboardingPrompt(text: 'Failed to create shop: $e');
-        }
-      } else if (t == 'cancel' || t == 'n') {
-        _sessions.remove(chatId);
-        return OnboardingPrompt(text: 'Onboarding cancelled.');
-      } else {
-        // At confirmation step, only buttons or confirm/cancel allowed - ignore other text
-        return OnboardingPrompt(
-          text: _confirmSummary(s),
-          keyboard: _buildConfirmationKeyboard(chatId),
-        );
-      }
-    default:
-      _sessions.remove(chatId);
-      return OnboardingPrompt(text: 'Onboarding session ended unexpectedly. Please start again with /start.');
-  }
-}
+  final session = OnboardingSession(chatId: chatId, createdBy: createdBy);
+  _sessions[chatId] = session;
 
-// Callback handlers for button presses
-Future<OnboardingPrompt> handleGstButtonPress(int chatId, bool isYes) async {
-  final s = _sessions[chatId];
-  if (s == null || s.step != 2) return OnboardingPrompt(text: 'Onboarding session expired.');
-  
-  if (isYes) {
-    s.data['gst_mode'] = 'REGISTERED';
-    s.step = 3;
-    return OnboardingPrompt(text: _askForGstNumber(s));
-  } else {
-    s.data['gst_mode'] = 'UNREGISTERED';
-    s.step = 4;
-    return OnboardingPrompt(
-      text: _askForBusinessType(s),
-      keyboard: _buildBusinessTypeKeyboard(chatId),
-    );
-  }
-}
-
-Future<OnboardingPrompt> handleBusinessTypeButtonPress(int chatId, String bizType) async {
-  final s = _sessions[chatId];
-  if (s == null || s.step != 4) return OnboardingPrompt(text: 'Onboarding session expired.');
-  
-  s.data['business_type'] = bizType;
-  s.step = 5;
-  return OnboardingPrompt(
-    text: _confirmSummary(s),
-    keyboard: _buildConfirmationKeyboard(chatId),
+  return OnboardingResult(
+    text: '👋 *Welcome to Dukan Sathi Pro!* 🚀\n\n'
+        "We're excited to help you manage and grow your retail business with AI.\n\n"
+        '✨ Let\'s set up your shop. What is the *name of your shop?*',
   );
 }
 
-Future<OnboardingPrompt> handleConfirmationButtonPress(int chatId, bool isSubmit) async {
+/// Handle a plain text message during onboarding.
+Future<OnboardingResult> processOnboardingText(int chatId, String input) async {
   final s = _sessions[chatId];
-  if (s == null || s.step != 5) return OnboardingPrompt(text: 'Onboarding session expired.');
+  if (s == null) return OnboardingResult(text: '');
 
-  if (!isSubmit) {
-    // Cancel
-    _sessions.remove(chatId);
-    return OnboardingPrompt(text: 'Onboarding cancelled.');
+  final text = input.trim();
+  if (text.isEmpty) return OnboardingResult(text: '');
+
+  if (text.toLowerCase() == '/cancel') {
+    await _cancelSession(chatId);
+    return OnboardingResult(text: '❌ Onboarding cancelled. Send /start to begin again.');
   }
 
-  // Submit
-  final shopId = _uuid.v4();
-  final ownerId = _uuid.v5(Uuid.NAMESPACE_URL, 'telegram:${s.startedBy}');
-  final insert = {
-    'id': shopId,
-    'owner_id': ownerId,
-    'name': s.data['shop_name'],
-    'state': s.data['state'],
-    'gst_mode': s.data['gst_mode'] ?? 'UNREGISTERED',
-    'gst_registration_number': s.data['gst_registration_number'],
-    'business_type': s.data['business_type'],
-    'onboarding_started_at': DateTime.now().toIso8601String(),
-    'onboarding_completed': true,
-    'created_by': s.startedBy,
-  }..removeWhere((k, v) => v == null);
+  print('[onboarding] chat=$chatId step=${s.step.name} input="$text"');
 
-  try {
-    await supabase.from('shops').insert(insert).select().single();
-    _sessions.remove(chatId);
-    return OnboardingPrompt(
-      text: '✅ Onboarding complete. Your shop has been created and set as the active shop. You can now create bills.'
-    );
-  } catch (e) {
-    return OnboardingPrompt(text: 'Failed to create shop: $e');
+  switch (s.step) {
+    case OnboardingStep.shopName:
+      if (text.length < 2) {
+        return OnboardingResult(text: '⚠️ Shop name is too short. Please enter a valid shop name.');
+      }
+      s.shopName = text;
+      s.step = OnboardingStep.state;
+      await _upsertDraft(s);
+      return OnboardingResult(
+        text: '📍 Which *state* is your shop in?\n_(e.g. Assam, AS, Maharashtra, MH)_',
+      );
+
+    case OnboardingStep.state:
+      final code = _normalizeState(text);
+      if (code == null) {
+        return OnboardingResult(
+          text: '⚠️ Could not recognise that state. Please enter a valid Indian state name or 2-letter code.\n_(e.g. "Assam" or "AS")_',
+        );
+      }
+      s.state = code;
+      s.step = OnboardingStep.gstChoice;
+      await _upsertDraft(s);
+      return OnboardingResult(
+        text: '🧾 Is your shop *registered for GST?*',
+        keyboard: _gstKeyboard(),
+      );
+
+    case OnboardingStep.gstChoice:
+      return OnboardingResult(
+        text: '👆 Please use the buttons above to select your GST status.',
+        keyboard: _gstKeyboard(),
+      );
+
+    case OnboardingStep.gstin:
+      final v = text.toUpperCase();
+      if (!_validGstin(v)) {
+        return OnboardingResult(
+          text: '⚠️ Invalid GSTIN. It must be exactly 15 uppercase alphanumeric characters.\n\nPlease re-enter:',
+        );
+      }
+      s.gstin = v;
+      s.step = OnboardingStep.bizType;
+      await _upsertDraft(s);
+      return OnboardingResult(
+        text: '💼 What is your *business type?*',
+        keyboard: _bizKeyboard(),
+      );
+
+    case OnboardingStep.bizType:
+      return OnboardingResult(
+        text: '👆 Please use the buttons above to select your business type.',
+        keyboard: _bizKeyboard(),
+      );
+
+    case OnboardingStep.upiId:
+      s.upiId = text;
+      s.step = OnboardingStep.review;
+      await _upsertDraft(s);
+      return OnboardingResult(
+        text: _summaryText(s),
+        keyboard: _reviewKeyboard(),
+      );
+
+    case OnboardingStep.review:
+      return OnboardingResult(
+        text: '👆 Please use the *Approve* or *Cancel* buttons to confirm.',
+        keyboard: _reviewKeyboard(),
+      );
   }
 }
 
-bool _validateGstin(String gst) {
-  if (gst.length != 15) return false;
-  final re = RegExp(r'^[0-9A-Z]+$');
-  return re.hasMatch(gst);
+/// Handle a callback button press during onboarding.
+Future<OnboardingResult?> processOnboardingCallback(int chatId, String data) async {
+  if (!data.startsWith('ob_')) return null;
+
+  // Prevent duplicate callbacks (Telegram sometimes fires twice)
+  if (_lastCallback[chatId] == data) {
+    print('[onboarding] chat=$chatId DUPLICATE callback ignored: "$data"');
+    return null;
+  }
+  _lastCallback[chatId] = data;
+
+  final s = _sessions[chatId];
+  if (s == null) {
+    return OnboardingResult(
+      text: '⚠️ Session expired. Please send /start to begin again.',
+    );
+  }
+
+  print('[onboarding] chat=$chatId step=${s.step.name} callback="$data"');
+
+  // ── GST CHOICE ─────────────────────────────────────────────────────────────
+  if (data == 'ob_gst_yes') {
+    if (s.step != OnboardingStep.gstChoice) return null;
+    s.gstMode = 'REGISTERED';
+    s.step = OnboardingStep.gstin;
+    await _upsertDraft(s);
+    return OnboardingResult(text: '🆔 Please enter your *GSTIN* (15 characters):');
+  }
+
+  if (data == 'ob_gst_no') {
+    if (s.step != OnboardingStep.gstChoice) return null;
+    s.gstMode = 'UNREGISTERED';
+    s.step = OnboardingStep.bizType;
+    await _upsertDraft(s);
+    return OnboardingResult(
+      text: '💼 What is your *business type?*',
+      keyboard: _bizKeyboard(),
+    );
+  }
+
+  // ── BUSINESS TYPE → skip phone, go straight to UPI ─────────────────────────
+  if (data.startsWith('ob_biz_')) {
+    if (s.step != OnboardingStep.bizType) return null;
+    final biz = data.replaceFirst('ob_biz_', '');
+    s.bizType = biz;
+    s.step = OnboardingStep.upiId;
+    await _upsertDraft(s);
+    return OnboardingResult(
+      text: '💳 Enter your *UPI ID* for receiving payments _(optional)_\nor tap Skip:',
+      keyboard: _upiKeyboard(),
+    );
+  }
+
+  // ── UPI SKIP ───────────────────────────────────────────────────────────────
+  if (data == 'ob_upi_skip') {
+    if (s.step != OnboardingStep.upiId) return null;
+    s.upiId = null;
+    s.step = OnboardingStep.review;
+    await _upsertDraft(s);
+    return OnboardingResult(
+      text: _summaryText(s),
+      keyboard: _reviewKeyboard(),
+    );
+  }
+
+  // ── APPROVE ────────────────────────────────────────────────────────────────
+  if (data == 'ob_approve') {
+    if (s.step != OnboardingStep.review) return null;
+    return await _approveOnboarding(s);
+  }
+
+  // ── CANCEL ─────────────────────────────────────────────────────────────────
+  if (data == 'ob_cancel') {
+    await _cancelSession(chatId);
+    return OnboardingResult(
+      text: '❌ Onboarding cancelled. Send /start whenever you\'re ready to set up your shop.',
+    );
+  }
+
+  return null;
+}
+
+// ─── APPROVE: persist shop ────────────────────────────────────────────────────
+Future<OnboardingResult> _approveOnboarding(OnboardingSession s) async {
+  try {
+    final shopId  = _uuid.v4();
+    final ownerId = _uuid.v5(Uuid.NAMESPACE_URL, 'telegram:${s.createdBy}');
+
+    final insert = <String, dynamic>{
+      'id':                       shopId,
+      'owner_id':                 ownerId,
+      'name':                     s.shopName,
+      'state':                    s.state,
+      'gst_mode':                 s.gstMode,
+      'gst_registration_number':  s.gstin,
+      'business_type':            s.bizType,
+      'upi_id':                   s.upiId,
+      'onboarding_completed':     true,
+      'onboarding_started_at':    DateTime.now().toIso8601String(),
+      'created_by':               s.createdBy,
+    }..removeWhere((_, v) => v == null);
+
+    await supabase.from('shops').insert(insert);
+
+    if (s.draftId != null) {
+      await supabase
+          .from('onboarding_drafts')
+          .update({'status': 'APPROVED', 'updated_at': DateTime.now().toIso8601String()})
+          .eq('id', s.draftId!);
+    }
+
+    _sessions.remove(s.chatId);
+    _lastCallback.remove(s.chatId);
+
+    return OnboardingResult(
+      text: '🎉 *Shop created successfully!*\n\n'
+          '🏪 *${s.shopName}* is now live on Dukan Sathi Pro.\n\n'
+          'You can now:\n'
+          '• 🧾 Create invoices\n'
+          '• 📦 Add products\n'
+          '• 📊 View analytics\n\n'
+          'Just tell me what you need!',
+      done: true,
+    );
+  } catch (e) {
+    print('[onboarding][approve] error: $e');
+    return OnboardingResult(
+      text: '❌ Failed to save your shop. Please try again.\n\nError: $e',
+      keyboard: _reviewKeyboard(),
+    );
+  }
+}
+
+// ─── CANCEL SESSION ───────────────────────────────────────────────────────────
+Future<void> _cancelSession(int chatId) async {
+  final s = _sessions.remove(chatId);
+  _lastCallback.remove(chatId);
+  if (s?.draftId != null) {
+    try {
+      await supabase
+          .from('onboarding_drafts')
+          .update({'status': 'REJECTED', 'updated_at': DateTime.now().toIso8601String()})
+          .eq('id', s!.draftId!);
+    } catch (_) {}
+  }
 }

@@ -23,12 +23,21 @@ final Map<int, Chat> activeSessions = {};
 final Map<int, String> pendingRejections = {};
 
 const String _systemPrompt =
-  "You are the AI brain for Dukan Sathi Pro. Shop ID is '71a343a4-2e91-4e11-85b3-3a15f013d5a4'. CRITICAL RULES: 1. No narration (never say 'I am checking' or 'Using tool'). 2. Use tools silently. 3. Output final result only. 4. If you create a draft invoice, YOU MUST ALWAYS include the Approval ID in the format 'Approval ID: [ID]'. 5. customerId and customerState are OPTIONAL — do NOT ask for them; call the tool immediately with shopId and items. 6. For specific items use checkInventory. 7. For product lists use browseCatalogTool. 8. For analytics use businessInsightsTool.";
+  "You are the AI brain for Dukan Sathi Pro, a retail shop assistant. CRITICAL RULES: "
+  "1. NEVER make up, guess, or hallucinate product names, prices, stock, or any data. ONLY use real data from tool responses. "
+  "2. If inventory/catalog is empty, say so plainly — never invent sample products. "
+  "3. No narration (never say 'I am checking' or 'Let me look up'). Use tools silently, output final result only. "
+  "4. If you create a draft invoice, ALWAYS include the Approval ID in the format 'Approval ID: [ID]'. "
+  "5. If you propose adding products, ALWAYS include the Batch ID in the format 'Batch ID: [ID]'. "
+  "6. customerId and customerState are OPTIONAL — do NOT ask for them; call the tool immediately. "
+  "7. For specific product lookups, use checkInventory. For full product lists, use browseCatalogTool. "
+  "8. For analytics/revenue, use businessInsightsTool. For adding new products, use proposeProducts.";
 
 final checkInventoryTool = checkInventory;
 final catalogTool = browseCatalog;
 final createDraftInvoiceTool = createDraftInvoice;
 final analyticsTool = businessInsightsTool;
+final proposeProductsTool = proposeProducts;
 
 // ─── HELPER: check if user has already completed onboarding ────────────────
 Future<bool> _isUserOnboarded(String userIdentifier) async {
@@ -104,11 +113,12 @@ Future<String> _buildInvoiceMessage(
 
 // ─── CHAT SESSION ─────────────────────────────────────────────────────────────
 class Chat {
-  Chat({required this.model, required this.tools, required this.systemPrompt});
+  Chat({required this.model, required this.tools, required this.systemPrompt, required this.userIdentifier});
 
   final String model;
   final List<String> tools;
   final String systemPrompt;
+  final String userIdentifier;
   final List<Message> _history = [];
 
   bool _isBillingIntent(String input) {
@@ -118,10 +128,16 @@ class Chat {
 
   bool _isCatalogIntent(String input) {
     final n = input.toLowerCase();
-    return n.contains('what do you sell') || n.contains('what item') || n.contains('what items') ||
+    return n.contains('what do you sell') || n.contains('what do we sell') ||
+        n.contains('what item') || n.contains('what items') ||
         n.contains('catalog') || n.contains('list product') || n.contains('show product') ||
-        n.contains('show item') || n.contains('available product') || n.contains('what do you have') ||
-        n.contains('items do you have');
+        n.contains('show item') || n.contains('available product') ||
+        n.contains('what do you have') || n.contains('what do we have') ||
+        n.contains('items do you have') || n.contains('items do we have') ||
+        n.contains('show my product') || n.contains('view product') ||
+        n.contains('our product') || n.contains('our inventory') ||
+        n.contains('list inventory') || n.contains('see inventory') ||
+        n.contains('show inventory');
   }
 
   bool _isInventoryIntent(String input) {
@@ -135,6 +151,13 @@ class Chat {
     final n = input.toLowerCase();
     return n.contains('total sales') || n.contains('revenue') || n.contains('analytics') ||
         n.contains('insight') || n.contains('how much did');
+  }
+
+  bool _isAddProductIntent(String input) {
+    final n = input.toLowerCase();
+    return n.contains('add product') || n.contains('add item') || n.contains('new product') ||
+        n.contains('new item') || n.contains('create product') || n.contains('add service') ||
+        n.contains('add these') || n.contains('bulk add') || n.contains('upload');
   }
 
   String _extractInventoryQuery(String input) {
@@ -169,8 +192,14 @@ class Chat {
     final items = (payload['items'] as List<dynamic>? ?? <dynamic>[])
         .map((row) => Product.fromJson(Map<String, dynamic>.from(row as Map)))
         .toList();
-    if (items.isEmpty) return 'Our catalog is currently being updated.';
-    return items.take(20).map((p) => '${p.name}: ₹${_formatPrice(p.price)}, ${p.stockQuantity} units').join('\n');
+    if (items.isEmpty) {
+      return '🏪 Your catalog is empty right now.\n\nTip: Say *"Add product: [name], price [X], category [Y]"* to add your first product!';
+    }
+    final header = '📦 *Your Products (${items.length}):*\n\n';
+    final lines = items.take(20).map((p) =>
+      '• *${p.name}* — ₹${_formatPrice(p.price)} (${p.stockQuantity} in stock)'
+    ).join('\n');
+    return header + lines;
   }
 
   Future<String> sendMessage(String? text) async {
@@ -178,14 +207,29 @@ class Chat {
     if (input.isEmpty) return '';
 
     if (_isCatalogIntent(input)) {
-      final payload = await browseCatalogTool({'category': _extractCategory(input)});
-      final reply = _formatCatalogReply(payload);
-      _history.add(Message(role: Role.user, content: [TextPart(text: input)]));
-      _history.add(Message(role: Role.model, content: [TextPart(text: reply)]));
-      return reply;
+      // Direct catalog lookup scoped to this user's shop (bypasses tool abstraction)
+      try {
+        final shopId = await getShopIdForUser(userIdentifier);
+        final category = _extractCategory(input);
+        var query = supabase
+            .from('products')
+            .select('id, shop_id, name, price, stock_quantity, category')
+            .eq('shop_id', shopId);
+        if (category != null) query = query.eq('category', category);
+        final rows = await query.limit(20);
+        final products = (rows as List<dynamic>)
+            .map((row) => Product.fromJson(Map<String, dynamic>.from(row as Map)))
+            .toList();
+        final reply = _formatCatalogReply({'items': products.map((p) => p.toJson()).toList()});
+        _history.add(Message(role: Role.user, content: [TextPart(text: input)]));
+        _history.add(Message(role: Role.model, content: [TextPart(text: reply)]));
+        return reply;
+      } catch (e) {
+        return '⚠️ Could not load catalog: $e';
+      }
     }
 
-    if (_isInventoryIntent(input) && !_isBillingIntent(input)) {
+    if (_isInventoryIntent(input) && !_isBillingIntent(input) && !_isAddProductIntent(input)) {
       final query = _extractInventoryQuery(input);
       final products = await findInventoryProducts(query.isEmpty ? input : query);
       final reply = _formatInventoryReply(products);
@@ -202,6 +246,8 @@ class Chat {
       selectedTools = ['createDraftInvoice'];
     } else if (_isAnalyticsIntent(input)) {
       selectedTools = ['businessInsightsTool'];
+    } else if (_isAddProductIntent(input)) {
+      selectedTools = ['proposeProducts'];
     }
 
     Future<dynamic> runGenerate() => ai.generate(
@@ -211,6 +257,7 @@ class Chat {
         ..._history,
       ],
       toolNames: selectedTools,
+      context: {'userIdentifier': userIdentifier},
     );
 
     dynamic response;
@@ -226,6 +273,7 @@ class Chat {
             ..._history,
           ],
           toolNames: <String>[],
+          context: {'userIdentifier': userIdentifier},
         );
       } else {
         rethrow;
@@ -258,69 +306,19 @@ Future<void> main(List<String> arguments) async {
     final data = query.data ?? '';
     final msgId = query.message!.messageId;
 
-    // ── ONBOARDING: GST BUTTON ──────────────────────────────────────────
-    if (data.startsWith('onboard_gst_')) {
-      final isYes = data.contains('_yes_');
+    // ── ONBOARDING CALLBACKS (all prefixed ob_) ─────────────────────────
+    if (data.startsWith('ob_')) {
       await bot.answerCallbackQuery(query.id);
       try {
-        final prompt = await handleGstButtonPress(chatId, isYes);
-        await bot.editMessageText(
-          prompt.text,
-          chatId: chatId,
-          messageId: msgId,
-          replyMarkup: prompt.keyboard,
-        );
+        final result = await processOnboardingCallback(chatId, data);
+        if (result != null) {
+          // Always send as a NEW message so subsequent text input is handled cleanly
+          await bot.sendMessage(chatId, result.text,
+              parseMode: 'Markdown', replyMarkup: result.keyboard);
+        }
       } catch (e) {
-        stderr.writeln('Error handling GST button: $e');
-        await bot.answerCallbackQuery(query.id, text: 'Error processing choice.', showAlert: true);
-      }
-      return;
-    }
-
-    // ── ONBOARDING: BUSINESS TYPE BUTTON ────────────────────────────────
-    if (data.startsWith('onboard_biz_')) {
-      await bot.answerCallbackQuery(query.id);
-      try {
-        final bizType = data
-            .replaceFirst('onboard_biz_', '')
-            .split('_')
-            .first; // Extract type (retail, wholesale, etc.)
-        final bizWords = {
-          'retail': 'Retail',
-          'wholesale': 'Wholesale', 
-          'manufacturer': 'Manufacturer',
-          'other': 'Other',
-        };
-        final bizLabel = bizWords[bizType] ?? bizType;
-        final prompt = await handleBusinessTypeButtonPress(chatId, bizLabel);
-        await bot.editMessageText(
-          prompt.text,
-          chatId: chatId,
-          messageId: msgId,
-          replyMarkup: prompt.keyboard,
-        );
-      } catch (e) {
-        stderr.writeln('Error handling business type button: $e');
-        await bot.answerCallbackQuery(query.id, text: 'Error processing choice.', showAlert: true);
-      }
-      return;
-    }
-
-    // ── ONBOARDING: CONFIRMATION BUTTON ────────────────────────────────
-    if (data.startsWith('onboard_submit_') || data.startsWith('onboard_cancel_')) {
-      final isSubmit = data.startsWith('onboard_submit_');
-      await bot.answerCallbackQuery(query.id);
-      try {
-        final prompt = await handleConfirmationButtonPress(chatId, isSubmit);
-        await bot.editMessageText(
-          prompt.text,
-          chatId: chatId,
-          messageId: msgId,
-          replyMarkup: prompt.keyboard,
-        );
-      } catch (e) {
-        stderr.writeln('Error handling confirmation button: $e');
-        await bot.answerCallbackQuery(query.id, text: 'Error processing choice.', showAlert: true);
+        stderr.writeln('[onboarding-callback] $e');
+        await bot.sendMessage(chatId, '⚠️ Something went wrong. Please try again.');
       }
       return;
     }
@@ -414,11 +412,54 @@ Future<void> main(List<String> arguments) async {
         stderr.writeln('Error switching to CGST/SGST: $e');
         await bot.answerCallbackQuery(query.id, text: 'Failed to switch. Try again.', showAlert: true);
       }
+
+    // ── APPROVE PRODUCT BATCH ──────────────────────────────────────────
+    } else if (data.startsWith('p_approve_')) {
+      final batchId = data.replaceFirst('p_approve_', '');
+      await bot.answerCallbackQuery(query.id, text: '⏳ Adding to inventory...');
+      try {
+        final result = await approveProductBatch(batchId: batchId, reviewedBy: chatId.toString());
+        if (result['success'] == true) {
+          await bot.editMessageText(
+            result['message'] as String,
+            chatId: chatId,
+            messageId: msgId,
+            parseMode: 'Markdown',
+          );
+        } else {
+          await bot.answerCallbackQuery(query.id, text: '❌ ${result['error']}', showAlert: true);
+        }
+      } catch (e) {
+        stderr.writeln('Error approving batch: $e');
+        await bot.answerCallbackQuery(query.id, text: 'Failed to approve. Try again.', showAlert: true);
+      }
+
+    // ── REJECT PRODUCT BATCH ──────────────────────────────────────────
+    } else if (data.startsWith('p_reject_')) {
+      final batchId = data.replaceFirst('p_reject_', '');
+      await bot.answerCallbackQuery(query.id, text: '⏳ Rejecting...');
+      try {
+        final result = await rejectProductBatch(batchId: batchId, reviewedBy: chatId.toString());
+        if (result['success'] == true) {
+          await bot.editMessageText(
+            result['message'] as String,
+            chatId: chatId,
+            messageId: msgId,
+            parseMode: 'Markdown',
+          );
+        } else {
+          await bot.answerCallbackQuery(query.id, text: '❌ ${result['error']}', showAlert: true);
+        }
+      } catch (e) {
+        stderr.writeln('Error rejecting batch: $e');
+        await bot.answerCallbackQuery(query.id, text: 'Failed to reject. Try again.', showAlert: true);
+      }
     }
   });
 
   // ─── MESSAGE HANDLER ────────────────────────────────────────────────────
   bot.onMessage().listen((message) async {
+    print('Incoming message from ${message.chat.id}: ${message.text}');
     final text = message.text?.trim();
     if (text == null || text.isEmpty) return;
 
@@ -426,39 +467,46 @@ Future<void> main(List<String> arguments) async {
     final customerName = message.from?.firstName ?? 'Customer';
     final userIdentifier = message.from?.username ?? message.from?.firstName ?? chatId.toString();
 
-    // ── Onboarding hooks ────────────────────────────────────────────
+    // ── /start command ──────────────────────────────────────────────
     if (text == '/start' || text.toLowerCase() == 'join') {
       try {
-        final startedBy = userIdentifier;
-        final prompt = await startOnboarding(chatId, startedBy);
-        await bot.sendMessage(chatId, prompt.text, replyMarkup: prompt.keyboard);
+        final result = await startOnboarding(chatId, userIdentifier);
+        await bot.sendMessage(chatId, result.text,
+            parseMode: 'Markdown', replyMarkup: result.keyboard);
       } catch (e) {
-        stderr.writeln('[telegram][onboarding-start] chat=$chatId error: $e');
-        await bot.sendMessage(chatId, 'Onboarding could not start right now. Please try /start again.');
+        stderr.writeln('[onboarding-start] chat=$chatId error: $e');
+        await bot.sendMessage(chatId, 'Could not start. Please try /start again.');
       }
       return;
     }
 
-    if (isInOnboarding(chatId)) {
+    // ── Active onboarding text steps ────────────────────────────────
+    final inOnboarding = isInOnboarding(chatId);
+    print('[bot] chat=$chatId isInOnboarding=$inOnboarding text="$text"');
+    if (inOnboarding) {
       try {
-        final resp = await processOnboardingInput(chatId, text);
-        await bot.sendMessage(chatId, resp.text, replyMarkup: resp.keyboard);
+        final result = await processOnboardingText(chatId, text);
+        if (result.text.isNotEmpty) {
+          await bot.sendMessage(chatId, result.text,
+              parseMode: 'Markdown', replyMarkup: result.keyboard);
+        }
       } catch (e) {
-        stderr.writeln('[telegram][onboarding-step] chat=$chatId error: $e');
-        await bot.sendMessage(chatId, 'There was an onboarding error. Please send /start to restart onboarding.');
+        stderr.writeln('[onboarding-text] chat=$chatId error: $e');
+        await bot.sendMessage(chatId, 'Something went wrong. Send /start to restart.');
       }
       return;
     }
 
-    // ── Auto-start onboarding if user is not yet onboarded ────────────
+    // ── Auto-start onboarding for new users ─────────────────────────
     final isOnboarded = await _isUserOnboarded(userIdentifier);
     if (!isOnboarded) {
       try {
-        final prompt = await startOnboarding(chatId, userIdentifier);
-        await bot.sendMessage(chatId, prompt.text, replyMarkup: prompt.keyboard);
+        final result = await startOnboarding(chatId, userIdentifier);
+        await bot.sendMessage(chatId, result.text,
+            parseMode: 'Markdown', replyMarkup: result.keyboard);
       } catch (e) {
-        stderr.writeln('[telegram][onboarding-autostart] chat=$chatId error: $e');
-        await bot.sendMessage(chatId, 'Could not start onboarding automatically. Please send /start.');
+        stderr.writeln('[onboarding-autostart] chat=$chatId error: $e');
+        await bot.sendMessage(chatId, 'Could not start onboarding. Please send /start.');
       }
       return;
     }
@@ -490,8 +538,15 @@ Future<void> main(List<String> arguments) async {
       chatId,
       () => Chat(
         model: modelId,
-        tools: [checkInventoryTool.name, catalogTool.name, createDraftInvoiceTool.name, analyticsTool.name],
+        tools: [
+          checkInventoryTool.name,
+          catalogTool.name,
+          createDraftInvoiceTool.name,
+          analyticsTool.name,
+          proposeProductsTool.name
+        ],
         systemPrompt: _systemPrompt,
+        userIdentifier: userIdentifier,
       ),
     );
 
@@ -536,7 +591,69 @@ Future<void> main(List<String> arguments) async {
           await bot.sendMessage(chatId, reply);
         }
       } else {
-        await bot.sendMessage(chatId, reply.isEmpty ? "I didn't understand that." : reply);
+        // ── Check if product batch was created ─────────────────────────
+        final batchIdMatch = RegExp(
+          r'Batch ID:\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})'
+        ).firstMatch(reply);
+        final batchId = batchIdMatch?.group(1);
+
+        if (batchId != null) {
+          try {
+            final batchData = await getProductBatchDetails(batchId);
+            print('[bot] batchId=$batchId batchData=${batchData == null ? "NULL" : "FOUND"}');
+            if (batchData != null) {
+              final items = (batchData['proposed_products'] as List).map((i) => Map<String, dynamic>.from(i as Map)).toList();
+              
+              String summary = "";
+              if (items.length == 1) {
+                final p = items[0];
+                summary = "🏷 *${p['name']}*\n"
+                          "💰 Price: ₹${p['price']}\n"
+                          "📦 Stock: ${p['stock_quantity'] ?? 0}\n"
+                          "📂 Category: ${p['category']}\n";
+                if (p['description'] != null) {
+                  summary += "📝 Info: ${p['description']}\n";
+                }
+              } else {
+                summary = "📋 *${items.length} Items Found:*\n\n";
+                for (var i = 0; i < items.length; i++) {
+                  final p = items[i];
+                  summary += "${i + 1}. ${p['name']} (₹${p['price']}, ${p['stock_quantity'] ?? 0} pcs)\n";
+                  if (i == 4 && items.length > 5) {
+                    summary += "...and ${items.length - 5} more items.\n";
+                    break;
+                  }
+                }
+              }
+
+              final msg = "📦 *Product Draft Created*\n\n"
+                  "$summary\n"
+                  "Do you want to add these to your inventory?";
+
+              await bot.sendMessage(
+                chatId,
+                msg,
+                parseMode: 'Markdown',
+                replyMarkup: tg.InlineKeyboardMarkup(
+                  inlineKeyboard: [
+                    [
+                      tg.InlineKeyboardButton(text: '❌ REJECT', callbackData: 'p_reject_$batchId'),
+                      tg.InlineKeyboardButton(text: '✅ APPROVE', callbackData: 'p_approve_$batchId'),
+                    ]
+                  ],
+                ),
+              );
+            } else {
+              print('[bot] batchData null — sending raw reply: $reply');
+              await bot.sendMessage(chatId, reply);
+            }
+          } catch (e) {
+            stderr.writeln('Error formatting product batch: $e');
+            await bot.sendMessage(chatId, reply);
+          }
+        } else {
+          await bot.sendMessage(chatId, reply.isEmpty ? "I didn't understand that." : reply);
+        }
       }
 
     } catch (e) {

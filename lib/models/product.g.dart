@@ -13,6 +13,11 @@ _Product _$ProductFromJson(Map<String, dynamic> json) => _Product(
   price: (json['price'] as num).toDouble(),
   stockQuantity: (json['stock_quantity'] as num).toInt(),
   category: json['category'] as String,
+  description: json['description'] as String?,
+  isService: json['is_service'] as bool? ?? false,
+  gstRate: (json['gst_rate'] as num?)?.toDouble() ?? 0,
+  hsnSacCode: json['hsn_sac_code'] as String?,
+  metadata: json['metadata'] as Map<String, dynamic>? ?? const {},
 );
 
 Map<String, dynamic> _$ProductToJson(_Product instance) => <String, dynamic>{
@@ -22,4 +27,9 @@ Map<String, dynamic> _$ProductToJson(_Product instance) => <String, dynamic>{
   'price': instance.price,
   'stock_quantity': instance.stockQuantity,
   'category': instance.category,
+  'description': instance.description,
+  'is_service': instance.isService,
+  'gst_rate': instance.gstRate,
+  'hsn_sac_code': instance.hsnSacCode,
+  'metadata': instance.metadata,
 };
