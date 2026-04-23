@@ -8,5 +8,6 @@ void initializeBackend() {
   browseCatalog;
   createDraftInvoice;
   businessInsightsTool;
+  proposeProducts;
   retailAssistantFlow;
 }

@@ -29,7 +29,7 @@ Future<void> main(List<String> arguments) async {
   print('📊 Dashboard shows:');
     print('   • Models: $aiProvider ($modelId)');
   print('   • Flows: retailAssistantFlow');
-    print('   • Tools: checkInventory, browseCatalogTool, createDraftInvoice, businessInsightsTool');
+    print('   • Tools: checkInventory, browseCatalogTool, createDraftInvoice, businessInsightsTool, proposeProducts');
   print('   • Trace history');
   print('');
   print('Press Ctrl+C to stop.');
@@ -424,12 +424,14 @@ String getGenkitHTML({
                     <span class="chip brand">browseCatalogTool</span>
                     <span class="chip brand">createDraftInvoice</span>
                     <span class="chip brand">businessInsightsTool</span>
+                    <span class="chip brand">proposeProducts</span>
                 </div>
                 <div class="chips">
                     <span class="chip orange">Catalog Browsing</span>
                     <span class="chip orange">Price and Stock</span>
                     <span class="chip orange">Draft Billing</span>
                     <span class="chip orange">Revenue Insights</span>
+                    <span class="chip orange">Product Management</span>
                 </div>
             </article>
 

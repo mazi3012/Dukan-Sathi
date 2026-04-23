@@ -31,7 +31,8 @@ const String _systemPrompt =
   "5. If you propose adding products, ALWAYS include the Batch ID in the format 'Batch ID: [ID]'. "
   "6. customerId and customerState are OPTIONAL — do NOT ask for them; call the tool immediately. "
   "7. For specific product lookups, use checkInventory. For full product lists, use browseCatalogTool. "
-  "8. For analytics/revenue, use businessInsightsTool. For adding new products, use proposeProducts.";
+  "8. For business analytics (revenue, orders, approval status), use businessInsightsTool. Available metrics: total_revenue, total_orders, approved_count, pending_count, rejected_count, average_order_value, approval_rate. "
+  "9. Present analytics in clear format: 'Total Revenue: ₹X | Orders: Y | Approved: Z | Pending: W | Rejected: V'.";
 
 final checkInventoryTool = checkInventory;
 final catalogTool = browseCatalog;
@@ -150,7 +151,11 @@ class Chat {
   bool _isAnalyticsIntent(String input) {
     final n = input.toLowerCase();
     return n.contains('total sales') || n.contains('revenue') || n.contains('analytics') ||
-        n.contains('insight') || n.contains('how much did');
+        n.contains('insight') || n.contains('how much did') || n.contains('profit') ||
+        n.contains('profit margin') || n.contains('earnings') || n.contains('total earnings') ||
+        n.contains('how many orders') || n.contains('order count') || n.contains('approval') ||
+        n.contains('pending') || n.contains('rejected') || n.contains('approved') ||
+        n.contains('average order') || n.contains('approval rate');
   }
 
   bool _isAddProductIntent(String input) {

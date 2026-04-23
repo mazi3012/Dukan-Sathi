@@ -41,7 +41,10 @@ Future<void> main(List<String> arguments) async {
   print('');
   print('🔧 Tools Available:');
   print('   • checkInventory');
+  print('   • browseCatalogTool');
   print('   • createDraftInvoice');
+  print('   • businessInsightsTool ✨ Analytics');
+  print('   • proposeProducts ✨ Product Management');
   print('');
   print('💬 Telegram Bot: @Sathiaibeta_bot');
   print('');
@@ -76,7 +79,7 @@ Future<void> main(List<String> arguments) async {
                   'runAction': '/api/runAction',
                 },
                 'flows': ['/flow/retailAssistantFlow'],
-                'tools': ['checkInventory', 'createDraftInvoice'],
+                'tools': ['checkInventory', 'browseCatalogTool', 'createDraftInvoice', 'businessInsightsTool', 'proposeProducts'],
                 'admin_endpoints': {
                   'roles': '/api/admin/roles',
                   'users': '/api/admin/users',
@@ -116,6 +119,21 @@ Future<void> main(List<String> arguments) async {
                 'name': 'createDraftInvoice',
                 'key': '/tool/createDraftInvoice',
                 'description': 'Create a draft invoice',
+              },
+              {
+                'name': 'browseCatalogTool',
+                'key': '/tool/browseCatalogTool',
+                'description': 'Browse product catalog by category',
+              },
+              {
+                'name': 'businessInsightsTool',
+                'key': '/tool/businessInsightsTool',
+                'description': 'Get business analytics (revenue, orders, approval metrics)',
+              },
+              {
+                'name': 'proposeProducts',
+                'key': '/tool/proposeProducts',
+                'description': 'Propose new products for inventory approval',
               },
             ],
           }))
