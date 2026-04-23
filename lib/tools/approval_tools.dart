@@ -219,6 +219,106 @@ Future<Map<String, dynamic>?> getApprovalDetails(String approvalId) async {
   }
 }
 
+/// Approve a pending product deletion request and remove the products.
+Future<Map<String, dynamic>> approveProductDeletion({
+  required String requestId,
+  required String reviewedBy,
+}) async {
+  try {
+    final requestRows = await supabase
+        .from('draft_product_deletions')
+        .select()
+        .eq('id', requestId)
+        .eq('status', 'PENDING')
+        .single();
+
+    final requestData = Map<String, dynamic>.from(requestRows as Map);
+    final products = (requestData['products'] as List<dynamic>)
+        .map((product) => Map<String, dynamic>.from(product as Map))
+        .toList();
+    final productIds = products
+        .map((product) => product['id']?.toString())
+        .whereType<String>()
+        .toList();
+
+    if (productIds.isEmpty) {
+      return {
+        'success': false,
+        'error': 'Deletion request does not contain any products.',
+      };
+    }
+
+    await supabase.from('products').delete().inFilter('id', productIds);
+
+    await supabase.from('draft_product_deletions').update({
+      'status': 'APPROVED',
+      'reviewed_by': reviewedBy,
+      'reviewed_at': DateTime.now().toIso8601String(),
+      'deleted_at': DateTime.now().toIso8601String(),
+    }).eq('id', requestId);
+
+    return {
+      'success': true,
+      'requestId': requestId,
+      'itemCount': productIds.length,
+      'message': '''✅ *Product Deletion Approved!*
+
+    Removed ${productIds.length} product(s) from inventory.''',
+      'products': products,
+    };
+  } catch (e) {
+    return {
+      'success': false,
+      'error': 'Failed to approve product deletion: $e',
+    };
+  }
+}
+
+/// Reject a pending product deletion request.
+Future<Map<String, dynamic>> rejectProductDeletion({
+  required String requestId,
+  required String reviewedBy,
+  required String rejectionReason,
+}) async {
+  try {
+    await supabase.from('draft_product_deletions').update({
+      'status': 'REJECTED',
+      'reviewed_by': reviewedBy,
+      'reviewed_at': DateTime.now().toIso8601String(),
+      'approval_notes': rejectionReason,
+    }).eq('id', requestId);
+
+    return {
+      'success': true,
+      'requestId': requestId,
+      'message': '''❌ *Product Deletion Rejected*
+
+    Reason: $rejectionReason
+
+    _The product remains in inventory._''',
+    };
+  } catch (e) {
+    return {
+      'success': false,
+      'error': 'Failed to reject product deletion: $e',
+    };
+  }
+}
+
+/// Get product deletion request details for display.
+Future<Map<String, dynamic>?> getProductDeletionRequestDetails(String requestId) async {
+  try {
+    final result = await supabase
+        .from('draft_product_deletions')
+        .select()
+        .eq('id', requestId)
+        .single();
+    return Map<String, dynamic>.from(result as Map);
+  } catch (e) {
+    return null;
+  }
+}
+
 /// Approve a product batch and insert items into the products table
 Future<Map<String, dynamic>> approveProductBatch({
   required String batchId,

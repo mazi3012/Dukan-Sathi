@@ -25,6 +25,13 @@ final retailAssistantFlow = ai.defineFlow(
         normalizedPrompt.contains('new product')) {
       toolNames.add('proposeProducts');
     }
+    if (normalizedPrompt.contains('delete') ||
+        normalizedPrompt.contains('remove') ||
+        normalizedPrompt.contains('archive') ||
+        normalizedPrompt.contains('discard product') ||
+        normalizedPrompt.contains('kill product')) {
+      toolNames.add('requestProductDeletion');
+    }
     if (normalizedPrompt.contains('revenue') ||
         normalizedPrompt.contains('sales') ||
         normalizedPrompt.contains('profit') ||
@@ -44,7 +51,7 @@ final retailAssistantFlow = ai.defineFlow(
           content: [
             TextPart(
               text:
-                  'You are the AI brain for Dukan Sathi Pro. Shop ID is \'b6ff658b-c750-4c9a-b9ce-909ef6c52674\'. When a user asks about prices or stock, use the checkInventory tool. When a user asks to create a bill, use the createDraftInvoice tool. For business analytics, revenue, or sales data, use the businessInsightsTool. Always reply concisely in a friendly manner. Important: When a bill is created, it requires human approval before finalization. Summarize the draft items and total amount (including taxes). Tell the user to check for the approval message shortly.',
+                  'You are the AI brain for Dukan Sathi Pro. Shop ID is \'b6ff658b-c750-4c9a-b9ce-909ef6c52674\'. When a user asks about prices or stock, use the checkInventory tool. When a user asks to create a bill, use the createDraftInvoice tool. For business analytics, revenue, or sales data, use the businessInsightsTool. When a user wants to add products, use proposeProducts. When a user wants to delete or remove a product, use requestProductDeletion and never delete directly. Always reply concisely in a friendly manner. Important: Product additions and deletions require human approval before finalization. Summarize the draft items and tell the user to check for the approval message shortly.',
             ),
           ],
         ),

@@ -29,7 +29,8 @@ Future<void> main(List<String> arguments) async {
   print('📊 Dashboard shows:');
     print('   • Models: $aiProvider ($modelId)');
   print('   • Flows: retailAssistantFlow');
-    print('   • Tools: checkInventory, browseCatalogTool, createDraftInvoice, businessInsightsTool, proposeProducts');
+        print('   • Tools: checkInventory, browseCatalogTool, createDraftInvoice, businessInsightsTool, proposeProducts, requestProductDeletion');
+        print('   • Functions: approval handlers, request handlers, inventory lookup helpers');
   print('   • Trace history');
   print('');
   print('Press Ctrl+C to stop.');
@@ -56,8 +57,45 @@ Future<void> main(List<String> arguments) async {
             'actions': [
               {
                 'name': 'retailAssistantFlow',
+                                'type': 'flow',
                 'key': '/flow/retailAssistantFlow',
                 'description': 'Dukan Sathi retail assistant',
+                            },
+                            {
+                                'name': 'checkInventory',
+                                'type': 'tool',
+                                'key': '/tool/checkInventory',
+                                'description': 'Find matching products by name fragment',
+                            },
+                            {
+                                'name': 'browseCatalogTool',
+                                'type': 'tool',
+                                'key': '/tool/browseCatalogTool',
+                                'description': 'List available catalog items',
+                            },
+                            {
+                                'name': 'createDraftInvoice',
+                                'type': 'tool',
+                                'key': '/tool/createDraftInvoice',
+                                'description': 'Create invoice drafts that require approval',
+                            },
+                            {
+                                'name': 'businessInsightsTool',
+                                'type': 'tool',
+                                'key': '/tool/businessInsightsTool',
+                                'description': 'Revenue, order, and approval analytics',
+                            },
+                            {
+                                'name': 'proposeProducts',
+                                'type': 'tool',
+                                'key': '/tool/proposeProducts',
+                                'description': 'Propose new inventory items for approval',
+                            },
+                            {
+                                'name': 'requestProductDeletion',
+                                'type': 'tool',
+                                'key': '/tool/requestProductDeletion',
+                                'description': 'Request approval before deleting products',
               },
             ],
           }))
@@ -260,6 +298,11 @@ String getGenkitHTML({
             gap: 7px;
         }
 
+        .stack {
+            display: grid;
+            gap: 10px;
+        }
+
         .chip {
             font-size: 0.84rem;
             border-radius: 999px;
@@ -272,6 +315,75 @@ String getGenkitHTML({
         .chip.brand { background: #dbf5f2; border-color: #8cd8d0; color: #0f766e; }
         .chip.orange { background: #ffedd5; border-color: #fdba74; color: #9a3412; }
         .chip.blue { background: #dbeafe; border-color: #93c5fd; color: #1d4ed8; }
+        .chip.slate { background: #e2e8f0; border-color: #cbd5e1; color: #334155; }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            padding: 4px 9px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+        }
+
+        .badge.flow { background: #dbeafe; color: #1d4ed8; }
+        .badge.tool { background: #ddf7e8; color: #106b3f; }
+        .badge.fn { background: #f3e8ff; color: #7c3aed; }
+
+        .flow-map {
+            display: grid;
+            gap: 10px;
+        }
+
+        .node {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: #fff;
+            padding: 12px;
+        }
+
+        .node-title {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .node small {
+            color: var(--muted);
+            display: block;
+            line-height: 1.45;
+        }
+
+        .connector {
+            margin-left: 16px;
+            padding-left: 14px;
+            border-left: 2px dashed #cbd5e1;
+            color: var(--muted);
+            font-size: 0.84rem;
+        }
+
+        .registry {
+            display: grid;
+            gap: 8px;
+        }
+
+        .registry-item {
+            border: 1px solid var(--line);
+            background: #fff;
+            border-radius: 12px;
+            padding: 10px 12px;
+        }
+
+        .registry-item strong {
+            display: block;
+            margin-bottom: 4px;
+        }
 
         .prompt-area {
             display: grid;
@@ -425,6 +537,7 @@ String getGenkitHTML({
                     <span class="chip brand">createDraftInvoice</span>
                     <span class="chip brand">businessInsightsTool</span>
                     <span class="chip brand">proposeProducts</span>
+                    <span class="chip brand">requestProductDeletion</span>
                 </div>
                 <div class="chips">
                     <span class="chip orange">Catalog Browsing</span>
@@ -432,6 +545,7 @@ String getGenkitHTML({
                     <span class="chip orange">Draft Billing</span>
                     <span class="chip orange">Revenue Insights</span>
                     <span class="chip orange">Product Management</span>
+                    <span class="chip orange">Delete Requests</span>
                 </div>
             </article>
 
@@ -443,6 +557,35 @@ String getGenkitHTML({
                     <li>See output, status, and trace history below.</li>
                     <li>Use Action Explorer to inspect connected actions.</li>
                 </ol>
+            </article>
+
+            <article class="panel span-4">
+                <h3>System Map</h3>
+                <div class="flow-map">
+                    <div class="node">
+                        <div class="node-title">
+                            <span>retailAssistantFlow</span>
+                            <span class="badge flow">flow</span>
+                        </div>
+                        <small>Main conversation router for Telegram and dashboard runs.</small>
+                    </div>
+                    <div class="connector">Routes to one tool per request when possible.</div>
+                    <div class="node">
+                        <div class="node-title">
+                            <span>Inventory + Catalog Tools</span>
+                            <span class="badge tool">tools</span>
+                        </div>
+                        <small>checkInventory, browseCatalogTool, proposeProducts, requestProductDeletion.</small>
+                    </div>
+                    <div class="connector">Add and delete actions both wait for human approval.</div>
+                    <div class="node">
+                        <div class="node-title">
+                            <span>Approval Handlers</span>
+                            <span class="badge fn">functions</span>
+                        </div>
+                        <small>approveDraftInvoice, rejectDraftInvoice, approveProductBatch, rejectProductBatch, approveProductDeletion, rejectProductDeletion.</small>
+                    </div>
+                </div>
             </article>
 
             <article class="panel span-7">
@@ -484,6 +627,7 @@ String getGenkitHTML({
                     <table>
                         <thead>
                             <tr>
+                                <th>Type</th>
                                 <th>Name</th>
                                 <th>Key</th>
                                 <th>Description</th>
@@ -514,6 +658,40 @@ String getGenkitHTML({
                     </table>
                 </div>
             </article>
+
+            <article class="panel span-12">
+                <h3>Core Functions</h3>
+                <div class="registry">
+                    <div class="registry-item">
+                        <strong>Inventory lookup</strong>
+                        <div class="chips">
+                            <span class="badge fn">findInventoryProducts</span>
+                            <span class="badge fn">_formatInventoryReply</span>
+                            <span class="badge fn">_formatCatalogReply</span>
+                        </div>
+                    </div>
+                    <div class="registry-item">
+                        <strong>Approval workflow</strong>
+                        <div class="chips">
+                            <span class="badge fn">approveDraftInvoice</span>
+                            <span class="badge fn">rejectDraftInvoice</span>
+                            <span class="badge fn">approveProductBatch</span>
+                            <span class="badge fn">rejectProductBatch</span>
+                            <span class="badge fn">approveProductDeletion</span>
+                            <span class="badge fn">rejectProductDeletion</span>
+                        </div>
+                    </div>
+                    <div class="registry-item">
+                        <strong>Request details + formatting</strong>
+                        <div class="chips">
+                            <span class="badge fn">getApprovalDetails</span>
+                            <span class="badge fn">getProductBatchDetails</span>
+                            <span class="badge fn">getProductDeletionRequestDetails</span>
+                            <span class="badge fn">_buildInvoiceMessage</span>
+                        </div>
+                    </div>
+                </div>
+            </article>
         </section>
     </div>
 
@@ -536,20 +714,27 @@ String getGenkitHTML({
                 const data = await res.json();
                 const actions = data.actions || [];
                 if (!actions.length) {
-                    table.innerHTML = '<tr><td colspan="3">No actions found.</td></tr>';
+                    table.innerHTML = '<tr><td colspan="4">No actions found.</td></tr>';
                     return;
                 }
 
                 table.innerHTML = actions.map(action => {
                     return '<tr>' +
+                        '<td>' + escapeHtml(action.type || inferActionType(action.key)) + '</td>' +
                         '<td>' + escapeHtml(action.name || '-') + '</td>' +
                         '<td>' + escapeHtml(action.key || '-') + '</td>' +
                         '<td>' + escapeHtml(action.description || '-') + '</td>' +
                     '</tr>';
                 }).join('');
             } catch (e) {
-                table.innerHTML = '<tr><td colspan="3">Could not load actions: ' + escapeHtml(e.message) + '</td></tr>';
+                table.innerHTML = '<tr><td colspan="4">Could not load actions: ' + escapeHtml(e.message) + '</td></tr>';
             }
+        }
+
+        function inferActionType(key) {
+            if ((key || '').startsWith('/flow/')) return 'flow';
+            if ((key || '').startsWith('/tool/')) return 'tool';
+            return 'function';
         }
 
         async function runFlow() {

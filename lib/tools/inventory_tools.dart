@@ -1,4 +1,5 @@
 import 'package:schemantic/schemantic.dart';
+import 'package:uuid/uuid.dart';
 
 import '../core/database.dart';
 import '../runtime/genkit_runtime.dart';
@@ -213,3 +214,158 @@ final proposeProductsTool =
 );
 
 final proposeProducts = proposeProductsTool;
+
+Future<Map<String, dynamic>> createProductBatchRequest({
+  required String userIdentifier,
+  required List<Map<String, dynamic>> products,
+}) async {
+  if (products.isEmpty) {
+    return {
+      'success': false,
+      'message': 'No products were provided.',
+    };
+  }
+
+  final shopId = await getShopIdForUser(userIdentifier);
+  final response = await supabase.from('draft_product_batches').insert({
+    'shop_id': shopId,
+    'proposed_products': products,
+    'status': 'PENDING',
+  }).select('id').single();
+
+  return {
+    'success': true,
+    'batchId': response['id'],
+    'itemCount': products.length,
+    'products': products,
+  };
+}
+
+Future<Map<String, dynamic>> createProductDeletionRequest({
+  required String userIdentifier,
+  required String rawQuery,
+  String? reason,
+}) async {
+  final normalizedQuery = rawQuery.toLowerCase().trim();
+  final shopId = await getShopIdForUser(userIdentifier);
+
+  final listQuery = normalizedQuery.contains('last item') ||
+          normalizedQuery.contains('last one') ||
+          normalizedQuery.contains('first item') ||
+          normalizedQuery.contains('first one') ||
+          normalizedQuery.contains('1st one')
+      ? await supabase
+          .from('products')
+          .select('id, shop_id, name, price, stock_quantity, category')
+          .eq('shop_id', shopId)
+          .limit(50)
+      : null;
+
+  final matches = listQuery == null
+      ? await findInventoryProducts(rawQuery, shopId)
+      : (listQuery as List<dynamic>).map((row) => _productFromRow(row as Map)).toList();
+
+  if (matches.isEmpty) {
+    return {
+      'success': false,
+      'message': 'No products matched "$rawQuery".',
+    };
+  }
+
+  final selectedProducts = normalizedQuery.contains('last item') ||
+          normalizedQuery.contains('last one')
+      ? [matches.last]
+      : normalizedQuery.contains('first item') ||
+              normalizedQuery.contains('first one') ||
+              normalizedQuery.contains('1st one')
+          ? [matches.first]
+          : matches.length > 1 && matches.first.name.toLowerCase() != rawQuery.toLowerCase()
+              ? [matches.first]
+              : matches;
+
+  final requestId = const Uuid().v4();
+  final payload = selectedProducts.map((product) {
+    return {
+      'id': product.id,
+      'name': product.name,
+      'price': product.price,
+      'stock_quantity': product.stockQuantity,
+      'category': product.category,
+    };
+  }).toList();
+
+  await supabase.from('draft_product_deletions').insert({
+    'id': requestId,
+    'shop_id': shopId,
+    'requested_by': userIdentifier,
+    'products': payload,
+    'reason': reason,
+    'status': 'PENDING',
+  });
+
+  return {
+    'success': true,
+    'requestId': requestId,
+    'productName': payload.first['name']?.toString() ?? rawQuery,
+    'itemCount': payload.length,
+    'products': payload,
+  };
+}
+
+final SchemanticType<Map<String, dynamic>> requestProductDeletionInputSchema =
+    SchemanticType.from<Map<String, dynamic>>(
+  jsonSchema: {
+    'type': 'object',
+    'properties': {
+      'productName': {'type': 'string'},
+      'product_name': {'type': 'string'},
+      'reason': {'type': 'string'},
+    },
+    'required': ['productName'],
+    'additionalProperties': false,
+  },
+  parse: (json) => Map<String, dynamic>.from(json as Map),
+);
+
+final requestProductDeletionTool =
+    ai.defineTool<Map<String, dynamic>, Map<String, dynamic>>(
+  name: 'deleteProduct',
+  description:
+      'Create a human-approval request before deleting one or more products from inventory.',
+  inputSchema: requestProductDeletionInputSchema,
+  fn: (input, context) async {
+    final rawName = ((input['productName'] as String?) ?? (input['product_name'] as String?))?.trim() ?? '';
+    final reason = (input['reason'] as String?)?.trim();
+    if (rawName.isEmpty) {
+      return {
+        'success': false,
+        'message': 'Product name is required.',
+      };
+    }
+
+    final result = await createProductDeletionRequest(
+      userIdentifier: context.context?['userIdentifier']?.toString() ?? '',
+      rawQuery: rawName,
+      reason: reason,
+    );
+
+    if (result['success'] != true) {
+      return result;
+    }
+
+    return {
+      'success': true,
+      'message': '''🗑 *Product Deletion Request Created*
+
+Delete Request ID: ${result['requestId']}
+Items: ${result['itemCount']}
+
+Human approval is required before any product is removed.''',
+      'requestId': result['requestId'],
+      'itemCount': result['itemCount'],
+      'products': result['products'],
+    };
+  },
+);
+
+final requestProductDeletion = requestProductDeletionTool;

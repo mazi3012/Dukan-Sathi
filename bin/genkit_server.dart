@@ -45,6 +45,7 @@ Future<void> main(List<String> arguments) async {
   print('   • createDraftInvoice');
   print('   • businessInsightsTool ✨ Analytics');
   print('   • proposeProducts ✨ Product Management');
+  print('   • requestProductDeletion ✨ Human approval delete flow');
   print('');
   print('💬 Telegram Bot: @Sathiaibeta_bot');
   print('');
@@ -79,7 +80,7 @@ Future<void> main(List<String> arguments) async {
                   'runAction': '/api/runAction',
                 },
                 'flows': ['/flow/retailAssistantFlow'],
-                'tools': ['checkInventory', 'browseCatalogTool', 'createDraftInvoice', 'businessInsightsTool', 'proposeProducts'],
+                'tools': ['checkInventory', 'browseCatalogTool', 'createDraftInvoice', 'businessInsightsTool', 'proposeProducts', 'requestProductDeletion'],
                 'admin_endpoints': {
                   'roles': '/api/admin/roles',
                   'users': '/api/admin/users',
@@ -105,6 +106,7 @@ Future<void> main(List<String> arguments) async {
             'actions': [
               {
                 'name': 'retailAssistantFlow',
+                'type': 'flow',
                 'key': '/flow/retailAssistantFlow',
                 'description': 'Retail assistant AI flow',
                 'input_schema': {'type': 'string'},
@@ -112,28 +114,39 @@ Future<void> main(List<String> arguments) async {
               },
               {
                 'name': 'checkInventory',
+                'type': 'tool',
                 'key': '/tool/checkInventory',
                 'description': 'Check product inventory and prices',
               },
               {
                 'name': 'createDraftInvoice',
+                'type': 'tool',
                 'key': '/tool/createDraftInvoice',
                 'description': 'Create a draft invoice',
               },
               {
                 'name': 'browseCatalogTool',
+                'type': 'tool',
                 'key': '/tool/browseCatalogTool',
                 'description': 'Browse product catalog by category',
               },
               {
                 'name': 'businessInsightsTool',
+                'type': 'tool',
                 'key': '/tool/businessInsightsTool',
                 'description': 'Get business analytics (revenue, orders, approval metrics)',
               },
               {
                 'name': 'proposeProducts',
+                'type': 'tool',
                 'key': '/tool/proposeProducts',
                 'description': 'Propose new products for inventory approval',
+              },
+              {
+                'name': 'requestProductDeletion',
+                'type': 'tool',
+                'key': '/tool/requestProductDeletion',
+                'description': 'Request approval before deleting products',
               },
             ],
           }))

@@ -9,5 +9,6 @@ void initializeBackend() {
   createDraftInvoice;
   businessInsightsTool;
   proposeProducts;
+  requestProductDeletion;
   retailAssistantFlow;
 }

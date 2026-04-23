@@ -21,13 +21,14 @@ Future<void> main(List<String> arguments) async {
   print('📊 Dashboard Features:');
     print('   • Models: Google GenAI SDK (MODEL_ID from env)');
   print('   • Flows: retailAssistantFlow');
-  print('   • Tools: checkInventory, createDraftInvoice');
+    print('   • Tools: checkInventory, browseCatalogTool, createDraftInvoice, businessInsightsTool, proposeProducts, requestProductDeletion');
   print('   • Trace history & telemetry');
   print('');
   print('Press Ctrl+C to stop.');
   print('');
   
   server.listen((HttpRequest request) async {
+                                'type': 'flow',
     try {
       if (request.method == 'GET' && request.uri.path == '/') {
         // Serve the HTML UI
@@ -35,28 +36,39 @@ Future<void> main(List<String> arguments) async {
         request.response
           ..statusCode = 200
           ..headers.contentType = ContentType.html
+                                'type': 'tool',
           ..write(html)
           ..close();
       } else if (request.method == 'GET' && request.uri.path == '/api/listActions') {
+                            {
+                                'name': 'browseCatalogTool',
+                                'type': 'tool',
+                                'key': '/tool/browseCatalogTool',
+                                'description': 'Browse product catalog by category',
+                            },
         // Return list of actions
         request.response
+                                'type': 'tool',
           ..statusCode = 200
           ..headers.contentType = ContentType.json
           ..write(jsonEncode({
-            'actions': [
-              {
-                'name': 'retailAssistantFlow',
-                'key': '/flow/retailAssistantFlow',
-                'description': 'Dukan Sathi retail assistant',
                 'inputSchema': {'type': 'string'},
                 'outputSchema': {'type': 'string'},
+                                'type': 'tool',
               },
             ],
           }))
           ..close();
       } else if (request.method == 'POST' && request.uri.path == '/api/runAction') {
+                                'type': 'tool',
         var body = await utf8.decodeStream(request);
         try {
+                            },
+                            {
+                                'name': 'requestProductDeletion',
+                                'type': 'tool',
+                                'key': '/tool/requestProductDeletion',
+                                'description': 'Request approval before deleting products',
           final data = jsonDecode(body) as Map<String, dynamic>;
           final input = data['input'] as String?;
           
