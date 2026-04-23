@@ -52,3 +52,13 @@ Date: 2026-04-22
 
 - Embedded a Unicode-capable font in the invoice PDF renderer so the `₹` symbol renders correctly instead of showing fallback glyph boxes.
 - Kept the rest of the invoice layout unchanged while improving currency readability on mobile viewers.
+
+Telegram approvals and billing hardening
+Date: 2026-04-23
+
+- Added `draft_product_deletions` migration for human-in-the-loop product deletion approvals in Supabase.
+- Telegram flow now supports direct draft creation for product deletion and bulk product additions with explicit approve/reject actions.
+- Improved image-to-inventory draft parsing to tolerate numeric fields returned as strings from OCR/model output.
+- Refactored billing draft creation into a reusable request function and added fuzzy product matching for shorthand names.
+- Added deterministic billing parsing in Telegram for common messages like `Make a bill for 2 parle g biscuit` to reduce model-only fallback failures.
+- Updated Genkit UI/server views to surface flows, tools, and functions for easier system tracking.
