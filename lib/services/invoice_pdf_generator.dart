@@ -66,8 +66,10 @@ class InvoicePdfGenerator {
     required String invoiceNumber,
   }) async {
     final approval = await _fetchApproval(approvalId);
+    final approvalData = await _fetchApprovalData(approvalId);
     final template = resolveTemplate(approval.proposedTaxBreakdown);
     final shop = await _fetchShop(approval.shopId);
+    final customerName = approvalData?['customer_name'] as String?;
     final customer = approval.customerId == null
         ? null
         : await _fetchCustomer(approval.customerId!);
@@ -89,7 +91,9 @@ class InvoicePdfGenerator {
             shopState: shop['state'] as String? ?? '-',
             gstNumber: shop['gst_registration_number'] as String?,
             businessType: shop['business_type'] as String? ?? 'Retail',
-            customerName: customer?['name'] as String? ?? 'Walk-in Customer',
+            customerName: customerName?.trim().isNotEmpty == true
+              ? customerName!.trim()
+              : customer?['name'] as String? ?? 'Walk-in Customer',
             customerPhone: customer?['phone'] as String?,
             invoiceNumber: invoiceNumber,
             approvedAt: approvedAt,
@@ -124,6 +128,15 @@ class InvoicePdfGenerator {
         .eq('approval_id', approvalId)
         .single();
     return DraftApproval.fromJson(Map<String, dynamic>.from(approvalRows as Map));
+  }
+
+  static Future<Map<String, dynamic>> _fetchApprovalData(String approvalId) async {
+    final approvalRows = await supabase
+        .from('draft_approvals')
+        .select()
+        .eq('approval_id', approvalId)
+        .single();
+    return Map<String, dynamic>.from(approvalRows as Map);
   }
 
   static Future<Map<String, dynamic>> _fetchShop(String shopId) async {

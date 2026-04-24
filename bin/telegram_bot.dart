@@ -22,6 +22,12 @@ final Map<int, Chat> activeSessions = {};
 
 // Track pending rejection flows: chatId -> approvalId
 final Map<int, String> pendingRejections = {};
+// Track pending discount edits: chatId -> approvalId
+final Map<int, String> pendingDiscountEdits = {};
+// Track pending partial payment amount input: chatId -> approvalId
+final Map<int, String> pendingPartialPaymentEdits = {};
+// Track customer-name hints by approval id when DB schema is behind latest columns.
+final Map<String, String> draftCustomerNameHints = {};
 // Track pending image import confirmation: chatId -> telegram file URL
 final Map<int, String> pendingImageImports = {};
 
@@ -32,11 +38,29 @@ const String _systemPrompt =
   "3. No narration (never say 'I am checking' or 'Let me look up'). Use tools silently, output final result only. "
   "4. If you create a draft invoice, ALWAYS include the Approval ID in the format 'Approval ID: [ID]'. "
   "5. If you propose adding products, ALWAYS include the Batch ID in the format 'Batch ID: [ID]'. "
-  "6. customerId and customerState are OPTIONAL — do NOT ask for them; call the tool immediately. "
+  "6. customerId, customerName, and customerState are OPTIONAL — do NOT ask for them; call the tool immediately. "
+  "If a customer name is mentioned, pass customerName. If no customer is mentioned, use walk-in customer. "
   "7. For specific product lookups, use checkInventory. For full product lists, use browseCatalogTool. "
   "8. For business analytics (revenue, orders, approval status), use businessInsightsTool. Available metrics: total_revenue, total_orders, approved_count, pending_count, rejected_count, average_order_value, approval_rate. "
   "9. Present analytics in clear format: 'Total Revenue: ₹X | Orders: Y | Approved: Z | Pending: W | Rejected: V'. "
   "10. For product deletion, use deleteProduct and always include 'Delete Request ID: [ID]' in the response so Telegram can show approval buttons.";
+
+DateTime _nowIst() => DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
+
+String _twoDigits(int value) => value.toString().padLeft(2, '0');
+
+String _formatIstTime(DateTime instant) {
+  var hour = instant.hour;
+  final minute = _twoDigits(instant.minute);
+  final period = hour >= 12 ? 'PM' : 'AM';
+  hour = hour % 12;
+  if (hour == 0) hour = 12;
+  return '${_twoDigits(hour)}:$minute $period';
+}
+
+String _formatIstDate(DateTime instant) {
+  return '${instant.year}-${_twoDigits(instant.month)}-${_twoDigits(instant.day)}';
+}
 
 final checkInventoryTool = checkInventory;
 final catalogTool = browseCatalog;
@@ -81,21 +105,136 @@ tg.InlineKeyboardMarkup _buildInvoiceKeyboard(String approvalId, String currentG
   }
 
   final List<tg.InlineKeyboardButton> row2 = [
+    tg.InlineKeyboardButton(text: '💰 PAID', callbackData: 'pay_paid_$approvalId'),
+    tg.InlineKeyboardButton(text: '🕒 PARTIAL', callbackData: 'pay_partial_$approvalId'),
+    tg.InlineKeyboardButton(text: '⭕ UNPAID', callbackData: 'pay_unpaid_$approvalId'),
+  ];
+
+  final List<tg.InlineKeyboardButton> row3 = [
+    tg.InlineKeyboardButton(text: '✏️ DISCOUNT', callbackData: 'edit_discount_$approvalId'),
     tg.InlineKeyboardButton(text: '❌ REJECT', callbackData: 'reject_$approvalId'),
     tg.InlineKeyboardButton(text: '✅ APPROVE', callbackData: 'approve_$approvalId'),
   ];
 
   return tg.InlineKeyboardMarkup(
-    inlineKeyboard: isRegistered ? [row1, row2] : [row2],
+    inlineKeyboard: isRegistered ? [row1, row2, row3] : [row2, row3],
   );
 }
 
 // ─── HELPER: build formatted invoice message from DB ─────────────────────────
+Future<String> _resolveDraftCustomerName(Map<String, dynamic> draftData) async {
+  final explicitName = draftData['customer_name']?.toString().trim();
+  if (explicitName != null && explicitName.isNotEmpty) {
+    return explicitName;
+  }
+
+  final approvalId = draftData['approval_id']?.toString();
+  if (approvalId != null) {
+    final hintedName = draftCustomerNameHints[approvalId]?.trim();
+    if (hintedName != null && hintedName.isNotEmpty) {
+      return hintedName;
+    }
+  }
+
+  final customerId = draftData['customer_id']?.toString();
+  if (customerId == null || customerId.isEmpty) {
+    return 'Walk-in Customer';
+  }
+
+  try {
+    final customerRows = await supabase
+        .from('customers')
+        .select('name')
+        .eq('id', customerId)
+        .single();
+    final customer = Map<String, dynamic>.from(customerRows as Map);
+    return customer['name']?.toString().trim().isNotEmpty == true
+        ? customer['name'].toString().trim()
+        : 'Walk-in Customer';
+  } catch (_) {
+    return 'Walk-in Customer';
+  }
+}
+
+String? _extractBillingCustomerName(String input) {
+  var text = input.toLowerCase().trim();
+  text = text
+      .replaceAll(RegExp(r'^(please\s+)?(make|create|generate)\s+(a\s+)?(bill|invoice)\s*(for|with|to)?\s*'), '')
+      .replaceAll(RegExp(r'\.$'), '')
+      .trim();
+
+  if (text.isEmpty) {
+    return null;
+  }
+
+  final stopWords = {
+    'he', 'she', 'they', 'customer', 'buyer', 'bought', 'took', 'takes', 'take',
+    'brought', 'want', 'needs', 'need', 'please', 'for', 'to', 'the', 'a', 'an',
+    'of', 'item', 'items', 'product', 'products', 'with', 'and', 'plus', 'has', 'have', 'got'
+  };
+
+  final tokens = text.split(RegExp(r'\s+')).where((token) => token.isNotEmpty).toList();
+  final nameTokens = <String>[];
+  for (final token in tokens) {
+    if (RegExp(r'^\d+$').hasMatch(token)) {
+      break;
+    }
+    if (stopWords.contains(token)) {
+      break;
+    }
+    nameTokens.add(token);
+  }
+
+  if (nameTokens.isEmpty) {
+    return null;
+  }
+
+  return nameTokens.map((token) => token[0].toUpperCase() + token.substring(1)).join(' ');
+}
+
+double? _parsePaidAmountText(String input) {
+  final normalized = input.trim().replaceAll(',', '').toLowerCase();
+  final amountMatch = RegExp(r'^(?:₹|rs\.?\s*)?(\d+(?:\.\d+)?)\s*(?:rs|rupees)?$').firstMatch(normalized);
+  if (amountMatch == null) {
+    return null;
+  }
+  return double.tryParse(amountMatch.group(1)!);
+}
+
+Map<String, dynamic>? _parseDiscountText(String input) {
+  final normalized = input.trim().replaceAll(',', '').toLowerCase();
+  final percentMatch = RegExp(r'^(\d+(?:\.\d+)?)\s*%$').firstMatch(normalized);
+  if (percentMatch != null) {
+    return {
+      'discountType': 'PERCENT',
+      'discountValue': double.parse(percentMatch.group(1)!),
+    };
+  }
+
+  final amountMatch = RegExp(r'^(?:₹|rs\.?\s*)?(\d+(?:\.\d+)?)\s*(?:rs|rupees)?$').firstMatch(normalized);
+  if (amountMatch != null) {
+    return {
+      'discountType': 'AMOUNT',
+      'discountValue': double.parse(amountMatch.group(1)!),
+    };
+  }
+
+  return null;
+}
+
 Future<String> _buildInvoiceMessage(
   Map<String, dynamic> draftData,
-  String customerName,
 ) async {
   final approval = DraftApproval.fromJson(draftData);
+  final customerName = await _resolveDraftCustomerName(draftData);
+  final paymentStatus = draftData['payment_status']?.toString();
+  final amountPaid = (draftData['amount_paid'] as num?)?.toDouble();
+  final dueAmount = (draftData['due_amount'] as num?)?.toDouble();
+  final discountType = draftData['discount_type']?.toString();
+  final discountValue = (draftData['discount_value'] as num?)?.toDouble();
+  final discountAmount = (draftData['discount_amount'] as num?)?.toDouble();
+  final subtotalBeforeDiscount = (draftData['subtotal_before_discount'] as num?)?.toDouble();
+  final subtotalAfterDiscount = (draftData['subtotal_after_discount'] as num?)?.toDouble();
   final itemDescriptions = <String>[];
   for (final item in approval.proposedItems) {
     try {
@@ -114,6 +253,14 @@ Future<String> _buildInvoiceMessage(
     approval: approval,
     customerName: customerName,
     itemDescriptions: itemDescriptions,
+    paymentStatus: paymentStatus,
+    amountPaid: amountPaid,
+    dueAmount: dueAmount,
+    discountType: discountType,
+    discountValue: discountValue,
+    discountAmount: discountAmount,
+    subtotalBeforeDiscount: subtotalBeforeDiscount,
+    subtotalAfterDiscount: subtotalAfterDiscount,
   );
 }
 
@@ -445,7 +592,10 @@ class Chat {
         n.contains('profit margin') || n.contains('earnings') || n.contains('total earnings') ||
         n.contains('how many orders') || n.contains('order count') || n.contains('approval') ||
         n.contains('pending') || n.contains('rejected') || n.contains('approved') ||
-        n.contains('average order') || n.contains('approval rate');
+      n.contains('average order') || n.contains('approval rate') ||
+      n.contains('today') || n.contains('yesterday') || n.contains('this week') ||
+      n.contains('last week') || n.contains('this month') || n.contains('last month') ||
+      n.contains('date range') || n.contains('between') || n.contains('from ') || n.contains('to ');
   }
 
   bool _isAddProductIntent(String input) {
@@ -461,6 +611,26 @@ class Chat {
         n.contains('delete item') || n.contains('remove item') ||
         n.contains('delete this product') || n.contains('remove this product') ||
         n.contains('archive product') || n.contains('discard product');
+  }
+
+  bool _isTimeIntent(String input) {
+    final n = input.toLowerCase();
+    return n.contains('what time is it') ||
+        n.contains('what is the time') ||
+        n.contains('what is the time now') ||
+        n.contains('current time') ||
+        n.contains('time now') ||
+        n.contains('tell me the time');
+  }
+
+  bool _isDateIntent(String input) {
+    final n = input.toLowerCase();
+    return n.contains('what is the date') ||
+        n.contains('what is today\'s date') ||
+        n.contains('today\'s date') ||
+        n.contains('current date') ||
+        n.contains('date today') ||
+        n.contains('what day is it');
   }
 
   String _extractInventoryQuery(String input) {
@@ -508,7 +678,7 @@ class Chat {
   Map<String, int> _parseBillingRequestedItems(String input) {
     var text = input.toLowerCase().trim();
     text = text
-        .replaceAll(RegExp(r'^(please\s+)?(make|create|generate)\s+(a\s+)?(bill|invoice)\s*(for|with)?\s*'), '')
+        .replaceAll(RegExp(r'^(please\s+)?(make|create|generate)\s+(a\s+)?(bill|invoice)\s*(for|with|to)?\s*'), '')
         .replaceAll(RegExp(r'\.$'), '')
         .trim();
 
@@ -516,35 +686,45 @@ class Chat {
       return {};
     }
 
-    final parts = text
-        .split(RegExp(r'\s*(?:,| and )\s*'))
-        .map((p) => p.trim())
-        .where((p) => p.isNotEmpty)
-        .toList();
-
     final requested = <String, int>{};
 
-    for (final part in parts) {
-      final qtyFirst = RegExp(r'^(\d+)\s*x?\s+(.+)$').firstMatch(part);
-      final qtyLast = RegExp(r'^(.+?)\s*x\s*(\d+)$').firstMatch(part);
+    final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final qtyBeforeNamePattern = RegExp(
+      r'(\d+)\s*x?\s+([a-z0-9][a-z0-9\s\-()\/]*?)(?=(?:\s+(?:and|with|plus|,|;|\.|$))|$)',
+      caseSensitive: false,
+    );
+    final qtyAfterNamePattern = RegExp(
+      r'([a-z0-9][a-z0-9\s\-()\/]*?)\s*x\s*(\d+)(?=(?:\s+(?:and|with|plus|,|;|\.|$))|$)',
+      caseSensitive: false,
+    );
 
-      String? name;
-      int? qty;
-
-      if (qtyFirst != null) {
-        qty = int.tryParse(qtyFirst.group(1)!);
-        name = qtyFirst.group(2)?.trim();
-      } else if (qtyLast != null) {
-        qty = int.tryParse(qtyLast.group(2)!);
-        name = qtyLast.group(1)?.trim();
-      }
-
-      if (qty == null || qty <= 0 || name == null || name.isEmpty) {
+    for (final match in qtyBeforeNamePattern.allMatches(normalized)) {
+      final qty = int.tryParse(match.group(1) ?? '');
+      var name = match.group(2)?.trim() ?? '';
+      if (qty == null || qty <= 0 || name.isEmpty) {
         continue;
       }
 
       name = name
-          .replaceAll(RegExp(r'\b(of|item|items|product|products)\b'), ' ')
+          .replaceAll(RegExp(r'\b(he|she|they|customer|buyer|bought|took|takes|take|brought|want|needs|need|please|for|to|the|a|an|of|item|items|product|products)\b'), ' ')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      if (name.isEmpty) {
+        continue;
+      }
+
+      requested[name] = (requested[name] ?? 0) + qty;
+    }
+
+    for (final match in qtyAfterNamePattern.allMatches(normalized)) {
+      final qty = int.tryParse(match.group(2) ?? '');
+      var name = match.group(1)?.trim() ?? '';
+      if (qty == null || qty <= 0 || name.isEmpty) {
+        continue;
+      }
+
+      name = name
+          .replaceAll(RegExp(r'\b(he|she|they|customer|buyer|bought|took|takes|take|brought|want|needs|need|please|for|to|the|a|an|of|item|items|product|products)\b'), ' ')
           .replaceAll(RegExp(r'\s+'), ' ')
           .trim();
       if (name.isEmpty) {
@@ -560,6 +740,22 @@ class Chat {
   Future<String> sendMessage(String? text) async {
     final input = (text ?? '').trim();
     if (input.isEmpty) return '';
+
+    if (_isTimeIntent(input)) {
+      final now = _nowIst();
+      final reply = 'The current time is ${_formatIstTime(now)} IST.';
+      _history.add(Message(role: Role.user, content: [TextPart(text: input)]));
+      _history.add(Message(role: Role.model, content: [TextPart(text: reply)]));
+      return reply;
+    }
+
+    if (_isDateIntent(input)) {
+      final now = _nowIst();
+      final reply = "Today's date is ${_formatIstDate(now)} IST.";
+      _history.add(Message(role: Role.user, content: [TextPart(text: input)]));
+      _history.add(Message(role: Role.model, content: [TextPart(text: reply)]));
+      return reply;
+    }
 
     if (_isCatalogIntent(input)) {
       // Direct catalog lookup scoped to this user's shop (bypasses tool abstraction)
@@ -597,10 +793,22 @@ class Chat {
       final requestedItems = _parseBillingRequestedItems(input);
       if (requestedItems.isNotEmpty) {
         try {
+            final customerName = _extractBillingCustomerName(input);
           final result = await createDraftInvoiceRequest(
-            input: {'requestedItems': requestedItems},
+              input: {
+                'requestedItems': requestedItems,
+                if (customerName != null) 'customerName': customerName,
+              },
             userIdentifier: userIdentifier,
           );
+          final approvalId = result['approvalId']?.toString();
+          final resolvedCustomerName = result['customerName']?.toString().trim();
+          if (approvalId != null &&
+              approvalId.isNotEmpty &&
+              resolvedCustomerName != null &&
+              resolvedCustomerName.isNotEmpty) {
+            draftCustomerNameHints[approvalId] = resolvedCustomerName;
+          }
           final reply = (result['message'] as String?) ?? 'Draft invoice created.\n\nApproval ID: ${result['approvalId']}';
           _history.add(Message(role: Role.user, content: [TextPart(text: input)]));
           _history.add(Message(role: Role.model, content: [TextPart(text: reply)]));
@@ -760,7 +968,7 @@ Future<void> main(List<String> arguments) async {
         if (result['success'] == true) {
           final draftData = await getApprovalDetails(approvalId);
           if (draftData != null) {
-            final msg = await _buildInvoiceMessage(draftData, query.from.firstName);
+            final msg = await _buildInvoiceMessage(draftData);
             await bot.editMessageText(msg, chatId: chatId, messageId: msgId,
               parseMode: 'Markdown',
               replyMarkup: _buildInvoiceKeyboard(approvalId, 'IGST', true));
@@ -780,7 +988,7 @@ Future<void> main(List<String> arguments) async {
         if (result['success'] == true) {
           final draftData = await getApprovalDetails(approvalId);
           if (draftData != null) {
-            final msg = await _buildInvoiceMessage(draftData, query.from.firstName);
+            final msg = await _buildInvoiceMessage(draftData);
             await bot.editMessageText(msg, chatId: chatId, messageId: msgId,
               parseMode: 'Markdown',
               replyMarkup: _buildInvoiceKeyboard(approvalId, 'CGST_SGST', true));
@@ -790,6 +998,74 @@ Future<void> main(List<String> arguments) async {
         stderr.writeln('Error switching to CGST/SGST: $e');
         await bot.answerCallbackQuery(query.id, text: 'Failed to switch. Try again.', showAlert: true);
       }
+
+    // ── PAYMENT STATUS QUICK SWITCH ───────────────────────────────────
+    } else if (data.startsWith('pay_paid_') || data.startsWith('pay_partial_') || data.startsWith('pay_unpaid_')) {
+      final approvalId = data.replaceFirst(RegExp(r'^pay_(paid|partial|unpaid)_'), '');
+      final paymentStatus = data.contains('_paid_')
+          ? 'PAID'
+          : data.contains('_partial_')
+              ? 'PARTIAL'
+              : 'UNPAID';
+
+      if (paymentStatus == 'PARTIAL') {
+        pendingPartialPaymentEdits[chatId] = approvalId;
+        await bot.answerCallbackQuery(query.id);
+        await bot.editMessageText(
+          '🕒 Send the *paid amount* now (example: *400* or *₹400*).',
+          chatId: chatId,
+          messageId: msgId,
+          parseMode: 'Markdown',
+        );
+        return;
+      }
+
+      await bot.answerCallbackQuery(query.id, text: '⏳ Updating payment status...');
+      try {
+        final result = await updateDraftPaymentStatus(
+          approvalId: approvalId,
+          paymentStatus: paymentStatus,
+        );
+        if (result['success'] == true) {
+          final draftData = await getApprovalDetails(approvalId);
+          if (draftData != null) {
+            final shopId = draftData['shop_id'] as String;
+            final shopRows = await supabase
+                .from('shops')
+                .select('gst_mode')
+                .eq('id', shopId)
+                .single();
+            final gstMode = (shopRows as Map)['gst_mode'] as String? ?? 'REGISTERED';
+            final isRegistered = gstMode == 'REGISTERED';
+            final currentGstType = draftData['gst_type'] as String? ?? 'CGST_SGST';
+            final formattedMessage = await _buildInvoiceMessage(draftData);
+            await bot.editMessageText(
+              formattedMessage,
+              chatId: chatId,
+              messageId: msgId,
+              parseMode: 'Markdown',
+              replyMarkup: _buildInvoiceKeyboard(approvalId, currentGstType, isRegistered),
+            );
+          }
+        } else {
+          await bot.answerCallbackQuery(query.id, text: '❌ ${result['error']}', showAlert: true);
+        }
+      } catch (e) {
+        stderr.writeln('Error updating payment status: $e');
+        await bot.answerCallbackQuery(query.id, text: 'Failed to update payment status.', showAlert: true);
+      }
+
+    // ── DISCOUNT EDIT ────────────────────────────────────────────────
+    } else if (data.startsWith('edit_discount_')) {
+      final approvalId = data.replaceFirst('edit_discount_', '');
+      pendingDiscountEdits[chatId] = approvalId;
+      await bot.answerCallbackQuery(query.id);
+      await bot.editMessageText(
+        '✏️ Send the new discount as *10%* or *₹50*.',
+        chatId: chatId,
+        messageId: msgId,
+        parseMode: 'Markdown',
+      );
 
     // ── APPROVE PRODUCT BATCH ──────────────────────────────────────────
     } else if (data.startsWith('p_approve_')) {
@@ -877,7 +1153,6 @@ Future<void> main(List<String> arguments) async {
     final caption = message.caption?.trim();
 
     final chatId = message.chat.id;
-    final customerName = message.from?.firstName ?? 'Customer';
     final userIdentifier = message.from?.username ?? message.from?.firstName ?? chatId.toString();
 
     // ── Image-only intake for inventory import ─────────────────────────
@@ -937,6 +1212,106 @@ Future<void> main(List<String> arguments) async {
     }
 
     if (text == null || text.isEmpty) return;
+
+    // ── Handle pending partial-payment amount input ─────────────────────
+    if (pendingPartialPaymentEdits.containsKey(chatId)) {
+      final approvalId = pendingPartialPaymentEdits.remove(chatId) ?? '';
+      final amountPaid = _parsePaidAmountText(text);
+      if (amountPaid == null || amountPaid <= 0) {
+        pendingPartialPaymentEdits[chatId] = approvalId;
+        await bot.sendMessage(
+          chatId,
+          'Please send a valid paid amount like 400 or ₹400.',
+        );
+        return;
+      }
+
+      try {
+        final result = await updateDraftPaymentStatus(
+          approvalId: approvalId,
+          paymentStatus: 'PARTIAL',
+          amountPaid: amountPaid,
+        );
+        if (result['success'] == true) {
+          final draftData = await getApprovalDetails(approvalId);
+          if (draftData != null) {
+            final shopId = draftData['shop_id'] as String;
+            final shopRows = await supabase
+                .from('shops')
+                .select('gst_mode')
+                .eq('id', shopId)
+                .single();
+            final gstMode = (shopRows as Map)['gst_mode'] as String? ?? 'REGISTERED';
+            final isRegistered = gstMode == 'REGISTERED';
+            final currentGstType = draftData['gst_type'] as String? ?? 'CGST_SGST';
+            final formattedMessage = await _buildInvoiceMessage(draftData);
+            await bot.sendMessage(chatId, 'Partial payment updated.');
+            await bot.sendMessage(
+              chatId,
+              formattedMessage,
+              parseMode: 'Markdown',
+              replyMarkup: _buildInvoiceKeyboard(approvalId, currentGstType, isRegistered),
+            );
+          }
+        } else {
+          await bot.sendMessage(chatId, result['error']?.toString() ?? 'Failed to update partial payment.');
+        }
+      } catch (e) {
+        stderr.writeln('Error updating partial payment: $e');
+        await bot.sendMessage(chatId, 'Failed to update partial payment. Try again.');
+      }
+      return;
+    }
+
+    // ── Handle pending discount edit input ──────────────────────────────
+    if (pendingDiscountEdits.containsKey(chatId)) {
+      final approvalId = pendingDiscountEdits.remove(chatId) ?? '';
+      final discount = _parseDiscountText(text);
+      if (discount == null) {
+        pendingDiscountEdits[chatId] = approvalId;
+        await bot.sendMessage(
+          chatId,
+          'Send the new discount as 10% or ₹50. Reply with the amount now.',
+        );
+        return;
+      }
+
+      try {
+        final result = await updateDraftDiscount(
+          approvalId: approvalId,
+          discountType: discount['discountType'] as String,
+          discountValue: discount['discountValue'] as double,
+        );
+        if (result['success'] == true) {
+          final draftData = await getApprovalDetails(approvalId);
+          if (draftData != null) {
+            final shopId = draftData['shop_id'] as String;
+            final shopRows = await supabase
+                .from('shops')
+                .select('gst_mode')
+                .eq('id', shopId)
+                .single();
+            final gstMode = (shopRows as Map)['gst_mode'] as String? ?? 'REGISTERED';
+            final isRegistered = gstMode == 'REGISTERED';
+            final currentGstType = draftData['gst_type'] as String? ?? 'CGST_SGST';
+            final formattedMessage = await _buildInvoiceMessage(draftData);
+            await bot.sendMessage(chatId, 'Discount updated successfully.');
+            await bot.sendMessage(
+              chatId,
+              formattedMessage,
+              parseMode: 'Markdown',
+              replyMarkup: _buildInvoiceKeyboard(approvalId, currentGstType, isRegistered),
+            );
+          }
+        } else {
+          await bot.sendMessage(chatId, result['error']?.toString() ?? 'Failed to update discount.');
+        }
+      } catch (e) {
+        stderr.writeln('Error updating discount: $e');
+        await bot.sendMessage(chatId, 'Failed to update discount. Try again.');
+      }
+      return;
+    }
 
     // ── Confirm image import flow ───────────────────────────────────────
     if (pendingImageImports.containsKey(chatId)) {
@@ -1193,7 +1568,7 @@ Future<void> main(List<String> arguments) async {
             final isRegistered = gstMode == 'REGISTERED';
 
             final currentGstType = draftData['gst_type'] as String? ?? 'CGST_SGST';
-            final formattedMessage = await _buildInvoiceMessage(draftData, customerName);
+            final formattedMessage = await _buildInvoiceMessage(draftData);
 
             await bot.sendMessage(
               chatId,

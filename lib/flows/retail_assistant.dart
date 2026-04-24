@@ -39,6 +39,12 @@ final retailAssistantFlow = ai.defineFlow(
         normalizedPrompt.contains('insight') ||
         normalizedPrompt.contains('earnings') ||
         normalizedPrompt.contains('total sales') ||
+        normalizedPrompt.contains('today') ||
+        normalizedPrompt.contains('yesterday') ||
+        normalizedPrompt.contains('week') ||
+        normalizedPrompt.contains('month') ||
+        normalizedPrompt.contains('date range') ||
+        normalizedPrompt.contains('between') ||
         normalizedPrompt.contains('order')) {
       toolNames.add('businessInsightsTool');
     }
@@ -50,8 +56,8 @@ final retailAssistantFlow = ai.defineFlow(
           role: Role.system,
           content: [
             TextPart(
-              text:
-                  'You are the AI brain for Dukan Sathi Pro. Shop ID is \'b6ff658b-c750-4c9a-b9ce-909ef6c52674\'. When a user asks about prices or stock, use the checkInventory tool. When a user asks to create a bill, use the createDraftInvoice tool. For business analytics, revenue, or sales data, use the businessInsightsTool. When a user wants to add products, use proposeProducts. When a user wants to delete or remove a product, use requestProductDeletion and never delete directly. Always reply concisely in a friendly manner. Important: Product additions and deletions require human approval before finalization. Summarize the draft items and tell the user to check for the approval message shortly.',
+                text:
+                  'You are the AI brain for Dukan Sathi Pro. Shop ID is \'b6ff658b-c750-4c9a-b9ce-909ef6c52674\'. When a user asks about prices or stock, use the checkInventory tool. When a user asks to create a bill, use the createDraftInvoice tool. For business analytics, revenue, profit, or date-based queries, use the businessInsightsTool and interpret date ranges in India Standard Time. When a user wants to add products, use proposeProducts. When a user wants to delete or remove a product, use requestProductDeletion and never delete directly. Always reply concisely in a friendly manner. Important: Product additions and deletions require human approval before finalization. Summarize the draft items and tell the user to check for the approval message shortly.',
             ),
           ],
         ),

@@ -4,6 +4,381 @@ import '../models/cart_item.dart';
 import '../services/gst_calculator.dart';
 import '../models/shop_config.dart';
 
+double _roundToTwoDecimals(double value) => (value * 100).round() / 100;
+
+String? _normalizeCustomerName(dynamic value) {
+  final normalized = value?.toString().trim();
+  if (normalized == null || normalized.isEmpty) {
+    return null;
+  }
+  return normalized.replaceAll(RegExp(r'\s+'), ' ');
+}
+
+String _normalizePaymentStatus(dynamic value, double amountPaid, double totalAmount) {
+  final normalized = value?.toString().trim().toUpperCase();
+  if (normalized == null || normalized.isEmpty) {
+    if (amountPaid <= 0) return 'UNPAID';
+    if (amountPaid >= totalAmount) return 'PAID';
+    return 'PARTIAL';
+  }
+  if (normalized == 'PAID' || normalized == 'PARTIAL' || normalized == 'UNPAID') {
+    return normalized;
+  }
+  throw StateError('Invalid payment status in draft approval.');
+}
+
+Map<String, dynamic> _applyDiscountToItems({
+  required List<CartItem> items,
+  required String? discountType,
+  required double? discountValue,
+}) {
+  final subtotal = _roundToTwoDecimals(
+    items.fold<double>(0.0, (sum, item) => sum + (item.unitPrice * item.quantity)),
+  );
+
+  if (subtotal <= 0) {
+    return {
+      'subtotalBeforeDiscount': 0.0,
+      'discountAmount': 0.0,
+      'subtotalAfterDiscount': 0.0,
+      'items': items,
+    };
+  }
+
+  var discountAmount = 0.0;
+  if (discountType != null && discountValue != null) {
+    if (discountType == 'PERCENT') {
+      if (discountValue < 0 || discountValue > 100) {
+        throw StateError('discountValue must be between 0 and 100 for percent discounts.');
+      }
+      discountAmount = subtotal * (discountValue / 100.0);
+    } else {
+      if (discountValue < 0) {
+        throw StateError('discountValue must be non-negative for fixed amount discounts.');
+      }
+      discountAmount = discountValue;
+    }
+  }
+
+  if (discountAmount > subtotal) {
+    throw StateError('Discount cannot be greater than subtotal.');
+  }
+
+  final subtotalAfterDiscount = _roundToTwoDecimals(subtotal - discountAmount);
+  final ratio = subtotal == 0 ? 1.0 : subtotalAfterDiscount / subtotal;
+
+  final adjustedItems = items.map((item) {
+    final adjustedUnitPrice = _roundToTwoDecimals(item.unitPrice * ratio);
+    return item.copyWith(unitPrice: adjustedUnitPrice);
+  }).toList();
+
+  return {
+    'subtotalBeforeDiscount': subtotal,
+    'discountAmount': _roundToTwoDecimals(discountAmount),
+    'subtotalAfterDiscount': subtotalAfterDiscount,
+    'items': adjustedItems,
+  };
+}
+
+Future<void> _deductInventoryStock({
+  required String shopId,
+  required List<CartItem> items,
+}) async {
+  final productIds = items.map((item) => item.productId).toSet().toList();
+  if (productIds.isEmpty) {
+    return;
+  }
+
+  final productRows = await supabase
+      .from('products')
+      .select('id, stock_quantity')
+      .inFilter('id', productIds);
+
+  final stockById = <String, int>{};
+  for (final row in productRows as List<dynamic>) {
+    final data = Map<String, dynamic>.from(row as Map);
+    final productId = data['id']?.toString();
+    final stockQuantity = (data['stock_quantity'] as num?)?.toInt() ?? 0;
+    if (productId != null) {
+      stockById[productId] = stockQuantity;
+    }
+  }
+
+  for (final item in items) {
+    final currentStock = stockById[item.productId];
+    if (currentStock == null) {
+      throw StateError('Product ${item.productId} not found in inventory.');
+    }
+    if (currentStock < item.quantity) {
+      throw StateError('Insufficient stock for product ${item.productId}. Available: $currentStock, required: ${item.quantity}.');
+    }
+  }
+
+  for (final item in items) {
+    final currentStock = stockById[item.productId]!;
+    await supabase
+        .from('products')
+        .update({'stock_quantity': currentStock - item.quantity})
+        .eq('shop_id', shopId)
+        .eq('id', item.productId);
+  }
+}
+
+Future<void> _updateCustomerBalance({
+  required String shopId,
+  required String customerId,
+  required double dueAmount,
+}) async {
+  if (dueAmount <= 0) {
+    return;
+  }
+
+  final customerRows = await supabase
+      .from('customers')
+      .select('id, current_balance')
+      .eq('shop_id', shopId)
+      .eq('id', customerId)
+      .single();
+
+  final customerData = Map<String, dynamic>.from(customerRows as Map);
+  final currentBalance = (customerData['current_balance'] as num?)?.toDouble() ?? 0.0;
+
+  await supabase.from('customers').update({
+    'current_balance': _roundToTwoDecimals(currentBalance + dueAmount),
+    'updated_at': DateTime.now().toIso8601String(),
+  }).eq('shop_id', shopId).eq('id', customerId);
+}
+
+Future<String?> _ensureCustomerRecord({
+  required String shopId,
+  required String? existingCustomerId,
+  required String? customerName,
+}) async {
+  if (existingCustomerId != null && existingCustomerId.isNotEmpty) {
+    return existingCustomerId;
+  }
+
+  final normalizedName = _normalizeCustomerName(customerName);
+  if (normalizedName == null || normalizedName.toLowerCase() == 'walk-in customer') {
+    return null;
+  }
+
+  try {
+    final existingByName = await supabase
+        .from('customers')
+        .select('id, name')
+        .eq('shop_id', shopId)
+        .ilike('name', normalizedName)
+        .maybeSingle();
+
+    if (existingByName != null) {
+      final customerData = Map<String, dynamic>.from(existingByName as Map);
+      final customerId = customerData['id']?.toString();
+      if (customerId != null && customerId.isNotEmpty) {
+        return customerId;
+      }
+    }
+  } catch (_) {
+    // Continue to insert fallback customer.
+  }
+
+  final generatedPhone = 'AUTO-${DateTime.now().millisecondsSinceEpoch}-${const Uuid().v4().substring(0, 6)}';
+  final insertRows = await supabase
+      .from('customers')
+      .insert({
+        'shop_id': shopId,
+        'name': normalizedName,
+        'phone': generatedPhone,
+        'current_balance': 0,
+      })
+      .select('id')
+      .single();
+
+  return (insertRows as Map)['id']?.toString();
+}
+
+Future<Map<String, dynamic>> updateDraftPaymentStatus({
+  required String approvalId,
+  required String paymentStatus,
+  double? amountPaid,
+}) async {
+  try {
+    final approvalRows = await supabase
+        .from('draft_approvals')
+        .select()
+        .eq('approval_id', approvalId)
+        .eq('approval_status', 'PENDING')
+        .single();
+
+    final approvalData = Map<String, dynamic>.from(approvalRows as Map);
+    final proposedTotal = (approvalData['proposed_total'] as num).toDouble();
+    final normalized = paymentStatus.toUpperCase();
+
+    double resolvedAmountPaid;
+    double dueAmount;
+    if (normalized == 'PAID') {
+      resolvedAmountPaid = proposedTotal;
+      dueAmount = 0.0;
+    } else if (normalized == 'PARTIAL') {
+      resolvedAmountPaid = amountPaid ?? (approvalData['amount_paid'] as num?)?.toDouble() ?? 0.0;
+      if (resolvedAmountPaid <= 0) {
+        throw StateError('amountPaid must be greater than 0 for PARTIAL payments.');
+      }
+      if (resolvedAmountPaid > proposedTotal) {
+        throw StateError('amountPaid cannot exceed the invoice total.');
+      }
+      dueAmount = _roundToTwoDecimals(proposedTotal - resolvedAmountPaid);
+    } else {
+      resolvedAmountPaid = 0.0;
+      dueAmount = proposedTotal;
+    }
+
+    await supabase.from('draft_approvals').update({
+      'payment_status': normalized,
+      'amount_paid': resolvedAmountPaid,
+      'due_amount': dueAmount,
+    }).eq('approval_id', approvalId);
+
+    return {
+      'success': true,
+      'approvalId': approvalId,
+      'paymentStatus': normalized,
+      'amountPaid': resolvedAmountPaid,
+      'dueAmount': dueAmount,
+    };
+  } catch (e) {
+    return {
+      'success': false,
+      'error': 'Failed to update payment status: $e',
+    };
+  }
+}
+
+Future<Map<String, dynamic>> updateDraftDiscount({
+  required String approvalId,
+  required String discountType,
+  required double discountValue,
+}) async {
+  try {
+    final approvalRows = await supabase
+        .from('draft_approvals')
+        .select()
+        .eq('approval_id', approvalId)
+        .eq('approval_status', 'PENDING')
+        .single();
+
+    final approvalData = Map<String, dynamic>.from(approvalRows as Map);
+    final shopId = approvalData['shop_id'] as String;
+    final customerState = approvalData['customer_state'] as String?;
+    final originalItemsJson = (approvalData['original_items'] as List<dynamic>? ?? approvalData['proposed_items'] as List<dynamic>?) ?? const [];
+    final originalItems = originalItemsJson.map((itemJson) {
+      final json = Map<String, dynamic>.from(itemJson as Map);
+      return CartItem(
+        productId: json['productId'] as String,
+        quantity: json['quantity'] as int,
+        unitPrice: (json['unitPrice'] as num).toDouble(),
+      );
+    }).toList();
+
+    if (originalItems.isEmpty) {
+      throw StateError('Draft has no items to discount.');
+    }
+
+    final billingAdjustments = _applyDiscountToItems(
+      items: originalItems,
+      discountType: discountType,
+      discountValue: discountValue,
+    );
+    final adjustedItems = billingAdjustments['items'] as List<CartItem>;
+    final subtotalBeforeDiscount = billingAdjustments['subtotalBeforeDiscount'] as double;
+    final discountAmount = billingAdjustments['discountAmount'] as double;
+    final subtotalAfterDiscount = billingAdjustments['subtotalAfterDiscount'] as double;
+
+    final shopRows = await supabase
+        .from('shops')
+        .select('id, state, gst_registration_number, gst_mode, business_type, created_at')
+        .eq('id', shopId)
+        .single();
+
+    final shopData = Map<String, dynamic>.from(shopRows as Map);
+    final gstModeStr = shopData['gst_mode'] as String? ?? 'REGISTERED';
+    final gstMode = GSTMode.values.firstWhere(
+      (e) => e.name == gstModeStr.toLowerCase(),
+      orElse: () => GSTMode.registered,
+    );
+
+    final shopConfig = ShopConfig(
+      shopId: shopId,
+      state: shopData['state'] as String,
+      gstRegistrationNumber: shopData['gst_registration_number'] as String?,
+      gstMode: gstMode,
+      businessType: shopData['business_type'] as String? ?? 'Retail',
+      createdAt: DateTime.parse(shopData['created_at'] as String),
+    );
+
+    final taxBreakdown = GSTCalculator.calculateTax(
+      items: adjustedItems,
+      shopConfig: shopConfig,
+      customerState: customerState,
+    );
+
+    final paymentStatus = _normalizePaymentStatus(
+      approvalData['payment_status'],
+      (approvalData['amount_paid'] as num?)?.toDouble() ?? 0.0,
+      taxBreakdown.totalAmount,
+    );
+
+    final amountPaid = paymentStatus == 'PAID'
+        ? taxBreakdown.totalAmount
+        : paymentStatus == 'PARTIAL'
+            ? ((_roundToTwoDecimals((approvalData['amount_paid'] as num?)?.toDouble() ?? 0.0)).clamp(0.0, taxBreakdown.totalAmount) as double)
+            : 0.0;
+    final dueAmount = _roundToTwoDecimals(taxBreakdown.totalAmount - amountPaid);
+
+    await supabase.from('draft_approvals').update({
+      'proposed_items': adjustedItems.map((item) => item.toJson()).toList(),
+      'proposed_tax_breakdown': {
+        'subtotal': taxBreakdown.subtotal,
+        'cgst_amount': taxBreakdown.cgstAmount,
+        'sgst_amount': taxBreakdown.sgstAmount,
+        'igst_amount': taxBreakdown.igstAmount,
+        'gst_mode': taxBreakdown.gstMode,
+        'applicable_state': taxBreakdown.applicableState,
+        'tax_slab': taxBreakdown.taxSlab,
+        'total_amount': taxBreakdown.totalAmount,
+        'breakdown': taxBreakdown.breakdown,
+      },
+      'proposed_total': taxBreakdown.totalAmount,
+      'subtotal_before_discount': subtotalBeforeDiscount,
+      'subtotal_after_discount': subtotalAfterDiscount,
+      'discount_type': discountType,
+      'discount_value': discountValue,
+      'discount_amount': discountAmount,
+      'payment_status': paymentStatus,
+      'amount_paid': amountPaid,
+      'due_amount': dueAmount,
+    }).eq('approval_id', approvalId);
+
+    return {
+      'success': true,
+      'approvalId': approvalId,
+      'discountType': discountType,
+      'discountValue': discountValue,
+      'discountAmount': discountAmount,
+      'subtotalBeforeDiscount': subtotalBeforeDiscount,
+      'subtotalAfterDiscount': subtotalAfterDiscount,
+      'paymentStatus': paymentStatus,
+      'amountPaid': amountPaid,
+      'dueAmount': dueAmount,
+    };
+  } catch (e) {
+    return {
+      'success': false,
+      'error': 'Failed to update discount: $e',
+    };
+  }
+}
+
 /// Approve a pending draft invoice and create Sale + DraftInvoice records
 Future<Map<String, dynamic>> approveDraftInvoice({
   required String approvalId,
@@ -22,11 +397,19 @@ Future<Map<String, dynamic>> approveDraftInvoice({
 
     final shopId = approvalData['shop_id'] as String;
     final customerId = approvalData['customer_id'] as String?;
+    final customerName = approvalData['customer_name'] as String?;
+    final customerState = approvalData['customer_state'] as String?;
     final proposedItems = approvalData['proposed_items'] as List;
     final proposedTotal = approvalData['proposed_total'] as num;
     final taxBreakdown = approvalData['proposed_tax_breakdown'] as Map<String, dynamic>;
+    final subtotalBeforeDiscount = (approvalData['subtotal_before_discount'] as num?)?.toDouble() ?? proposedTotal.toDouble();
+    final subtotalAfterDiscount = (approvalData['subtotal_after_discount'] as num?)?.toDouble() ?? proposedTotal.toDouble();
+    final discountType = approvalData['discount_type'] as String?;
+    final discountValue = (approvalData['discount_value'] as num?)?.toDouble();
+    final discountAmount = (approvalData['discount_amount'] as num?)?.toDouble() ?? 0.0;
+    final amountPaidDraft = (approvalData['amount_paid'] as num?)?.toDouble() ?? 0.0;
 
-    final items = (proposedItems as List).map((itemJson) {
+    final items = proposedItems.map((itemJson) {
       final json = Map<String, dynamic>.from(itemJson as Map);
       return CartItem(
         productId: json['productId'] as String,
@@ -35,12 +418,33 @@ Future<Map<String, dynamic>> approveDraftInvoice({
       );
     }).toList();
 
+    final resolvedCustomerId = await _ensureCustomerRecord(
+      shopId: shopId,
+      existingCustomerId: customerId,
+      customerName: customerName,
+    );
+
+    final paymentStatus = _normalizePaymentStatus(
+      approvalData['payment_status'],
+      amountPaidDraft,
+      proposedTotal.toDouble(),
+    );
+    final amountPaid = paymentStatus == 'PAID'
+        ? proposedTotal.toDouble()
+        : paymentStatus == 'PARTIAL'
+            ? amountPaidDraft
+            : 0.0;
+    final dueAmount = _roundToTwoDecimals(proposedTotal.toDouble() - amountPaid);
+
+    await _deductInventoryStock(shopId: shopId, items: items);
+
     // Create draft_invoices record
     final draftInvoiceResponse = await supabase
         .from('draft_invoices')
         .insert({
           'shop_id': shopId,
-          'customer_id': customerId,
+          'customer_id': resolvedCustomerId,
+          'customer_name': customerName,
           'items': items.map((item) => item.toJson()).toList(),
           'total_amount': proposedTotal,
           'tax_breakdown': taxBreakdown,
@@ -60,12 +464,30 @@ Future<Map<String, dynamic>> approveDraftInvoice({
       'invoice_number': invoiceNumber,
       'shop_id': shopId,
       'invoice_id': draftInvoiceId,
-      'customer_id': customerId,
+      'customer_id': resolvedCustomerId,
+      'customer_name': customerName,
       'amount': proposedTotal,
+      'amount_paid': amountPaid,
+      'due_amount': dueAmount,
+      'payment_status': paymentStatus,
+      'discount_type': discountType,
+      'discount_value': discountValue,
+      'discount_amount': discountAmount,
+      'subtotal_before_discount': subtotalBeforeDiscount,
+      'subtotal_after_discount': subtotalAfterDiscount,
+      'customer_state': customerState,
       'timestamp': DateTime.now().toIso8601String(),
       'payment_method': 'pending',
       'status': 'approved',
     });
+
+    if (resolvedCustomerId != null) {
+      await _updateCustomerBalance(
+        shopId: shopId,
+        customerId: resolvedCustomerId,
+        dueAmount: dueAmount,
+      );
+    }
 
     // Update draft_approval status
     await supabase
@@ -76,6 +498,9 @@ Future<Map<String, dynamic>> approveDraftInvoice({
           'reviewed_at': DateTime.now().toIso8601String(),
           'draft_invoice_id': draftInvoiceId,
           'sale_id': saleId,
+          'payment_status': paymentStatus,
+          'amount_paid': amountPaid,
+          'due_amount': dueAmount,
         })
         .eq('approval_id', approvalId);
 
@@ -86,6 +511,9 @@ Future<Map<String, dynamic>> approveDraftInvoice({
       'invoiceNumber': invoiceNumber,
       'draftInvoiceId': draftInvoiceId,
       'totalAmount': proposedTotal,
+      'amountPaid': amountPaid,
+      'dueAmount': dueAmount,
+      'paymentStatus': paymentStatus,
       'message': '✅ *Invoice Approved!*\n\n🧾 `$invoiceNumber`\n💰 Total: ₹${proposedTotal.toStringAsFixed(2)}\n\n_Saved to records._',
     };
   } catch (e) {

@@ -4,12 +4,54 @@ import '../models/tax_breakdown.dart';
 class ApprovalFormatter {
   static String _formatPrice(double v) => v.toStringAsFixed(2);
 
-  /// Main formatted invoice for Telegram
+  static double _roundToTwoDecimals(double value) =>
+      (value * 100).round() / 100;
+
+  static String _formatDiscountLine({
+    String? discountType,
+    double? discountValue,
+    double? discountAmount,
+  }) {
+    if (discountType == null && discountAmount == null && discountValue == null) {
+      return '';
+    }
+
+    // Handle case where only discountAmount is provided (fixed amount)
+    if (discountType == null && discountAmount != null) {
+      return 'Discount:      -₹${_formatPrice(discountAmount)}';
+    }
+
+    // Handle percentage discount: show as "Discount: -₹[Amount] ([Percentage]%)"
+    if (discountType == 'PERCENT') {
+      final percentStr = discountValue?.toStringAsFixed(1) ?? '0.0';
+      final amountStr = discountAmount != null ? _formatPrice(discountAmount) : '0.00';
+      return 'Discount:      -₹$amountStr ($percentStr%)';
+    }
+
+    // Handle fixed amount discount
+    if (discountType == 'AMOUNT') {
+      final amountStr = discountAmount != null ? _formatPrice(discountAmount) : _formatPrice(discountValue ?? 0);
+      return 'Discount:      -₹$amountStr';
+    }
+
+    return '';
+  }
+
+  /// Main formatted invoice for Telegram - GST-compliant format
+  /// Follows hierarchy: Items Total → Discount → Taxable Value → Taxes → Grand Total → Paid → Due
   static String formatApprovalMessage({
     required DraftApproval approval,
     required String customerName,
     required List<String> itemDescriptions,
     String gstType = 'CGST_SGST', // 'CGST_SGST' or 'IGST'
+    String? paymentStatus,
+    double? amountPaid,
+    double? dueAmount,
+    String? discountType,
+    double? discountValue,
+    double? discountAmount,
+    double? subtotalBeforeDiscount,
+    double? subtotalAfterDiscount,
   }) {
     final tax = approval.proposedTaxBreakdown;
     final isUnregistered = tax.gstMode == 'UNREGISTERED';
@@ -20,37 +62,78 @@ class ApprovalFormatter {
         ? itemDescriptions.map((i) => '  • $i').join('\n')
         : '  No items';
 
-    final StringBuffer taxLines = StringBuffer();
-    taxLines.writeln('Subtotal: ₹${_formatPrice(tax.subtotal)}');
+    // Calculate itemsTotal first (gross total before discount)
+    final itemsTotal = subtotalBeforeDiscount ?? tax.subtotal;
+    final discountAmt = discountAmount ?? 0.0;
+    // Taxable value = items total - discount
+    final taxableValue = subtotalAfterDiscount ?? (itemsTotal - discountAmt);
 
-    if (isUnregistered) {
-      taxLines.writeln('GST: None (Unregistered Seller)');
-    } else if (isComposite) {
-      final taxAmt = approval.proposedTotal - tax.subtotal;
-      taxLines.writeln('Composite GST (3%): ₹${_formatPrice(taxAmt)}');
-    } else if (isIGST) {
-      taxLines.writeln('IGST (18% — Inter-State): ₹${_formatPrice(tax.igstAmount)}');
-    } else {
-      taxLines.writeln('CGST (9%): ₹${_formatPrice(tax.cgstAmount)}');
-      taxLines.writeln('SGST (9%): ₹${_formatPrice(tax.sgstAmount)}');
+    final StringBuffer billingSummary = StringBuffer();
+
+    // 1. ITEMS TOTAL (gross, before any discount)
+    billingSummary.writeln('Items Total:   ₹${_formatPrice(itemsTotal)}');
+
+    // 2. DISCOUNT LINE (with proper format: -₹XXX (YY%))
+    if (discountAmt > 0 || discountType != null) {
+      final discountLine = _formatDiscountLine(
+        discountType: discountType,
+        discountValue: discountValue,
+        discountAmount: discountAmount,
+      );
+      if (discountLine.isNotEmpty) {
+        billingSummary.writeln(discountLine);
+      }
     }
 
+    // 3. TAXABLE VALUE (after discount)
+    billingSummary.writeln('Taxable Value: ₹${_formatPrice(taxableValue)}');
+    billingSummary.writeln('');
+
+    // 4. TAX LINES (CGST/SGST or IGST)
+    if (isUnregistered) {
+      billingSummary.writeln('GST:           None (Unregistered)');
+    } else if (isComposite) {
+      final taxAmt = approval.proposedTotal - taxableValue;
+      billingSummary.writeln('Composite GST (3%): ₹${_formatPrice(taxAmt)}');
+    } else if (isIGST) {
+      billingSummary.writeln('IGST (18%):    ₹${_formatPrice(tax.igstAmount)}');
+    } else {
+      billingSummary.writeln('CGST (9%):     ₹${_formatPrice(tax.cgstAmount)}');
+      billingSummary.writeln('SGST (9%):     ₹${_formatPrice(tax.sgstAmount)}');
+    }
+
+    // 5. GRAND TOTAL (must appear before payment info)
+    billingSummary.writeln('');
+    billingSummary.writeln('TOTAL:         ₹${_formatPrice(approval.proposedTotal)}');
+
+    // 6. PAYMENT STATUS & AMOUNT
+    final grandTotal = approval.proposedTotal;
+    final finalAmountPaid = amountPaid ?? 0.0;
+    final finalDueAmount = dueAmount ?? _roundToTwoDecimals(grandTotal - finalAmountPaid);
+
+    billingSummary.writeln('');
+    if (finalAmountPaid > 0) {
+      billingSummary.writeln('Paid:          ₹${_formatPrice(finalAmountPaid)}');
+    }
+
+    // 7. BALANCE DUE (final line in billing summary)
+    billingSummary.writeln('DUE:           ₹${_formatPrice(finalDueAmount)}');
+
     final stateLabel = isIGST ? 'Inter-State (IGST)' : '${tax.applicableState} — Intra-State';
+    final statusLabel = paymentStatus ?? 'UNPAID';
 
-    return '''🧾 *INVOICE FOR APPROVAL*
+    return '''👤 Customer: $customerName
 
-👤 Customer: $customerName
 📦 Items:
 $itemsText
 
-💰 *Billing Summary*
-━━━━━━━━━━━━━━━━━
-${taxLines.toString().trim()}
-━━━━━━━━━━━━━━━━━
-*TOTAL: ₹${_formatPrice(approval.proposedTotal)}*
+💰 Billing Summary:
+────────────────────
+${billingSummary.toString().trim()}
+────────────────────
 
 📍 State: $stateLabel
-⏳ Status: Awaiting Approval
+💳 Status: $statusLabel
 🆔 `${approval.approvalId}`''';
   }
 
