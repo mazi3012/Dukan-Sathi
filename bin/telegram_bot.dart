@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:dotenv/dotenv.dart';
 import 'package:dukansathi_new/bootstrap.dart';
@@ -14,6 +15,8 @@ import 'package:dukansathi_new/tools/billing_tools.dart';
 import 'package:dukansathi_new/core/database.dart';
 import 'package:dukansathi_new/models/draft_approval.dart';
 import 'package:dukansathi_new/tools/inventory_tools.dart';
+import 'package:dukansathi_new/tools/utility_tools.dart';
+import 'package:dukansathi_new/tools/expense_tools.dart';
 import 'package:genkit/genkit.dart';
 import 'package:teledart/teledart.dart' as tg;
 import 'package:teledart/model.dart' as tg;
@@ -30,6 +33,8 @@ final Map<int, String> pendingPartialPaymentEdits = {};
 final Map<String, String> draftCustomerNameHints = {};
 // Track pending image import confirmation: chatId -> telegram file URL
 final Map<int, String> pendingImageImports = {};
+// Track pending reminder heads-up question: chatId -> {text, scheduledAt}
+final Map<int, Map<String, dynamic>> pendingReminderHeadsUp = {};
 
 const String _systemPrompt =
   "You are the AI brain for Dukan Sathi Pro, a retail shop assistant. CRITICAL RULES: "
@@ -43,7 +48,10 @@ const String _systemPrompt =
   "7. For specific product lookups, use checkInventory. For full product lists, use browseCatalogTool. "
   "8. For business analytics (revenue, orders, approval status), use businessInsightsTool. Available metrics: total_revenue, total_orders, approved_count, pending_count, rejected_count, average_order_value, approval_rate. "
   "9. Present analytics in clear format: 'Total Revenue: ₹X | Orders: Y | Approved: Z | Pending: W | Rejected: V'. "
-  "10. For product deletion, use deleteProduct and always include 'Delete Request ID: [ID]' in the response so Telegram can show approval buttons.";
+  "10. For product deletion, use deleteProduct and always include 'Delete Request ID: [ID]' in the response so Telegram can show approval buttons.\n"
+  "11. For weather, use getWeather. If the user hasn't provided a 6-digit PIN code, ask for it first.\n"
+  "12. For reminders, use setReminder. First, ALWAYS ask the user if they want a 'heads-up' 25 mins early. AFTER they answer YES or NO, YOU MUST execute the setReminder tool to save it. Never just say it is set without calling the tool.\n"
+  "13. For shop expenses (rent, electricity, repairs), use logExpense.";
 
 DateTime _nowIst() => DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
 
@@ -68,6 +76,9 @@ final createDraftInvoiceTool = createDraftInvoice;
 final analyticsTool = businessInsightsTool;
 final proposeProductsTool = proposeProducts;
 final requestProductDeletionTool = requestProductDeletion;
+final weatherTool = getWeather;
+final reminderTool = setReminder;
+final expenseTool = logExpense;
 
 // ─── HELPER: check if user has already completed onboarding ────────────────
 Future<bool> _isUserOnboarded(String userIdentifier) async {
@@ -441,6 +452,87 @@ bool _isNoReply(String input) {
   return n == 'no' || n == 'n' || n == 'cancel' || n == 'stop' || n == 'skip';
 }
 
+bool _isReminderIntentGlobal(String input) {
+  final n = input.toLowerCase();
+  return n.contains('remind') || n.contains('reminder') || n.contains('set a alert') || n.contains('set an alert');
+}
+
+/// Parse reminder text and time from user input like:
+/// "Set a reminder for stock checking at 12.44 am today"
+/// "Remind me to call supplier at 5:30 PM"
+/// "Set a reminder to check stock at 1:5 AM today"
+Map<String, dynamic>? _parseReminderFromText(String input) {
+  // Try to extract time pattern like "12.44 am", "5:30 PM", "1:5 am", "12:00 am"
+  final timePattern = RegExp(
+    r'(?:at|for)\s+(\d{1,2})[.:](\d{1,2})\s*(am|pm|a\.m|p\.m|ap|AM|PM)',
+    caseSensitive: false,
+  );
+
+  final match = timePattern.firstMatch(input);
+  if (match == null) {
+    // Try simpler pattern like "at 5 pm"
+    final simplePattern = RegExp(
+      r'(?:at|for)\s+(\d{1,2})\s*(am|pm|a\.m|p\.m|AM|PM)',
+      caseSensitive: false,
+    );
+    final simpleMatch = simplePattern.firstMatch(input);
+    if (simpleMatch == null) return null;
+
+    var hour = int.parse(simpleMatch.group(1)!);
+    final ampm = simpleMatch.group(2)!.toLowerCase().replaceAll('.', '');
+    if (ampm.startsWith('p') && hour != 12) hour += 12;
+    if (ampm.startsWith('a') && hour == 12) hour = 0;
+
+    final nowIst = _nowIst();
+    // Use DateTime.utc so .toUtc() is a no-op later (we handle IST->UTC manually)
+    var scheduledIst = DateTime.utc(nowIst.year, nowIst.month, nowIst.day, hour, 0);
+    if (scheduledIst.isBefore(nowIst)) {
+      scheduledIst = scheduledIst.add(const Duration(days: 1));
+    }
+    // Convert IST to UTC by subtracting 5:30
+    final scheduledUtc = scheduledIst.subtract(const Duration(hours: 5, minutes: 30));
+
+    final reminderText = _extractReminderDescription(input);
+    return {'text': reminderText, 'scheduledAt': scheduledUtc};
+  }
+
+  var hour = int.parse(match.group(1)!);
+  final minute = int.parse(match.group(2)!);
+  // "1:5" means 1:05, not 1:50 — keep the parsed value as-is
+  final ampm = match.group(3)!.toLowerCase().replaceAll('.', '');
+
+  if (ampm.startsWith('p') && hour != 12) hour += 12;
+  if (ampm.startsWith('a') && hour == 12) hour = 0;
+
+  final nowIst = _nowIst();
+  // Use DateTime.utc so .toUtc() is a no-op later
+  var scheduledIst = DateTime.utc(nowIst.year, nowIst.month, nowIst.day, hour, minute);
+  if (scheduledIst.isBefore(nowIst)) {
+    scheduledIst = scheduledIst.add(const Duration(days: 1));
+  }
+  // Convert IST to UTC
+  final scheduledUtc = scheduledIst.subtract(const Duration(hours: 5, minutes: 30));
+
+  final reminderText = _extractReminderDescription(input);
+  return {'text': reminderText, 'scheduledAt': scheduledUtc};
+}
+
+
+String _extractReminderDescription(String input) {
+  // Remove the "set a reminder" prefix and time suffix
+  var text = input
+      .replaceAll(RegExp(r'set\s+(a\s+)?reminder\s+(for\s+|to\s+)?', caseSensitive: false), '')
+      .replaceAll(RegExp(r'remind\s+me\s+(to\s+|for\s+)?', caseSensitive: false), '')
+      .replaceAll(RegExp(r'\s+at\s+\d{1,2}[.:]\d{1,2}\s*(am|pm|a\.m|p\.m|ap|AM|PM).*', caseSensitive: false), '')
+      .replaceAll(RegExp(r'\s+at\s+\d{1,2}\s*(am|pm|a\.m|p\.m|AM|PM).*', caseSensitive: false), '')
+      .trim();
+  if (text.isEmpty) text = 'Reminder';
+  // Capitalize first letter
+  return text[0].toUpperCase() + text.substring(1);
+}
+
+
+
 Map<String, dynamic>? _tryParseJsonObject(String raw) {
   try {
     final decoded = jsonDecode(raw);
@@ -583,6 +675,24 @@ class Chat {
     return n.contains('stock') || n.contains('inventory') || n.contains('price') ||
         n.contains('how many') || n.contains('quantity') || n.contains('left') ||
         n.contains('available') || n.contains('have');
+  }
+
+  bool _isWeatherIntent(String input) {
+    final n = input.toLowerCase();
+    return n.contains('weather') || n.contains('temperature') || n.contains('forecast') || n.contains('outside');
+  }
+
+  bool _isExpenseIntent(String input) {
+    final n = input.toLowerCase();
+    return n.contains('expense') || n.contains('spent') || n.contains('paid for') || 
+        n.contains('bill paid') || n.contains('cost') || n.contains('electricity bill') ||
+        n.contains('water bill') || n.contains('rent bill') || n.contains('internet bill') ||
+        n.contains('phone bill');
+  }
+
+  bool _isReminderIntent(String input) {
+    final n = input.toLowerCase();
+    return n.contains('remind') || n.contains('reminder') || n.contains('set a alert');
   }
 
   bool _isAnalyticsIntent(String input) {
@@ -780,7 +890,9 @@ class Chat {
       }
     }
 
-    if (_isInventoryIntent(input) && !_isBillingIntent(input) && !_isAddProductIntent(input)) {
+    final bool isUtilityIntent = _isReminderIntent(input) || _isExpenseIntent(input) || _isWeatherIntent(input);
+
+    if (!isUtilityIntent && _isInventoryIntent(input) && !_isBillingIntent(input) && !_isAddProductIntent(input)) {
       final query = _extractInventoryQuery(input);
       final products = await findInventoryProducts(query.isEmpty ? input : query);
       final reply = _formatInventoryReply(products);
@@ -789,7 +901,7 @@ class Chat {
       return reply;
     }
 
-    if (_isBillingIntent(input)) {
+    if (!isUtilityIntent && _isBillingIntent(input)) {
       final requestedItems = _parseBillingRequestedItems(input);
       if (requestedItems.isNotEmpty) {
         try {
@@ -834,15 +946,21 @@ class Chat {
       selectedTools = ['proposeProducts'];
     } else if (_isDeleteProductIntent(input)) {
       selectedTools = ['deleteProduct'];
+    } else if (_isWeatherIntent(input)) {
+      selectedTools = ['getWeather'];
+    } else if (_isReminderIntent(input)) {
+      selectedTools = ['setReminder'];
+    } else if (_isExpenseIntent(input)) {
+      selectedTools = ['logExpense'];
     }
 
     Future<dynamic> runGenerate() => ai.generate(
       model: appModel(model),
       messages: [
-        Message(role: Role.system, content: [TextPart(text: systemPrompt)]),
+        Message(role: Role.system, content: [TextPart(text: '$systemPrompt\nThe current date/time in IST is ${_formatIstDate(_nowIst())} ${_formatIstTime(_nowIst())}. Use this to calculate ISO 8601 timestamps for reminders.')]),
         ..._history,
       ],
-      toolNames: selectedTools,
+      toolNames: {...tools, ...selectedTools}.toList(),
       context: {'userIdentifier': userIdentifier},
     );
 
@@ -855,7 +973,7 @@ class Chat {
         response = await ai.generate(
           model: appModel(model),
           messages: [
-            Message(role: Role.system, content: [TextPart(text: systemPrompt)]),
+            Message(role: Role.system, content: [TextPart(text: '$systemPrompt\nThe current date/time in IST is ${_formatIstDate(_nowIst())} ${_formatIstTime(_nowIst())}. Use this to calculate ISO 8601 timestamps for reminders.')]),
             ..._history,
           ],
           toolNames: <String>[],
@@ -934,6 +1052,49 @@ Future<void> main(List<String> arguments) async {
               caption: pdf.caption,
             );
             print('[bot] PDF sent to user');
+
+            // --- Post-Sale Notification Logic ---
+            try {
+              final draftData = await getApprovalDetails(approvalId);
+              if (draftData != null) {
+                final approval = DraftApproval.fromJson(draftData);
+                String notification = '✅ *Post-Sale Summary*\n\n';
+                
+                notification += '📦 *Remaining Stock:*\n';
+                for (final item in approval.proposedItems) {
+                  try {
+                    final pRes = await supabase.from('products').select('name, stock_quantity').eq('id', item.productId).single();
+                    final name = (pRes as Map)['name'] ?? 'Product';
+                    final stock = (pRes)['stock_quantity'] ?? 0;
+                    notification += '• $name: $stock left\n';
+                  } catch (_) {
+                    // Ignore if product is not found
+                  }
+                }
+                
+                if (approval.dueAmount > 0 && approval.customerId != null && approval.customerId!.isNotEmpty) {
+                  try {
+                    final cRes = await supabase.from('customers').select('name, current_balance').eq('id', approval.customerId!).single();
+                    final cName = (cRes as Map)['name'] ?? 'Customer';
+                    final balance = (cRes)['current_balance'] ?? 0.0;
+                    notification += '\n💳 *Credit Update:*\n';
+                    notification += '• $cName now has a total due balance of ₹${(balance as num).toStringAsFixed(2)}.\n';
+                  } catch (_) {
+                    // Ignore if customer not found
+                  }
+                }
+
+                await bot.sendMessage(
+                  chatId,
+                  notification,
+                  parseMode: 'Markdown',
+                );
+              }
+            } catch (notifyError, stackTrace) {
+              stderr.writeln('Error sending post-sale notification: $notifyError');
+            }
+            // ------------------------------------
+
           } catch (pdfError, stackTrace) {
             stderr.writeln('Error generating/sending invoice PDF: $pdfError');
             stderr.writeln('Stack trace: $stackTrace');
@@ -1324,6 +1485,60 @@ Future<void> main(List<String> arguments) async {
       return;
     }
 
+    // ── Handle pending reminder heads-up answer ───────────────────────────
+    if (pendingReminderHeadsUp.containsKey(chatId)) {
+      final reminderData = pendingReminderHeadsUp.remove(chatId)!;
+      final reminderText = reminderData['text'] as String;
+      var scheduledAt = reminderData['scheduledAt'] as DateTime;
+      final bool headsUp = _isYesReply(text);
+
+      if (headsUp) {
+        scheduledAt = scheduledAt.subtract(const Duration(minutes: 25));
+      }
+
+      try {
+        final shopId = await getShopIdForUser(userIdentifier);
+        await supabase.from('reminders').insert({
+          'chat_id': chatId,
+          'shop_id': shopId,
+          'reminder_text': reminderText,
+          'scheduled_at': scheduledAt.toUtc().toIso8601String(),
+          'heads_up': headsUp,
+          'status': 'PENDING',
+        });
+
+        final istTime = scheduledAt.toUtc().add(const Duration(hours: 5, minutes: 30));
+        var hour = istTime.hour;
+        final minute = istTime.minute.toString().padLeft(2, '0');
+        final period = hour >= 12 ? 'PM' : 'AM';
+        hour = hour % 12;
+        if (hour == 0) hour = 12;
+        final timeStr = '$hour:$minute $period';
+
+        if (headsUp) {
+          await bot.sendMessage(chatId, '✅ Reminder set! I\'ll remind you about "$reminderText" at $timeStr (25 min early heads-up). 🔔');
+        } else {
+          await bot.sendMessage(chatId, '✅ Reminder set! I\'ll remind you about "$reminderText" at $timeStr. 🔔');
+        }
+      } catch (e) {
+        stderr.writeln('Error saving reminder: $e');
+        await bot.sendMessage(chatId, '⚠️ Could not save reminder. Please try again.');
+      }
+      return;
+    }
+
+    // ── Detect reminder intent and start flow ─────────────────────────────
+    if (_isReminderIntentGlobal(text)) {
+      final parsed = _parseReminderFromText(text);
+      if (parsed != null) {
+        pendingReminderHeadsUp[chatId] = parsed;
+        await bot.sendMessage(chatId, '⏰ Got it — "${parsed['text']}". Should I remind you 25 minutes earlier as a heads-up? Reply *YES* or *NO*.', parseMode: 'Markdown');
+      } else {
+        await bot.sendMessage(chatId, 'I understood you want a reminder, but I couldn\'t parse the time. Please try like:\n"Set a reminder to check stock at 5:30 PM today"');
+      }
+      return;
+    }
+
     // ── Confirm image import flow ───────────────────────────────────────
     if (pendingImageImports.containsKey(chatId)) {
       if (_isNoReply(text)) {
@@ -1548,6 +1763,9 @@ Future<void> main(List<String> arguments) async {
           analyticsTool.name,
           proposeProductsTool.name,
           requestProductDeletionTool.name,
+          weatherTool.name,
+          reminderTool.name,
+          expenseTool.name,
         ],
         systemPrompt: _systemPrompt,
         userIdentifier: userIdentifier,
@@ -1706,4 +1924,39 @@ Future<void> main(List<String> arguments) async {
   print('✅ Telegram Bot is running as @${me.username}');
 
   bot.start();
+
+  // ─── REMINDER BACKGROUND PROCESSOR ─────────────────────────────────────
+  print('⏰ Starting Reminder Background Processor...');
+  Timer.periodic(const Duration(minutes: 1), (timer) async {
+    try {
+      final now = DateTime.now().toUtc().toIso8601String();
+      final dueReminders = await supabase
+          .from('reminders')
+          .select()
+          .eq('status', 'PENDING')
+          .lte('scheduled_at', now);
+
+      for (final row in dueReminders as List) {
+        final data = Map<String, dynamic>.from(row as Map);
+        final id = data['id'];
+        final chatId = data['chat_id'] as int;
+        final text = data['reminder_text'] as String;
+
+        print('[reminders] Delivering reminder $id to chat $chatId');
+        
+        await bot.sendMessage(
+          chatId,
+          '⏰ *REMINDER*\n\n$text',
+          parseMode: 'Markdown',
+        );
+
+        await supabase
+            .from('reminders')
+            .update({'status': 'SENT'})
+            .eq('id', id);
+      }
+    } catch (e) {
+      stderr.writeln('[reminders-error] $e');
+    }
+  });
 }
