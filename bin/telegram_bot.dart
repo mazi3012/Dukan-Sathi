@@ -912,38 +912,49 @@ Future<void> main(List<String> arguments) async {
     // ── APPROVE ──────────────────────────────────────────────────────────
     if (data.startsWith('approve_')) {
       final approvalId = data.replaceFirst('approve_', '');
+      print('[bot] Handling approval for: $approvalId');
       await bot.answerCallbackQuery(query.id, text: '⏳ Processing...');
       try {
+        print('[bot] Calling approveDraftInvoice...');
         final result = await approveDraftInvoice(approvalId: approvalId, reviewedBy: chatId.toString());
+        print('[bot] approveDraftInvoice result: ${result['success']}');
+        
         if (result['success'] == true) {
           try {
+            print('[bot] Generating PDF for invoice: ${result['invoiceNumber']}');
             final pdf = await InvoicePdfGenerator.generateApprovedInvoicePdf(
               approvalId: approvalId,
               invoiceNumber: result['invoiceNumber'] as String,
             );
+            print('[bot] PDF generated successfully: ${pdf.file.path}');
+            
             await bot.sendDocument(
               chatId,
               pdf.file,
               caption: pdf.caption,
             );
-          } catch (pdfError) {
+            print('[bot] PDF sent to user');
+          } catch (pdfError, stackTrace) {
             stderr.writeln('Error generating/sending invoice PDF: $pdfError');
+            stderr.writeln('Stack trace: $stackTrace');
             await bot.sendMessage(
               chatId,
-              'Invoice was approved and saved, but the PDF could not be generated right now.',
+              '⚠️ Invoice was approved and saved, but the PDF could not be generated.\n\nError: $pdfError',
             );
           }
           await bot.editMessageText(
-            '${result['message'] as String}\n\n📄 PDF invoice sent.',
+            '${result['message'] as String}\n\n📄 PDF process complete.',
             chatId: chatId,
             messageId: msgId,
             parseMode: 'Markdown',
           );
         } else {
+          print('[bot] Approval failed: ${result['error']}');
           await bot.answerCallbackQuery(query.id, text: '❌ ${result['error']}', showAlert: true);
         }
-      } catch (e) {
-        stderr.writeln('Error approving: $e');
+      } catch (e, stackTrace) {
+        stderr.writeln('Critical error during approval process: $e');
+        stderr.writeln('Stack trace: $stackTrace');
         await bot.answerCallbackQuery(query.id, text: 'Failed to approve. Try again.', showAlert: true);
       }
 

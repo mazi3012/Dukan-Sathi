@@ -51,13 +51,12 @@ class InvoicePdfGenerator {
   static String templateLabel(InvoicePdfTemplate template) {
     switch (template) {
       case InvoicePdfTemplate.igst:
-        return 'IGST Invoice';
       case InvoicePdfTemplate.cgstSgst:
-        return 'CGST/SGST Invoice';
+        return 'Tax Invoice';
       case InvoicePdfTemplate.nonGst:
-        return 'Non-GST Invoice';
+        return 'Bill of Supply';
       case InvoicePdfTemplate.composite:
-        return 'Composite GST Invoice';
+        return 'Composite Bill of Supply';
     }
   }
 
@@ -73,7 +72,7 @@ class InvoicePdfGenerator {
     final customer = approval.customerId == null
         ? null
         : await _fetchCustomer(approval.customerId!);
-    final itemNames = await _fetchProductNames(approval.proposedItems);
+    final productDetails = await _fetchProductDetails(approval.proposedItems);
     final approvedAt = approval.reviewedAt ?? DateTime.now();
     final theme = await _loadTheme();
 
@@ -91,13 +90,15 @@ class InvoicePdfGenerator {
             shopState: shop['state'] as String? ?? '-',
             gstNumber: shop['gst_registration_number'] as String?,
             businessType: shop['business_type'] as String? ?? 'Retail',
-            customerName: customerName?.trim().isNotEmpty == true
-              ? customerName!.trim()
-              : customer?['name'] as String? ?? 'Walk-in Customer',
+            customerName: approval.customerName?.isNotEmpty == true
+              ? approval.customerName!
+              : (customerName?.trim().isNotEmpty == true
+                  ? customerName!.trim()
+                  : customer?['name'] as String? ?? 'Walk-in Customer'),
             customerPhone: customer?['phone'] as String?,
             invoiceNumber: invoiceNumber,
             approvedAt: approvedAt,
-            itemNames: itemNames,
+            productDetails: productDetails,
             template: template,
           ),
         ],
@@ -161,21 +162,21 @@ class InvoicePdfGenerator {
     }
   }
 
-  static Future<Map<String, String>> _fetchProductNames(List<CartItem> items) async {
-    final names = <String, String>{};
+  static Future<Map<String, Map<String, dynamic>>> _fetchProductDetails(List<CartItem> items) async {
+    final details = <String, Map<String, dynamic>>{};
     for (final item in items) {
       try {
         final productRows = await supabase
             .from('products')
-            .select('name')
+            .select('name, hsn_sac_code')
             .eq('id', item.productId)
             .single();
-        names[item.productId] = (productRows as Map)['name'] as String? ?? item.productId;
+        details[item.productId] = Map<String, dynamic>.from(productRows as Map);
       } catch (_) {
-        names[item.productId] = item.productId;
+        details[item.productId] = {'name': item.productId, 'hsn_sac_code': null};
       }
     }
-    return names;
+    return details;
   }
 
   static pw.Widget _buildInvoicePage({
@@ -188,7 +189,7 @@ class InvoicePdfGenerator {
     required String? customerPhone,
     required String invoiceNumber,
     required DateTime approvedAt,
-    required Map<String, String> itemNames,
+    required Map<String, Map<String, dynamic>> productDetails,
     required InvoicePdfTemplate template,
   }) {
     final tax = approval.proposedTaxBreakdown;
@@ -204,11 +205,13 @@ class InvoicePdfGenerator {
     };
 
     final itemRows = approval.proposedItems.map((item) {
-      final itemName = itemNames[item.productId] ?? item.productId;
+      final details = productDetails[item.productId];
+      final itemName = details?['name'] as String? ?? item.productId;
+      final hsn = details?['hsn_sac_code'] as String? ?? '-';
       final amount = item.quantity * item.unitPrice;
       return [
         itemName,
-        item.productId,
+        hsn,
         item.quantity.toString(),
         _money(item.unitPrice),
         _money(amount),
@@ -293,8 +296,8 @@ class InvoicePdfGenerator {
             rows: [
               ['Customer', customerName],
               ['Phone', customerPhone ?? '-'],
+              ['State (POS)', approval.customerState ?? shopState],
               ['Approval ID', approval.approvalId],
-              ['Sale ID', approval.saleId ?? '-'],
             ],
             accent: accent,
           ),
@@ -303,12 +306,18 @@ class InvoicePdfGenerator {
             title: 'Invoice Summary',
             rows: [
               ['Subtotal', _money(tax.subtotal)],
+              if (approval.discountAmount != null && approval.discountAmount! > 0) ...[
+                ['Discount', '-${_money(approval.discountAmount!)}'],
+                ['Taxable Value', _money(approval.subtotalAfterDiscount ?? tax.subtotal)],
+              ],
               if (isIgst) ['IGST', _money(tax.igstAmount)],
               if (isCgstSgst) ['CGST', _money(tax.cgstAmount)],
               if (isCgstSgst) ['SGST', _money(tax.sgstAmount)],
               if (isNonGst) ['GST', 'Not applicable'],
               if (template == InvoicePdfTemplate.composite) ['Composite GST', _money(approval.proposedTotal - tax.subtotal)],
-              ['Total', _money(tax.totalAmount)],
+              ['Grand Total', _money(approval.proposedTotal)],
+              if (approval.amountPaid > 0) ['Amount Paid', _money(approval.amountPaid)],
+              if (approval.dueAmount > 0) ['Due Amount', _money(approval.dueAmount)],
             ],
             accent: accent,
             highlightLastRow: true,
@@ -333,13 +342,13 @@ class InvoicePdfGenerator {
             headerDecoration: pw.BoxDecoration(color: accent),
             cellAlignment: pw.Alignment.centerLeft,
             columnWidths: const {
-              0: pw.FlexColumnWidth(3.2),
-              1: pw.FlexColumnWidth(1.5),
+              0: pw.FlexColumnWidth(3.0),
+              1: pw.FlexColumnWidth(1.2),
               2: pw.FlexColumnWidth(0.8),
               3: pw.FlexColumnWidth(1.0),
               4: pw.FlexColumnWidth(1.0),
             },
-            headers: const ['Item', 'Product ID', 'Qty', 'Rate', 'Amount'],
+            headers: const ['Item', 'HSN/SAC', 'Qty', 'Rate', 'Amount'],
             data: itemRows,
           ),
           pw.SizedBox(height: 14),
@@ -369,6 +378,47 @@ class InvoicePdfGenerator {
           pw.Text(
             'This invoice was generated automatically after approval and matches the saved draft invoice record.',
             style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+          ),
+          pw.SizedBox(height: 20),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.end,
+            children: [
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('Reverse Charge: No', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.grey800)),
+                  pw.SizedBox(height: 8),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: pw.BoxDecoration(
+                      color: approval.paymentStatus == 'PAID' ? PdfColors.green50 : (approval.paymentStatus == 'PARTIAL' ? PdfColors.orange50 : PdfColors.red50),
+                      borderRadius: pw.BorderRadius.circular(6),
+                      border: pw.Border.all(
+                        color: approval.paymentStatus == 'PAID' ? PdfColors.green300 : (approval.paymentStatus == 'PARTIAL' ? PdfColors.orange300 : PdfColors.red300),
+                      ),
+                    ),
+                    child: pw.Text(
+                      'STATUS: ${approval.paymentStatus}',
+                      style: pw.TextStyle(
+                        color: approval.paymentStatus == 'PAID' ? PdfColors.green800 : (approval.paymentStatus == 'PARTIAL' ? PdfColors.orange800 : PdfColors.red800),
+                        fontWeight: pw.FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.SizedBox(height: 40), // Space for signature
+                  pw.Container(width: 140, height: 1, color: PdfColors.black),
+                  pw.SizedBox(height: 6),
+                  pw.Text('Authorized Signatory', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                ],
+              ),
+            ],
           ),
         ],
       ),
