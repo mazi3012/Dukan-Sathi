@@ -51,7 +51,7 @@ const String _systemPrompt =
   "10. For product deletion, use deleteProduct and always include 'Delete Request ID: [ID]' in the response so Telegram can show approval buttons.\n"
   "11. For weather, use getWeather. If the user hasn't provided a 6-digit PIN code, ask for it first.\n"
   "12. For reminders, use setReminder. First, ALWAYS ask the user if they want a 'heads-up' 25 mins early. AFTER they answer YES or NO, YOU MUST execute the setReminder tool to save it. Never just say it is set without calling the tool.\n"
-  "13. For shop expenses (rent, electricity, repairs), use logExpense.";
+  "13. For shop expenses (rent, electricity, repairs), use logExpense to record them, and getExpenses to retrieve or check past expenses.";
 
 DateTime _nowIst() => DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
 
@@ -79,6 +79,7 @@ final requestProductDeletionTool = requestProductDeletion;
 final weatherTool = getWeather;
 final reminderTool = setReminder;
 final expenseTool = logExpense;
+final getExpensesTool = getExpenses;
 
 // ─── HELPER: check if user has already completed onboarding ────────────────
 Future<bool> _isUserOnboarded(String userIdentifier) async {
@@ -951,7 +952,7 @@ class Chat {
     } else if (_isReminderIntent(input)) {
       selectedTools = ['setReminder'];
     } else if (_isExpenseIntent(input)) {
-      selectedTools = ['logExpense'];
+      selectedTools = ['logExpense', 'getExpenses'];
     }
 
     Future<dynamic> runGenerate() => ai.generate(

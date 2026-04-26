@@ -48,6 +48,15 @@ final retailAssistantFlow = ai.defineFlow(
         normalizedPrompt.contains('order')) {
       toolNames.add('businessInsightsTool');
     }
+    if (normalizedPrompt.contains('expense') ||
+        normalizedPrompt.contains('spent') ||
+        normalizedPrompt.contains('bill paid') ||
+        normalizedPrompt.contains('cost') ||
+        normalizedPrompt.contains('log') ||
+        normalizedPrompt.contains('utility')) {
+      toolNames.add('logExpense');
+      toolNames.add('getExpenses');
+    }
 
     final response = await ai.generate(
       model: appModel(),
@@ -57,7 +66,7 @@ final retailAssistantFlow = ai.defineFlow(
           content: [
             TextPart(
                 text:
-                  'You are the AI brain for Dukan Sathi Pro. Shop ID is \'b6ff658b-c750-4c9a-b9ce-909ef6c52674\'. When a user asks about prices or stock, use the checkInventory tool. When a user asks to create a bill, use the createDraftInvoice tool. For business analytics, revenue, profit, or date-based queries, use the businessInsightsTool and interpret date ranges in India Standard Time. When a user wants to add products, use proposeProducts. When a user wants to delete or remove a product, use requestProductDeletion and never delete directly. Always reply concisely in a friendly manner. Important: Product additions and deletions require human approval before finalization. Summarize the draft items and tell the user to check for the approval message shortly.',
+                  'You are the AI brain for Dukan Sathi Pro. Shop ID is \'b6ff658b-c750-4c9a-b9ce-909ef6c52674\'. When a user asks about prices or stock, use the checkInventory tool. When a user asks to create a bill, use the createDraftInvoice tool. For business analytics, revenue, profit, or date-based queries, use the businessInsightsTool and interpret date ranges in India Standard Time. When a user wants to add products, use proposeProducts. When a user wants to delete or remove a product, use requestProductDeletion and never delete directly. Use logExpense to record expenses and getExpenses to retrieve past expenses. Always reply concisely in a friendly manner. Important: Product additions and deletions require human approval before finalization. Summarize the draft items and tell the user to check for the approval message shortly.',
             ),
           ],
         ),

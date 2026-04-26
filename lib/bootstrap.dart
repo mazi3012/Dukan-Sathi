@@ -15,5 +15,6 @@ void initializeBackend() {
   getWeather;
   setReminder;
   logExpense;
+  getExpenses;
   retailAssistantFlow;
 }
