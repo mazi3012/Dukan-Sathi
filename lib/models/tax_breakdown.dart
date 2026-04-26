@@ -15,6 +15,8 @@ abstract class TaxBreakdown with _$TaxBreakdown {
     @JsonKey(name: 'tax_slab') required String taxSlab,
     @JsonKey(name: 'total_amount') required double totalAmount,
     @JsonKey(name: 'breakdown') required List<Map<String, dynamic>> breakdown,
+    /// GST summary grouped by rate — each entry: {rate, taxableAmount, cgst, sgst, igst, totalTax}
+    @JsonKey(name: 'rate_wise_summary') @Default([]) List<Map<String, dynamic>> rateWiseSummary,
   }) = _TaxBreakdown;
 
   factory TaxBreakdown.fromJson(Map<String, dynamic> json) =>

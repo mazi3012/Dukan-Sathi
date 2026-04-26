@@ -1112,7 +1112,13 @@ Future<void> main(List<String> arguments) async {
           );
         } else {
           print('[bot] Approval failed: ${result['error']}');
-          await bot.answerCallbackQuery(query.id, text: '❌ ${result['error']}', showAlert: true);
+          await bot.answerCallbackQuery(query.id, text: '❌ Approval failed');
+          await bot.sendMessage(
+            chatId,
+            '❌ *Approval Failed*\n\n${result['error']}',
+            parseMode: 'Markdown',
+            replyToMessageId: msgId,
+          );
         }
       } catch (e, stackTrace) {
         stderr.writeln('Critical error during approval process: $e');

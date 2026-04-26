@@ -52,11 +52,11 @@ class InvoicePdfGenerator {
     switch (template) {
       case InvoicePdfTemplate.igst:
       case InvoicePdfTemplate.cgstSgst:
-        return 'Tax Invoice';
+        return 'TAX INVOICE';
       case InvoicePdfTemplate.nonGst:
-        return 'Bill of Supply';
+        return 'BILL OF SUPPLY';
       case InvoicePdfTemplate.composite:
-        return 'Composite Bill of Supply';
+        return 'COMPOSITE BILL';
     }
   }
 
@@ -81,8 +81,9 @@ class InvoicePdfGenerator {
       pw.MultiPage(
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(28),
+          margin: const pw.EdgeInsets.all(28.35), // 10mm margins
         ),
+        footer: (context) => _buildFooter(template: template),
         build: (context) => [
           _buildInvoicePage(
             approval: approval,
@@ -95,7 +96,7 @@ class InvoicePdfGenerator {
               : (customerName?.trim().isNotEmpty == true
                   ? customerName!.trim()
                   : customer?['name'] as String? ?? 'Walk-in Customer'),
-            customerPhone: customer?['phone'] as String?,
+            customerPhone: ((customer?['phone'] as String?)?.startsWith('AUTO-') ?? false) ? null : customer?['phone'] as String?,
             invoiceNumber: invoiceNumber,
             approvedAt: approvedAt,
             productDetails: productDetails,
@@ -168,12 +169,12 @@ class InvoicePdfGenerator {
       try {
         final productRows = await supabase
             .from('products')
-            .select('name, hsn_sac_code')
+            .select('name, hsn_sac_code, gst_rate')
             .eq('id', item.productId)
             .single();
         details[item.productId] = Map<String, dynamic>.from(productRows as Map);
       } catch (_) {
-        details[item.productId] = {'name': item.productId, 'hsn_sac_code': null};
+        details[item.productId] = {'name': item.productId, 'hsn_sac_code': null, 'gst_rate': null};
       }
     }
     return details;
@@ -194,230 +195,308 @@ class InvoicePdfGenerator {
   }) {
     final tax = approval.proposedTaxBreakdown;
     final isIgst = template == InvoicePdfTemplate.igst;
-    final isCgstSgst = template == InvoicePdfTemplate.cgstSgst;
     final isNonGst = template == InvoicePdfTemplate.nonGst;
     final title = templateLabel(template);
-    final accent = switch (template) {
-      InvoicePdfTemplate.igst => PdfColors.indigo800,
-      InvoicePdfTemplate.cgstSgst => PdfColors.teal800,
-      InvoicePdfTemplate.nonGst => PdfColors.brown800,
-      InvoicePdfTemplate.composite => PdfColors.orange800,
-    };
+    
+    // Professional Color Palette
+    final tealColor = PdfColor.fromInt(0x0D7C66);
+    final darkText = PdfColors.grey900;
+    final lightGrey = PdfColors.grey100;
+    final borderColor = PdfColors.grey300;
 
-    final itemRows = approval.proposedItems.map((item) {
+    // 1. HEADER
+    final headerSection = pw.Container(
+      padding: const pw.EdgeInsets.only(bottom: 15),
+      decoration: pw.BoxDecoration(
+        border: pw.Border(bottom: pw.BorderSide(color: tealColor, width: 2)),
+      ),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  shopName.toUpperCase(),
+                  style: pw.TextStyle(color: tealColor, fontSize: 18, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  '$businessType • State: $shopState',
+                  style: pw.TextStyle(color: PdfColors.grey700, fontSize: 9),
+                ),
+                if (gstNumber != null && gstNumber.isNotEmpty)
+                  pw.Text(
+                    'GSTIN: $gstNumber',
+                    style: pw.TextStyle(color: PdfColors.grey700, fontSize: 9),
+                  ),
+              ],
+            ),
+          ),
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.end,
+            children: [
+              pw.Text(
+                title,
+                style: pw.TextStyle(color: tealColor, fontSize: 16, fontWeight: pw.FontWeight.bold, letterSpacing: 1),
+              ),
+              pw.SizedBox(height: 6),
+              pw.Text(
+                'Invoice No: $invoiceNumber',
+                style: pw.TextStyle(color: darkText, fontSize: 9, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.Text(
+                'Date: ${_formatDateTime(approvedAt)}',
+                style: pw.TextStyle(color: PdfColors.grey700, fontSize: 9),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    // 2. INFO GRID
+    final infoGrid = pw.Container(
+      margin: const pw.EdgeInsets.symmetric(vertical: 15),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          // Bill To
+          pw.Expanded(
+            child: pw.Container(
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(color: lightGrey, borderRadius: pw.BorderRadius.circular(4)),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('Billed To:', style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                  pw.SizedBox(height: 4),
+                  pw.Text(customerName, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: darkText)),
+                  if (customerPhone != null && customerPhone.isNotEmpty)
+                    pw.Text('Phone: $customerPhone', style: pw.TextStyle(fontSize: 8, color: darkText)),
+                  pw.Text('State (POS): ${approval.customerState ?? shopState}', style: pw.TextStyle(fontSize: 8, color: darkText)),
+                ],
+              ),
+            ),
+          ),
+          pw.SizedBox(width: 15),
+          // Invoice Details
+          pw.Expanded(
+            child: pw.Container(
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(color: lightGrey, borderRadius: pw.BorderRadius.circular(4)),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('Payment Details:', style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                  pw.SizedBox(height: 4),
+                  pw.Row(
+                    children: [
+                      pw.Text('Status: ', style: pw.TextStyle(fontSize: 9, color: darkText)),
+                      _buildStatusBadge(approval.paymentStatus),
+                    ]
+                  ),
+                  pw.SizedBox(height: 2),
+                  pw.Text('Approval ID: ${approval.approvalId.split('-').first.toUpperCase()}', style: pw.TextStyle(fontSize: 8, color: darkText)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // 3. ITEMS TABLE
+    final itemRows = approval.proposedItems.asMap().entries.map((entry) {
+      final index = entry.key + 1;
+      final item = entry.value;
       final details = productDetails[item.productId];
       final itemName = details?['name'] as String? ?? item.productId;
       final hsn = details?['hsn_sac_code'] as String? ?? '-';
+      final gstRate = item.gstRate;
+      final rateStr = gstRate == gstRate.roundToDouble() ? '${gstRate.toInt()}%' : '${gstRate.toStringAsFixed(1)}%';
       final amount = item.quantity * item.unitPrice;
       return [
+        index.toString(),
         itemName,
         hsn,
+        rateStr,
         item.quantity.toString(),
         _money(item.unitPrice),
         _money(amount),
       ];
     }).toList();
 
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(18),
-      decoration: pw.BoxDecoration(
-        color: PdfColors.white,
-        borderRadius: pw.BorderRadius.circular(14),
-        border: pw.Border.all(color: PdfColors.grey300, width: 1),
-      ),
-      child: pw.Column(
+    final itemsTable = pw.TableHelper.fromTextArray(
+      headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 8),
+      cellStyle: pw.TextStyle(fontSize: 8, color: darkText),
+      headerDecoration: pw.BoxDecoration(color: tealColor),
+      border: pw.TableBorder.all(color: borderColor, width: 0.5),
+      cellHeight: 22,
+      cellAlignments: {
+        0: pw.Alignment.centerLeft,
+        1: pw.Alignment.centerLeft,
+        2: pw.Alignment.centerLeft,
+        3: pw.Alignment.centerRight,
+        4: pw.Alignment.centerRight,
+        5: pw.Alignment.centerRight,
+        6: pw.Alignment.centerRight,
+      },
+      columnWidths: const {
+        0: pw.FixedColumnWidth(25),
+        1: pw.FlexColumnWidth(3.0),
+        2: pw.FixedColumnWidth(55),
+        3: pw.FixedColumnWidth(40),
+        4: pw.FixedColumnWidth(35),
+        5: pw.FixedColumnWidth(65),
+        6: pw.FixedColumnWidth(75),
+      },
+      headers: const ['#', 'Item Description', 'HSN/SAC', 'GST', 'Qty', 'Rate', 'Amount'],
+      data: itemRows,
+    );
+
+    // 4. BILLING SUMMARY
+    final gstSummaryRows = tax.rateWiseSummary.map((entry) {
+      final rate = (entry['rate'] as num).toDouble();
+      final rateStr = rate == rate.roundToDouble() ? '${rate.toInt()}%' : '${rate.toStringAsFixed(1)}%';
+      final taxableAmt = _money((entry['taxableAmount'] as num).toDouble());
+      final totalTax = _money((entry['totalTax'] as num).toDouble());
+      if (isIgst) {
+        final igst = _money((entry['igst'] as num).toDouble());
+        return [rateStr, taxableAmt, igst, totalTax];
+      } else {
+        final cgst = _money((entry['cgst'] as num).toDouble());
+        final sgst = _money((entry['sgst'] as num).toDouble());
+        return [rateStr, taxableAmt, cgst, sgst, totalTax];
+      }
+    }).toList();
+
+    final summarySection = pw.Container(
+      margin: const pw.EdgeInsets.only(top: 15),
+      child: pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Container(
-            padding: const pw.EdgeInsets.all(16),
-            decoration: pw.BoxDecoration(
-              color: accent,
-              borderRadius: pw.BorderRadius.circular(12),
-            ),
-            child: pw.Row(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Expanded(
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        shopName,
-                        style: pw.TextStyle(
-                          color: PdfColors.white,
-                          fontSize: 20,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Text(
-                        '$businessType business • State: $shopState',
-                        style: pw.TextStyle(color: PdfColors.white, fontSize: 10),
-                      ),
-                      if (gstNumber != null && gstNumber.isNotEmpty) ...[
-                        pw.SizedBox(height: 2),
-                        pw.Text(
-                          'GSTIN: $gstNumber',
-                          style: pw.TextStyle(color: PdfColors.white, fontSize: 10),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+          // Left Side: GST Summary
+          pw.Expanded(
+            flex: 5,
+            child: (gstSummaryRows.isNotEmpty && !isNonGst && template != InvoicePdfTemplate.composite)
+              ? pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text(
-                      title,
-                      style: pw.TextStyle(
-                        color: PdfColors.white,
-                        fontSize: 16,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
+                    pw.Text('GST Breakup', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: tealColor)),
                     pw.SizedBox(height: 4),
-                    pw.Text(
-                      'Invoice: $invoiceNumber',
-                      style: pw.TextStyle(color: PdfColors.white, fontSize: 10),
-                    ),
-                    pw.Text(
-                      'Approved: ${_formatDateTime(approvedAt)}',
-                      style: pw.TextStyle(color: PdfColors.white, fontSize: 10),
+                    pw.TableHelper.fromTextArray(
+                      headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 6),
+                      cellStyle: pw.TextStyle(fontSize: 6, color: darkText),
+                      headerDecoration: pw.BoxDecoration(color: tealColor),
+                      border: pw.TableBorder.all(color: borderColor, width: 0.5),
+                      cellHeight: 16,
+                      cellAlignments: {
+                        0: pw.Alignment.centerLeft,
+                        1: pw.Alignment.centerRight,
+                        2: pw.Alignment.centerRight,
+                        3: pw.Alignment.centerRight,
+                        4: pw.Alignment.centerRight,
+                      },
+                      columnWidths: isIgst
+                        ? {0: const pw.FixedColumnWidth(35), 1: const pw.FlexColumnWidth(1), 2: const pw.FlexColumnWidth(1), 3: const pw.FlexColumnWidth(1)}
+                        : {0: const pw.FixedColumnWidth(30), 1: const pw.FlexColumnWidth(1), 2: const pw.FlexColumnWidth(1), 3: const pw.FlexColumnWidth(1), 4: const pw.FlexColumnWidth(1)},
+                      headers: isIgst
+                        ? const ['GST', 'Taxable', 'IGST', 'Total Tax']
+                        : const ['GST', 'Taxable', 'CGST', 'SGST', 'Total Tax'],
+                      data: gstSummaryRows,
                     ),
                   ],
-                ),
-              ],
-            ),
+                )
+              : pw.SizedBox(),
           ),
-          pw.SizedBox(height: 14),
-          _infoGrid(
-            title: 'Customer Details',
-            rows: [
-              ['Customer', customerName],
-              ['Phone', customerPhone ?? '-'],
-              ['State (POS)', approval.customerState ?? shopState],
-              ['Approval ID', approval.approvalId],
-            ],
-            accent: accent,
-          ),
-          pw.SizedBox(height: 12),
-          _infoGrid(
-            title: 'Invoice Summary',
-            rows: [
-              ['Subtotal', _money(tax.subtotal)],
-              if (approval.discountAmount != null && approval.discountAmount! > 0) ...[
-                ['Discount', '-${_money(approval.discountAmount!)}'],
-                ['Taxable Value', _money(approval.subtotalAfterDiscount ?? tax.subtotal)],
-              ],
-              if (isIgst) ['IGST', _money(tax.igstAmount)],
-              if (isCgstSgst) ['CGST', _money(tax.cgstAmount)],
-              if (isCgstSgst) ['SGST', _money(tax.sgstAmount)],
-              if (isNonGst) ['GST', 'Not applicable'],
-              if (template == InvoicePdfTemplate.composite) ['Composite GST', _money(approval.proposedTotal - tax.subtotal)],
-              ['Grand Total', _money(approval.proposedTotal)],
-              if (approval.amountPaid > 0) ['Amount Paid', _money(approval.amountPaid)],
-              if (approval.dueAmount > 0) ['Due Amount', _money(approval.dueAmount)],
-            ],
-            accent: accent,
-            highlightLastRow: true,
-          ),
-          pw.SizedBox(height: 16),
-          pw.Text(
-            'Itemized Details',
-            style: pw.TextStyle(
-              fontSize: 13,
-              fontWeight: pw.FontWeight.bold,
-              color: accent,
-            ),
-          ),
-          pw.SizedBox(height: 8),
-          pw.TableHelper.fromTextArray(
-            headerStyle: pw.TextStyle(
-              color: PdfColors.white,
-              fontWeight: pw.FontWeight.bold,
-              fontSize: 10,
-            ),
-            cellStyle: const pw.TextStyle(fontSize: 9),
-            headerDecoration: pw.BoxDecoration(color: accent),
-            cellAlignment: pw.Alignment.centerLeft,
-            columnWidths: const {
-              0: pw.FlexColumnWidth(3.0),
-              1: pw.FlexColumnWidth(1.2),
-              2: pw.FlexColumnWidth(0.8),
-              3: pw.FlexColumnWidth(1.0),
-              4: pw.FlexColumnWidth(1.0),
-            },
-            headers: const ['Item', 'HSN/SAC', 'Qty', 'Rate', 'Amount'],
-            data: itemRows,
-          ),
-          pw.SizedBox(height: 14),
-          pw.Container(
-            padding: const pw.EdgeInsets.all(14),
-            decoration: pw.BoxDecoration(
-              color: PdfColors.grey100,
-              borderRadius: pw.BorderRadius.circular(12),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  'Tax Mode',
-                  style: pw.TextStyle(
-                    fontSize: 12,
-                    fontWeight: pw.FontWeight.bold,
-                    color: accent,
-                  ),
-                ),
-                pw.SizedBox(height: 6),
-                pw.Text(_taxSummaryText(tax, template)),
-              ],
-            ),
-          ),
-          pw.SizedBox(height: 10),
-          pw.Text(
-            'This invoice was generated automatically after approval and matches the saved draft invoice record.',
-            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
-          ),
-          pw.SizedBox(height: 20),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: pw.CrossAxisAlignment.end,
-            children: [
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
+          pw.SizedBox(width: 20),
+          // Right Side: Totals Block
+          pw.Expanded(
+            flex: 4,
+            child: pw.Container(
+              padding: const pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                color: lightGrey,
+                borderRadius: pw.BorderRadius.circular(4),
+                border: pw.Border.all(color: borderColor),
+              ),
+              child: pw.Column(
                 children: [
-                  pw.Text('Reverse Charge: No', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.grey800)),
+                  if (approval.discountAmount != null && approval.discountAmount! > 0) ...[
+                    _summaryRow('Subtotal', _money(approval.subtotalBeforeDiscount ?? tax.subtotal)),
+                    _summaryRow('Discount', '-${_money(approval.discountAmount!)}', color: PdfColors.green700),
+                  ],
+                  _summaryRow('Taxable Value', _money(approval.subtotalAfterDiscount ?? tax.subtotal)),
+                  pw.SizedBox(height: 4),
+                  if (isIgst) _summaryRow('IGST', _money(tax.igstAmount)),
+                  if (!isIgst && !isNonGst) ...[
+                    _summaryRow('CGST', _money(tax.cgstAmount)),
+                    _summaryRow('SGST', _money(tax.sgstAmount)),
+                  ],
+                  pw.Divider(color: borderColor, thickness: 1),
+                  pw.SizedBox(height: 4),
+                  _summaryRow('Grand Total', _money(approval.proposedTotal), isBold: true, fontSize: 12, color: tealColor),
                   pw.SizedBox(height: 8),
-                  pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: pw.BoxDecoration(
-                      color: approval.paymentStatus == 'PAID' ? PdfColors.green50 : (approval.paymentStatus == 'PARTIAL' ? PdfColors.orange50 : PdfColors.red50),
-                      borderRadius: pw.BorderRadius.circular(6),
-                      border: pw.Border.all(
-                        color: approval.paymentStatus == 'PAID' ? PdfColors.green300 : (approval.paymentStatus == 'PARTIAL' ? PdfColors.orange300 : PdfColors.red300),
-                      ),
-                    ),
-                    child: pw.Text(
-                      'STATUS: ${approval.paymentStatus}',
-                      style: pw.TextStyle(
-                        color: approval.paymentStatus == 'PAID' ? PdfColors.green800 : (approval.paymentStatus == 'PARTIAL' ? PdfColors.orange800 : PdfColors.red800),
-                        fontWeight: pw.FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
+                  if (approval.amountPaid > 0) _summaryRow('Amount Paid', _money(approval.amountPaid), color: darkText),
+                  if (approval.dueAmount > 0) _summaryRow('Balance Due', _money(approval.dueAmount), color: PdfColors.red700, isBold: true),
                 ],
               ),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.center,
-                children: [
-                  pw.SizedBox(height: 40), // Space for signature
-                  pw.Container(width: 140, height: 1, color: PdfColors.black),
-                  pw.SizedBox(height: 6),
-                  pw.Text('Authorized Signatory', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        headerSection,
+        infoGrid,
+        itemsTable,
+        summarySection,
+      ],
+    );
+  }
+
+  static pw.Widget _buildFooter({required InvoicePdfTemplate template}) {
+    final borderColor = PdfColors.grey300;
+    final darkText = PdfColors.grey900;
+    final isIgst = template == InvoicePdfTemplate.igst;
+    
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(top: 20),
+      padding: const pw.EdgeInsets.only(top: 10),
+      decoration: pw.BoxDecoration(
+        border: pw.Border(top: pw.BorderSide(color: borderColor)),
+      ),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        children: [
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                isIgst ? 'Inter-state transaction (IGST applied). Reverse Charge: Not Applicable' : 'Intra-state transaction (CGST+SGST applied). Reverse Charge: Not Applicable',
+                style: pw.TextStyle(fontSize: 7, color: darkText),
               ),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                'This is a computer-generated invoice and does not require a physical signature.',
+                style: pw.TextStyle(color: PdfColors.grey500, fontSize: 7, fontStyle: pw.FontStyle.italic),
+              ),
+            ],
+          ),
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.SizedBox(height: 30),
+              pw.Container(width: 120, height: 1, color: darkText),
+              pw.SizedBox(height: 4),
+              pw.Text('Authorized Signatory', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: darkText)),
             ],
           ),
         ],
@@ -425,64 +504,31 @@ class InvoicePdfGenerator {
     );
   }
 
-  static pw.Widget _infoGrid({
-    required String title,
-    required List<List<String>> rows,
-    required PdfColor accent,
-    bool highlightLastRow = false,
-  }) {
+  static pw.Widget _buildStatusBadge(String status) {
+    final color = status == 'PAID' ? PdfColors.green600 : (status == 'PARTIAL' ? PdfColors.orange600 : PdfColors.red600);
+    final bgColor = status == 'PAID' ? PdfColors.green50 : (status == 'PARTIAL' ? PdfColors.orange50 : PdfColors.red50);
     return pw.Container(
-      padding: const pw.EdgeInsets.all(14),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: pw.BoxDecoration(
-        color: PdfColors.grey50,
+        color: bgColor,
         borderRadius: pw.BorderRadius.circular(12),
-        border: pw.Border.all(color: PdfColors.grey300),
+        border: pw.Border.all(color: color, width: 0.5),
       ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
+      child: pw.Text(
+        status,
+        style: pw.TextStyle(color: color, fontSize: 7, fontWeight: pw.FontWeight.bold),
+      ),
+    );
+  }
+
+  static pw.Widget _summaryRow(String label, String value, {bool isBold = false, double fontSize = 9, PdfColor? color}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text(
-            title,
-            style: pw.TextStyle(
-              fontSize: 12,
-              fontWeight: pw.FontWeight.bold,
-              color: accent,
-            ),
-          ),
-          pw.SizedBox(height: 8),
-          ...rows.asMap().entries.map((entry) {
-            final index = entry.key;
-            final row = entry.value;
-            final isLast = highlightLastRow && index == rows.length - 1;
-            return pw.Padding(
-              padding: const pw.EdgeInsets.only(bottom: 4),
-              child: pw.Row(
-                children: [
-                  pw.SizedBox(
-                    width: 120,
-                    child: pw.Text(
-                      row.first,
-                      style: pw.TextStyle(
-                        fontSize: 10,
-                        fontWeight: pw.FontWeight.bold,
-                        color: isLast ? accent : PdfColors.grey700,
-                      ),
-                    ),
-                  ),
-                  pw.Expanded(
-                    child: pw.Text(
-                      row.last,
-                      style: pw.TextStyle(
-                        fontSize: 10,
-                        fontWeight: isLast ? pw.FontWeight.bold : pw.FontWeight.normal,
-                        color: isLast ? accent : PdfColors.black,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
+          pw.Text(label, style: pw.TextStyle(fontSize: fontSize, fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal, color: color ?? PdfColors.grey800)),
+          pw.Text(value, style: pw.TextStyle(fontSize: fontSize, fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal, color: color ?? PdfColors.grey900)),
         ],
       ),
     );
@@ -515,19 +561,7 @@ class InvoicePdfGenerator {
   }
 
   static Future<pw.ThemeData> _loadTheme() async {
-    for (final fontPath in _fontCandidates) {
-      final file = File(fontPath);
-      if (await file.exists()) {
-        final regular = pw.Font.ttf(ByteData.sublistView(await file.readAsBytes()));
-        return pw.ThemeData.withFont(
-          base: regular,
-          bold: regular,
-          italic: regular,
-          boldItalic: regular,
-        );
-      }
-    }
-
+    // Force Helvetica as per user requirement "Helvetica only"
     return pw.ThemeData.withFont(
       base: pw.Font.helvetica(),
       bold: pw.Font.helveticaBold(),
@@ -540,11 +574,11 @@ class InvoicePdfGenerator {
     final local = value.toLocal();
     final day = local.day.toString().padLeft(2, '0');
     final month = local.month.toString().padLeft(2, '0');
-    final year = local.year.toString();
-    final hour = local.hour.toString().padLeft(2, '0');
-    final minute = local.minute.toString().padLeft(2, '0');
-    return '$day-$month-$year $hour:$minute';
+    final year = local.year;
+    return '$day-$month-$year';
   }
 
-  static String _money(num value) => '₹${value.toDouble().toStringAsFixed(2)}';
+  static String _money(double value) {
+    return 'Rs. ${value.toStringAsFixed(2)}';
+  }
 }

@@ -48,3 +48,6 @@ scratch/
 Thumbs.db
 .env*
 !.env.example
+*.pdf
+__pycache__/
+*.pyc

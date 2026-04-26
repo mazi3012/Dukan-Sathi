@@ -10,7 +10,9 @@ class GSTCalculator {
     return const Uuid().v4();
   }
 
-  /// Calculate complete tax breakdown for items based on shop config
+  /// Calculate complete tax breakdown for items based on shop config.
+  /// Each CartItem now carries its own `gstRate` — calculations use that
+  /// instead of a flat 18%.
   static TaxBreakdown calculateTax({
     required List<CartItem> items,
     required ShopConfig shopConfig,
@@ -47,6 +49,7 @@ class GSTCalculator {
   }
 
   /// Registered businesses: CGST/SGST (intra-state) or IGST (inter-state)
+  /// Now uses per-item gstRate instead of hardcoded 18%.
   static TaxBreakdown _calculateRegisteredTax({
     required List<CartItem> items,
     required String shopState,
@@ -59,24 +62,37 @@ class GSTCalculator {
     double totalIGST = 0;
     final breakdown = <Map<String, dynamic>>[];
 
+    // Accumulators for rate-wise summary
+    final rateAccum = <double, Map<String, double>>{};
+
     for (final item in items) {
       final lineTotal = item.quantity * item.unitPrice;
       subtotal += lineTotal;
 
-      // Get tax slab (18% default for most retail)
-      const slab = 18;
+      final rate = item.gstRate; // per-product GST rate
+      final halfRate = rate / 2;
+
+      // Ensure rate accumulator entry exists
+      rateAccum.putIfAbsent(rate, () => {
+        'taxableAmount': 0.0,
+        'cgst': 0.0,
+        'sgst': 0.0,
+        'igst': 0.0,
+      });
+      rateAccum[rate]!['taxableAmount'] = rateAccum[rate]!['taxableAmount']! + lineTotal;
 
       if (isInterState) {
         // Inter-state: IGST only
-        final igst = (lineTotal * 18) / 100;
+        final igst = _roundToTwoDecimals((lineTotal * rate) / 100);
         totalIGST += igst;
+        rateAccum[rate]!['igst'] = rateAccum[rate]!['igst']! + igst;
 
         breakdown.add({
           'productId': item.productId,
           'quantity': item.quantity,
           'unitPrice': item.unitPrice,
           'lineTotal': lineTotal,
-          'slab': slab,
+          'slab': rate,
           'cgst': 0,
           'sgst': 0,
           'igst': igst,
@@ -84,17 +100,19 @@ class GSTCalculator {
         });
       } else {
         // Intra-state: CGST + SGST
-        final cgst = (lineTotal * 9) / 100;
-        final sgst = (lineTotal * 9) / 100;
+        final cgst = _roundToTwoDecimals((lineTotal * halfRate) / 100);
+        final sgst = _roundToTwoDecimals((lineTotal * halfRate) / 100);
         totalCGST += cgst;
         totalSGST += sgst;
+        rateAccum[rate]!['cgst'] = rateAccum[rate]!['cgst']! + cgst;
+        rateAccum[rate]!['sgst'] = rateAccum[rate]!['sgst']! + sgst;
 
         breakdown.add({
           'productId': item.productId,
           'quantity': item.quantity,
           'unitPrice': item.unitPrice,
           'lineTotal': lineTotal,
-          'slab': slab,
+          'slab': rate,
           'cgst': cgst,
           'sgst': sgst,
           'igst': 0,
@@ -104,8 +122,36 @@ class GSTCalculator {
     }
 
     final totalAmount = subtotal + totalCGST + totalSGST + totalIGST;
-    final taxSlabDescription =
-        isInterState ? 'IGST 18% (Inter-State)' : 'CGST 9% + SGST 9%';
+
+    // Build rate-wise summary (sorted by rate ascending)
+    final sortedRates = rateAccum.keys.toList()..sort();
+    final rateWiseSummary = sortedRates.map((rate) {
+      final acc = rateAccum[rate]!;
+      final taxableAmt = _roundToTwoDecimals(acc['taxableAmount']!);
+      final cgst = _roundToTwoDecimals(acc['cgst']!);
+      final sgst = _roundToTwoDecimals(acc['sgst']!);
+      final igst = _roundToTwoDecimals(acc['igst']!);
+      return <String, dynamic>{
+        'rate': rate,
+        'taxableAmount': taxableAmt,
+        'cgst': cgst,
+        'sgst': sgst,
+        'igst': igst,
+        'totalTax': _roundToTwoDecimals(cgst + sgst + igst),
+      };
+    }).toList();
+
+    // Build human-readable tax slab description
+    final uniqueRates = sortedRates.where((r) => r > 0).toList();
+    final taxSlabDescription = uniqueRates.isEmpty
+        ? 'Exempt (0%)'
+        : isInterState
+            ? uniqueRates.map((r) => 'IGST ${r.toStringAsFixed(r == r.roundToDouble() ? 0 : 1)}%').join(' + ')
+            : uniqueRates.map((r) {
+                final half = r / 2;
+                final halfStr = half == half.roundToDouble() ? half.toInt().toString() : half.toStringAsFixed(1);
+                return 'CGST $halfStr% + SGST $halfStr%';
+              }).join(' | ');
 
     return TaxBreakdown(
       subtotal: _roundToTwoDecimals(subtotal),
@@ -117,6 +163,7 @@ class GSTCalculator {
       taxSlab: taxSlabDescription,
       totalAmount: _roundToTwoDecimals(totalAmount),
       breakdown: breakdown,
+      rateWiseSummary: rateWiseSummary,
     );
   }
 
@@ -141,6 +188,7 @@ class GSTCalculator {
       taxSlab: 'No GST (Unregistered)',
       totalAmount: _roundToTwoDecimals(subtotal),
       breakdown: [],
+      rateWiseSummary: [],
     );
   }
 
@@ -169,6 +217,7 @@ class GSTCalculator {
       taxSlab: 'Composite GST 3%',
       totalAmount: _roundToTwoDecimals(subtotal + compositeTax),
       breakdown: [],
+      rateWiseSummary: [],
     );
   }
 

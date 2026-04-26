@@ -15,7 +15,8 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$TaxBreakdown {
 
- double get subtotal;@JsonKey(name: 'cgst_amount') double get cgstAmount;@JsonKey(name: 'sgst_amount') double get sgstAmount;@JsonKey(name: 'igst_amount') double get igstAmount;@JsonKey(name: 'gst_mode') String get gstMode;@JsonKey(name: 'applicable_state') String get applicableState;@JsonKey(name: 'tax_slab') String get taxSlab;@JsonKey(name: 'total_amount') double get totalAmount;@JsonKey(name: 'breakdown') List<Map<String, dynamic>> get breakdown;
+ double get subtotal;@JsonKey(name: 'cgst_amount') double get cgstAmount;@JsonKey(name: 'sgst_amount') double get sgstAmount;@JsonKey(name: 'igst_amount') double get igstAmount;@JsonKey(name: 'gst_mode') String get gstMode;@JsonKey(name: 'applicable_state') String get applicableState;@JsonKey(name: 'tax_slab') String get taxSlab;@JsonKey(name: 'total_amount') double get totalAmount;@JsonKey(name: 'breakdown') List<Map<String, dynamic>> get breakdown;/// GST summary grouped by rate — each entry: {rate, taxableAmount, cgst, sgst, igst, totalTax}
+@JsonKey(name: 'rate_wise_summary') List<Map<String, dynamic>> get rateWiseSummary;
 /// Create a copy of TaxBreakdown
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +29,16 @@ $TaxBreakdownCopyWith<TaxBreakdown> get copyWith => _$TaxBreakdownCopyWithImpl<T
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is TaxBreakdown&&(identical(other.subtotal, subtotal) || other.subtotal == subtotal)&&(identical(other.cgstAmount, cgstAmount) || other.cgstAmount == cgstAmount)&&(identical(other.sgstAmount, sgstAmount) || other.sgstAmount == sgstAmount)&&(identical(other.igstAmount, igstAmount) || other.igstAmount == igstAmount)&&(identical(other.gstMode, gstMode) || other.gstMode == gstMode)&&(identical(other.applicableState, applicableState) || other.applicableState == applicableState)&&(identical(other.taxSlab, taxSlab) || other.taxSlab == taxSlab)&&(identical(other.totalAmount, totalAmount) || other.totalAmount == totalAmount)&&const DeepCollectionEquality().equals(other.breakdown, breakdown));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is TaxBreakdown&&(identical(other.subtotal, subtotal) || other.subtotal == subtotal)&&(identical(other.cgstAmount, cgstAmount) || other.cgstAmount == cgstAmount)&&(identical(other.sgstAmount, sgstAmount) || other.sgstAmount == sgstAmount)&&(identical(other.igstAmount, igstAmount) || other.igstAmount == igstAmount)&&(identical(other.gstMode, gstMode) || other.gstMode == gstMode)&&(identical(other.applicableState, applicableState) || other.applicableState == applicableState)&&(identical(other.taxSlab, taxSlab) || other.taxSlab == taxSlab)&&(identical(other.totalAmount, totalAmount) || other.totalAmount == totalAmount)&&const DeepCollectionEquality().equals(other.breakdown, breakdown)&&const DeepCollectionEquality().equals(other.rateWiseSummary, rateWiseSummary));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,subtotal,cgstAmount,sgstAmount,igstAmount,gstMode,applicableState,taxSlab,totalAmount,const DeepCollectionEquality().hash(breakdown));
+int get hashCode => Object.hash(runtimeType,subtotal,cgstAmount,sgstAmount,igstAmount,gstMode,applicableState,taxSlab,totalAmount,const DeepCollectionEquality().hash(breakdown),const DeepCollectionEquality().hash(rateWiseSummary));
 
 @override
 String toString() {
-  return 'TaxBreakdown(subtotal: $subtotal, cgstAmount: $cgstAmount, sgstAmount: $sgstAmount, igstAmount: $igstAmount, gstMode: $gstMode, applicableState: $applicableState, taxSlab: $taxSlab, totalAmount: $totalAmount, breakdown: $breakdown)';
+  return 'TaxBreakdown(subtotal: $subtotal, cgstAmount: $cgstAmount, sgstAmount: $sgstAmount, igstAmount: $igstAmount, gstMode: $gstMode, applicableState: $applicableState, taxSlab: $taxSlab, totalAmount: $totalAmount, breakdown: $breakdown, rateWiseSummary: $rateWiseSummary)';
 }
 
 
@@ -48,7 +49,7 @@ abstract mixin class $TaxBreakdownCopyWith<$Res>  {
   factory $TaxBreakdownCopyWith(TaxBreakdown value, $Res Function(TaxBreakdown) _then) = _$TaxBreakdownCopyWithImpl;
 @useResult
 $Res call({
- double subtotal,@JsonKey(name: 'cgst_amount') double cgstAmount,@JsonKey(name: 'sgst_amount') double sgstAmount,@JsonKey(name: 'igst_amount') double igstAmount,@JsonKey(name: 'gst_mode') String gstMode,@JsonKey(name: 'applicable_state') String applicableState,@JsonKey(name: 'tax_slab') String taxSlab,@JsonKey(name: 'total_amount') double totalAmount,@JsonKey(name: 'breakdown') List<Map<String, dynamic>> breakdown
+ double subtotal,@JsonKey(name: 'cgst_amount') double cgstAmount,@JsonKey(name: 'sgst_amount') double sgstAmount,@JsonKey(name: 'igst_amount') double igstAmount,@JsonKey(name: 'gst_mode') String gstMode,@JsonKey(name: 'applicable_state') String applicableState,@JsonKey(name: 'tax_slab') String taxSlab,@JsonKey(name: 'total_amount') double totalAmount,@JsonKey(name: 'breakdown') List<Map<String, dynamic>> breakdown,@JsonKey(name: 'rate_wise_summary') List<Map<String, dynamic>> rateWiseSummary
 });
 
 
@@ -65,7 +66,7 @@ class _$TaxBreakdownCopyWithImpl<$Res>
 
 /// Create a copy of TaxBreakdown
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? subtotal = null,Object? cgstAmount = null,Object? sgstAmount = null,Object? igstAmount = null,Object? gstMode = null,Object? applicableState = null,Object? taxSlab = null,Object? totalAmount = null,Object? breakdown = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? subtotal = null,Object? cgstAmount = null,Object? sgstAmount = null,Object? igstAmount = null,Object? gstMode = null,Object? applicableState = null,Object? taxSlab = null,Object? totalAmount = null,Object? breakdown = null,Object? rateWiseSummary = null,}) {
   return _then(_self.copyWith(
 subtotal: null == subtotal ? _self.subtotal : subtotal // ignore: cast_nullable_to_non_nullable
 as double,cgstAmount: null == cgstAmount ? _self.cgstAmount : cgstAmount // ignore: cast_nullable_to_non_nullable
@@ -76,6 +77,7 @@ as String,applicableState: null == applicableState ? _self.applicableState : app
 as String,taxSlab: null == taxSlab ? _self.taxSlab : taxSlab // ignore: cast_nullable_to_non_nullable
 as String,totalAmount: null == totalAmount ? _self.totalAmount : totalAmount // ignore: cast_nullable_to_non_nullable
 as double,breakdown: null == breakdown ? _self.breakdown : breakdown // ignore: cast_nullable_to_non_nullable
+as List<Map<String, dynamic>>,rateWiseSummary: null == rateWiseSummary ? _self.rateWiseSummary : rateWiseSummary // ignore: cast_nullable_to_non_nullable
 as List<Map<String, dynamic>>,
   ));
 }
@@ -161,10 +163,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( double subtotal, @JsonKey(name: 'cgst_amount')  double cgstAmount, @JsonKey(name: 'sgst_amount')  double sgstAmount, @JsonKey(name: 'igst_amount')  double igstAmount, @JsonKey(name: 'gst_mode')  String gstMode, @JsonKey(name: 'applicable_state')  String applicableState, @JsonKey(name: 'tax_slab')  String taxSlab, @JsonKey(name: 'total_amount')  double totalAmount, @JsonKey(name: 'breakdown')  List<Map<String, dynamic>> breakdown)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( double subtotal, @JsonKey(name: 'cgst_amount')  double cgstAmount, @JsonKey(name: 'sgst_amount')  double sgstAmount, @JsonKey(name: 'igst_amount')  double igstAmount, @JsonKey(name: 'gst_mode')  String gstMode, @JsonKey(name: 'applicable_state')  String applicableState, @JsonKey(name: 'tax_slab')  String taxSlab, @JsonKey(name: 'total_amount')  double totalAmount, @JsonKey(name: 'breakdown')  List<Map<String, dynamic>> breakdown, @JsonKey(name: 'rate_wise_summary')  List<Map<String, dynamic>> rateWiseSummary)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _TaxBreakdown() when $default != null:
-return $default(_that.subtotal,_that.cgstAmount,_that.sgstAmount,_that.igstAmount,_that.gstMode,_that.applicableState,_that.taxSlab,_that.totalAmount,_that.breakdown);case _:
+return $default(_that.subtotal,_that.cgstAmount,_that.sgstAmount,_that.igstAmount,_that.gstMode,_that.applicableState,_that.taxSlab,_that.totalAmount,_that.breakdown,_that.rateWiseSummary);case _:
   return orElse();
 
 }
@@ -182,10 +184,10 @@ return $default(_that.subtotal,_that.cgstAmount,_that.sgstAmount,_that.igstAmoun
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( double subtotal, @JsonKey(name: 'cgst_amount')  double cgstAmount, @JsonKey(name: 'sgst_amount')  double sgstAmount, @JsonKey(name: 'igst_amount')  double igstAmount, @JsonKey(name: 'gst_mode')  String gstMode, @JsonKey(name: 'applicable_state')  String applicableState, @JsonKey(name: 'tax_slab')  String taxSlab, @JsonKey(name: 'total_amount')  double totalAmount, @JsonKey(name: 'breakdown')  List<Map<String, dynamic>> breakdown)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( double subtotal, @JsonKey(name: 'cgst_amount')  double cgstAmount, @JsonKey(name: 'sgst_amount')  double sgstAmount, @JsonKey(name: 'igst_amount')  double igstAmount, @JsonKey(name: 'gst_mode')  String gstMode, @JsonKey(name: 'applicable_state')  String applicableState, @JsonKey(name: 'tax_slab')  String taxSlab, @JsonKey(name: 'total_amount')  double totalAmount, @JsonKey(name: 'breakdown')  List<Map<String, dynamic>> breakdown, @JsonKey(name: 'rate_wise_summary')  List<Map<String, dynamic>> rateWiseSummary)  $default,) {final _that = this;
 switch (_that) {
 case _TaxBreakdown():
-return $default(_that.subtotal,_that.cgstAmount,_that.sgstAmount,_that.igstAmount,_that.gstMode,_that.applicableState,_that.taxSlab,_that.totalAmount,_that.breakdown);case _:
+return $default(_that.subtotal,_that.cgstAmount,_that.sgstAmount,_that.igstAmount,_that.gstMode,_that.applicableState,_that.taxSlab,_that.totalAmount,_that.breakdown,_that.rateWiseSummary);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -202,10 +204,10 @@ return $default(_that.subtotal,_that.cgstAmount,_that.sgstAmount,_that.igstAmoun
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( double subtotal, @JsonKey(name: 'cgst_amount')  double cgstAmount, @JsonKey(name: 'sgst_amount')  double sgstAmount, @JsonKey(name: 'igst_amount')  double igstAmount, @JsonKey(name: 'gst_mode')  String gstMode, @JsonKey(name: 'applicable_state')  String applicableState, @JsonKey(name: 'tax_slab')  String taxSlab, @JsonKey(name: 'total_amount')  double totalAmount, @JsonKey(name: 'breakdown')  List<Map<String, dynamic>> breakdown)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( double subtotal, @JsonKey(name: 'cgst_amount')  double cgstAmount, @JsonKey(name: 'sgst_amount')  double sgstAmount, @JsonKey(name: 'igst_amount')  double igstAmount, @JsonKey(name: 'gst_mode')  String gstMode, @JsonKey(name: 'applicable_state')  String applicableState, @JsonKey(name: 'tax_slab')  String taxSlab, @JsonKey(name: 'total_amount')  double totalAmount, @JsonKey(name: 'breakdown')  List<Map<String, dynamic>> breakdown, @JsonKey(name: 'rate_wise_summary')  List<Map<String, dynamic>> rateWiseSummary)?  $default,) {final _that = this;
 switch (_that) {
 case _TaxBreakdown() when $default != null:
-return $default(_that.subtotal,_that.cgstAmount,_that.sgstAmount,_that.igstAmount,_that.gstMode,_that.applicableState,_that.taxSlab,_that.totalAmount,_that.breakdown);case _:
+return $default(_that.subtotal,_that.cgstAmount,_that.sgstAmount,_that.igstAmount,_that.gstMode,_that.applicableState,_that.taxSlab,_that.totalAmount,_that.breakdown,_that.rateWiseSummary);case _:
   return null;
 
 }
@@ -217,7 +219,7 @@ return $default(_that.subtotal,_that.cgstAmount,_that.sgstAmount,_that.igstAmoun
 @JsonSerializable()
 
 class _TaxBreakdown implements TaxBreakdown {
-  const _TaxBreakdown({required this.subtotal, @JsonKey(name: 'cgst_amount') required this.cgstAmount, @JsonKey(name: 'sgst_amount') required this.sgstAmount, @JsonKey(name: 'igst_amount') required this.igstAmount, @JsonKey(name: 'gst_mode') required this.gstMode, @JsonKey(name: 'applicable_state') required this.applicableState, @JsonKey(name: 'tax_slab') required this.taxSlab, @JsonKey(name: 'total_amount') required this.totalAmount, @JsonKey(name: 'breakdown') required final  List<Map<String, dynamic>> breakdown}): _breakdown = breakdown;
+  const _TaxBreakdown({required this.subtotal, @JsonKey(name: 'cgst_amount') required this.cgstAmount, @JsonKey(name: 'sgst_amount') required this.sgstAmount, @JsonKey(name: 'igst_amount') required this.igstAmount, @JsonKey(name: 'gst_mode') required this.gstMode, @JsonKey(name: 'applicable_state') required this.applicableState, @JsonKey(name: 'tax_slab') required this.taxSlab, @JsonKey(name: 'total_amount') required this.totalAmount, @JsonKey(name: 'breakdown') required final  List<Map<String, dynamic>> breakdown, @JsonKey(name: 'rate_wise_summary') final  List<Map<String, dynamic>> rateWiseSummary = const []}): _breakdown = breakdown,_rateWiseSummary = rateWiseSummary;
   factory _TaxBreakdown.fromJson(Map<String, dynamic> json) => _$TaxBreakdownFromJson(json);
 
 @override final  double subtotal;
@@ -235,6 +237,15 @@ class _TaxBreakdown implements TaxBreakdown {
   return EqualUnmodifiableListView(_breakdown);
 }
 
+/// GST summary grouped by rate — each entry: {rate, taxableAmount, cgst, sgst, igst, totalTax}
+ final  List<Map<String, dynamic>> _rateWiseSummary;
+/// GST summary grouped by rate — each entry: {rate, taxableAmount, cgst, sgst, igst, totalTax}
+@override@JsonKey(name: 'rate_wise_summary') List<Map<String, dynamic>> get rateWiseSummary {
+  if (_rateWiseSummary is EqualUnmodifiableListView) return _rateWiseSummary;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_rateWiseSummary);
+}
+
 
 /// Create a copy of TaxBreakdown
 /// with the given fields replaced by the non-null parameter values.
@@ -249,16 +260,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TaxBreakdown&&(identical(other.subtotal, subtotal) || other.subtotal == subtotal)&&(identical(other.cgstAmount, cgstAmount) || other.cgstAmount == cgstAmount)&&(identical(other.sgstAmount, sgstAmount) || other.sgstAmount == sgstAmount)&&(identical(other.igstAmount, igstAmount) || other.igstAmount == igstAmount)&&(identical(other.gstMode, gstMode) || other.gstMode == gstMode)&&(identical(other.applicableState, applicableState) || other.applicableState == applicableState)&&(identical(other.taxSlab, taxSlab) || other.taxSlab == taxSlab)&&(identical(other.totalAmount, totalAmount) || other.totalAmount == totalAmount)&&const DeepCollectionEquality().equals(other._breakdown, _breakdown));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TaxBreakdown&&(identical(other.subtotal, subtotal) || other.subtotal == subtotal)&&(identical(other.cgstAmount, cgstAmount) || other.cgstAmount == cgstAmount)&&(identical(other.sgstAmount, sgstAmount) || other.sgstAmount == sgstAmount)&&(identical(other.igstAmount, igstAmount) || other.igstAmount == igstAmount)&&(identical(other.gstMode, gstMode) || other.gstMode == gstMode)&&(identical(other.applicableState, applicableState) || other.applicableState == applicableState)&&(identical(other.taxSlab, taxSlab) || other.taxSlab == taxSlab)&&(identical(other.totalAmount, totalAmount) || other.totalAmount == totalAmount)&&const DeepCollectionEquality().equals(other._breakdown, _breakdown)&&const DeepCollectionEquality().equals(other._rateWiseSummary, _rateWiseSummary));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,subtotal,cgstAmount,sgstAmount,igstAmount,gstMode,applicableState,taxSlab,totalAmount,const DeepCollectionEquality().hash(_breakdown));
+int get hashCode => Object.hash(runtimeType,subtotal,cgstAmount,sgstAmount,igstAmount,gstMode,applicableState,taxSlab,totalAmount,const DeepCollectionEquality().hash(_breakdown),const DeepCollectionEquality().hash(_rateWiseSummary));
 
 @override
 String toString() {
-  return 'TaxBreakdown(subtotal: $subtotal, cgstAmount: $cgstAmount, sgstAmount: $sgstAmount, igstAmount: $igstAmount, gstMode: $gstMode, applicableState: $applicableState, taxSlab: $taxSlab, totalAmount: $totalAmount, breakdown: $breakdown)';
+  return 'TaxBreakdown(subtotal: $subtotal, cgstAmount: $cgstAmount, sgstAmount: $sgstAmount, igstAmount: $igstAmount, gstMode: $gstMode, applicableState: $applicableState, taxSlab: $taxSlab, totalAmount: $totalAmount, breakdown: $breakdown, rateWiseSummary: $rateWiseSummary)';
 }
 
 
@@ -269,7 +280,7 @@ abstract mixin class _$TaxBreakdownCopyWith<$Res> implements $TaxBreakdownCopyWi
   factory _$TaxBreakdownCopyWith(_TaxBreakdown value, $Res Function(_TaxBreakdown) _then) = __$TaxBreakdownCopyWithImpl;
 @override @useResult
 $Res call({
- double subtotal,@JsonKey(name: 'cgst_amount') double cgstAmount,@JsonKey(name: 'sgst_amount') double sgstAmount,@JsonKey(name: 'igst_amount') double igstAmount,@JsonKey(name: 'gst_mode') String gstMode,@JsonKey(name: 'applicable_state') String applicableState,@JsonKey(name: 'tax_slab') String taxSlab,@JsonKey(name: 'total_amount') double totalAmount,@JsonKey(name: 'breakdown') List<Map<String, dynamic>> breakdown
+ double subtotal,@JsonKey(name: 'cgst_amount') double cgstAmount,@JsonKey(name: 'sgst_amount') double sgstAmount,@JsonKey(name: 'igst_amount') double igstAmount,@JsonKey(name: 'gst_mode') String gstMode,@JsonKey(name: 'applicable_state') String applicableState,@JsonKey(name: 'tax_slab') String taxSlab,@JsonKey(name: 'total_amount') double totalAmount,@JsonKey(name: 'breakdown') List<Map<String, dynamic>> breakdown,@JsonKey(name: 'rate_wise_summary') List<Map<String, dynamic>> rateWiseSummary
 });
 
 
@@ -286,7 +297,7 @@ class __$TaxBreakdownCopyWithImpl<$Res>
 
 /// Create a copy of TaxBreakdown
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? subtotal = null,Object? cgstAmount = null,Object? sgstAmount = null,Object? igstAmount = null,Object? gstMode = null,Object? applicableState = null,Object? taxSlab = null,Object? totalAmount = null,Object? breakdown = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? subtotal = null,Object? cgstAmount = null,Object? sgstAmount = null,Object? igstAmount = null,Object? gstMode = null,Object? applicableState = null,Object? taxSlab = null,Object? totalAmount = null,Object? breakdown = null,Object? rateWiseSummary = null,}) {
   return _then(_TaxBreakdown(
 subtotal: null == subtotal ? _self.subtotal : subtotal // ignore: cast_nullable_to_non_nullable
 as double,cgstAmount: null == cgstAmount ? _self.cgstAmount : cgstAmount // ignore: cast_nullable_to_non_nullable
@@ -297,6 +308,7 @@ as String,applicableState: null == applicableState ? _self.applicableState : app
 as String,taxSlab: null == taxSlab ? _self.taxSlab : taxSlab // ignore: cast_nullable_to_non_nullable
 as String,totalAmount: null == totalAmount ? _self.totalAmount : totalAmount // ignore: cast_nullable_to_non_nullable
 as double,breakdown: null == breakdown ? _self._breakdown : breakdown // ignore: cast_nullable_to_non_nullable
+as List<Map<String, dynamic>>,rateWiseSummary: null == rateWiseSummary ? _self._rateWiseSummary : rateWiseSummary // ignore: cast_nullable_to_non_nullable
 as List<Map<String, dynamic>>,
   ));
 }

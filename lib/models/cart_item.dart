@@ -9,6 +9,7 @@ abstract class CartItem with _$CartItem {
     required String productId,
     required int quantity,
     required double unitPrice,
+    @Default(18.0) double gstRate,
   }) = _CartItem;
 
   factory CartItem.fromJson(Map<String, dynamic> json) =>

@@ -247,7 +247,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
 
     final allShopProductsRows = await supabase
         .from('products')
-        .select('id, price, name, shop_id')
+        .select('id, price, name, shop_id, gst_rate, hsn_sac_code')
         .eq('shop_id', shopId);
     final allShopProducts = (allShopProductsRows as List<dynamic>)
         .map((row) => Map<String, dynamic>.from(row as Map))
@@ -299,12 +299,16 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
 
       final unitPrice = (product['price'] as num).toDouble();
       final productId = product['id'] as String;
+      // Resolve GST rate: use product's gst_rate if set (>0), else default 18%
+      final rawGstRate = (product['gst_rate'] as num?)?.toDouble() ?? 0.0;
+      final gstRate = rawGstRate > 0 ? rawGstRate : 18.0;
 
       items.add(
         CartItem(
           productId: productId,
           quantity: quantity,
           unitPrice: unitPrice,
+          gstRate: gstRate,
         ),
       );
     }
@@ -379,6 +383,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
         'tax_slab': taxBreakdown.taxSlab,
         'total_amount': taxBreakdown.totalAmount,
         'breakdown': taxBreakdown.breakdown,
+        'rate_wise_summary': taxBreakdown.rateWiseSummary,
       },
       'proposed_total': finalTotal,
       'subtotal_before_discount': subtotalBeforeDiscount,
@@ -418,6 +423,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
           'tax_slab': taxBreakdown.taxSlab,
           'total_amount': taxBreakdown.totalAmount,
           'breakdown': taxBreakdown.breakdown,
+          'rate_wise_summary': taxBreakdown.rateWiseSummary,
         },
         'proposed_total': finalTotal,
         'approval_status': 'PENDING',

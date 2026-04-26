@@ -19,6 +19,11 @@ _TaxBreakdown _$TaxBreakdownFromJson(Map<String, dynamic> json) =>
       breakdown: (json['breakdown'] as List<dynamic>)
           .map((e) => e as Map<String, dynamic>)
           .toList(),
+      rateWiseSummary:
+          (json['rate_wise_summary'] as List<dynamic>?)
+              ?.map((e) => e as Map<String, dynamic>)
+              .toList() ??
+          const [],
     );
 
 Map<String, dynamic> _$TaxBreakdownToJson(_TaxBreakdown instance) =>
@@ -32,4 +37,5 @@ Map<String, dynamic> _$TaxBreakdownToJson(_TaxBreakdown instance) =>
       'tax_slab': instance.taxSlab,
       'total_amount': instance.totalAmount,
       'breakdown': instance.breakdown,
+      'rate_wise_summary': instance.rateWiseSummary,
     };

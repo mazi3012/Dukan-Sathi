@@ -19,16 +19,15 @@ Future<void> main(List<String> arguments) async {
   print('   http://localhost:$port');
   print('');
   print('📊 Dashboard Features:');
-    print('   • Models: Google GenAI SDK (MODEL_ID from env)');
+  print('   • Models: Google GenAI SDK (MODEL_ID from env)');
   print('   • Flows: retailAssistantFlow');
-    print('   • Tools: checkInventory, browseCatalogTool, createDraftInvoice, businessInsightsTool, proposeProducts, requestProductDeletion');
+  print('   • Tools: checkInventory, browseCatalogTool, createDraftInvoice, businessInsightsTool, proposeProducts, requestProductDeletion');
   print('   • Trace history & telemetry');
   print('');
   print('Press Ctrl+C to stop.');
   print('');
   
   server.listen((HttpRequest request) async {
-                                'type': 'flow',
     try {
       if (request.method == 'GET' && request.uri.path == '/') {
         // Serve the HTML UI
@@ -36,39 +35,57 @@ Future<void> main(List<String> arguments) async {
         request.response
           ..statusCode = 200
           ..headers.contentType = ContentType.html
-                                'type': 'tool',
           ..write(html)
           ..close();
       } else if (request.method == 'GET' && request.uri.path == '/api/listActions') {
-                            {
-                                'name': 'browseCatalogTool',
-                                'type': 'tool',
-                                'key': '/tool/browseCatalogTool',
-                                'description': 'Browse product catalog by category',
-                            },
-        // Return list of actions
+        // Return list of actions (simplified for this UI)
         request.response
-                                'type': 'tool',
           ..statusCode = 200
           ..headers.contentType = ContentType.json
           ..write(jsonEncode({
-                'inputSchema': {'type': 'string'},
-                'outputSchema': {'type': 'string'},
-                                'type': 'tool',
+            'actions': [
+              {
+                'name': 'retailAssistantFlow',
+                'type': 'flow',
+                'key': '/flow/retailAssistantFlow',
+                'description': 'Main AI shopping assistant flow',
               },
-            ],
+              {
+                'name': 'browseCatalogTool',
+                'type': 'tool',
+                'key': '/tool/browseCatalogTool',
+                'description': 'Browse product catalog by category',
+              },
+              {
+                'name': 'checkInventory',
+                'type': 'tool',
+                'key': '/tool/checkInventory',
+                'description': 'Search for products in inventory',
+              },
+              {
+                'name': 'businessInsightsTool',
+                'type': 'tool',
+                'key': '/tool/businessInsightsTool',
+                'description': 'Get business analytics and profit reports',
+              },
+              {
+                'name': 'proposeProducts',
+                'type': 'tool',
+                'key': '/tool/proposeProducts',
+                'description': 'Add new products to inventory',
+              },
+              {
+                'name': 'requestProductDeletion',
+                'type': 'tool',
+                'key': '/tool/requestProductDeletion',
+                'description': 'Request approval before deleting products',
+              },
+            ]
           }))
           ..close();
       } else if (request.method == 'POST' && request.uri.path == '/api/runAction') {
-                                'type': 'tool',
         var body = await utf8.decodeStream(request);
         try {
-                            },
-                            {
-                                'name': 'requestProductDeletion',
-                                'type': 'tool',
-                                'key': '/tool/requestProductDeletion',
-                                'description': 'Request approval before deleting products',
           final data = jsonDecode(body) as Map<String, dynamic>;
           final input = data['input'] as String?;
           

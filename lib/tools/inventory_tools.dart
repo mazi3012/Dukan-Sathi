@@ -18,6 +18,7 @@ Product _productFromRow(Map row) {
     'is_service': data['is_service'] as bool? ?? false,
     'gst_rate': (data['gst_rate'] as num?)?.toDouble() ?? 0.0,
     'hsn_sac_code': data['hsn_sac_code']?.toString(),
+    'cost_price': (data['cost_price'] as num?)?.toDouble() ?? 0.0,
     'metadata': data['metadata'] as Map<String, dynamic>? ?? {},
   });
 }
@@ -30,7 +31,7 @@ Future<List<Product>> findInventoryProducts(String rawQuery, [String? shopId]) a
 
   var select = supabase
       .from('products')
-      .select('id, shop_id, name, price, stock_quantity, category')
+      .select('id, shop_id, name, price, stock_quantity, category, cost_price')
       .ilike('name', '%$query%');
 
   if (shopId != null) {
@@ -60,7 +61,7 @@ Future<List<Product>> findInventoryProducts(String rawQuery, [String? shopId]) a
   for (final token in tokens) {
     var tokenSelect = supabase
         .from('products')
-        .select('id, shop_id, name, price, stock_quantity, category')
+        .select('id, shop_id, name, price, stock_quantity, category, cost_price')
         .ilike('name', '%$token%');
 
     if (shopId != null) {
@@ -128,7 +129,7 @@ final browseCatalogTool =
     
     var query = supabase
         .from('products')
-        .select('id, shop_id, name, price, stock_quantity, category')
+        .select('id, shop_id, name, price, stock_quantity, category, cost_price')
         .eq('shop_id', shopId);
 
     final rows = (category != null && category.isNotEmpty)
@@ -173,6 +174,7 @@ final SchemanticType<Map<String, dynamic>> proposeProductsInputSchema =
             'is_service': {'type': 'boolean', 'default': false},
             'gst_rate': {'type': 'number', 'default': 0},
             'hsn_sac_code': {'type': 'string'},
+            'cost_price': {'type': 'number'},
             'metadata': {'type': 'object'},
           },
           'required': ['name', 'price', 'category'],
@@ -256,7 +258,7 @@ Future<Map<String, dynamic>> createProductDeletionRequest({
           normalizedQuery.contains('1st one')
       ? await supabase
           .from('products')
-          .select('id, shop_id, name, price, stock_quantity, category')
+          .select('id, shop_id, name, price, stock_quantity, category, cost_price')
           .eq('shop_id', shopId)
           .limit(50)
       : null;
@@ -291,6 +293,7 @@ Future<Map<String, dynamic>> createProductDeletionRequest({
       'price': product.price,
       'stock_quantity': product.stockQuantity,
       'category': product.category,
+      'cost_price': product.costPrice,
     };
   }).toList();
 

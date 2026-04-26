@@ -17,6 +17,7 @@ _Product _$ProductFromJson(Map<String, dynamic> json) => _Product(
   isService: json['is_service'] as bool? ?? false,
   gstRate: (json['gst_rate'] as num?)?.toDouble() ?? 0,
   hsnSacCode: json['hsn_sac_code'] as String?,
+  costPrice: (json['cost_price'] as num?)?.toDouble() ?? 0,
   metadata: json['metadata'] as Map<String, dynamic>? ?? const {},
 );
 
@@ -31,5 +32,6 @@ Map<String, dynamic> _$ProductToJson(_Product instance) => <String, dynamic>{
   'is_service': instance.isService,
   'gst_rate': instance.gstRate,
   'hsn_sac_code': instance.hsnSacCode,
+  'cost_price': instance.costPrice,
   'metadata': instance.metadata,
 };

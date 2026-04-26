@@ -91,31 +91,33 @@ Future<void> _deductInventoryStock({
 
   final productRows = await supabase
       .from('products')
-      .select('id, stock_quantity')
+      .select('id, name, stock_quantity')
       .inFilter('id', productIds);
 
-  final stockById = <String, int>{};
+  final stockById = <String, Map<String, dynamic>>{};
   for (final row in productRows as List<dynamic>) {
     final data = Map<String, dynamic>.from(row as Map);
     final productId = data['id']?.toString();
-    final stockQuantity = (data['stock_quantity'] as num?)?.toInt() ?? 0;
     if (productId != null) {
-      stockById[productId] = stockQuantity;
+      stockById[productId] = data;
     }
   }
 
   for (final item in items) {
-    final currentStock = stockById[item.productId];
-    if (currentStock == null) {
-      throw StateError('Product ${item.productId} not found in inventory.');
+    final productData = stockById[item.productId];
+    if (productData == null) {
+      throw StateError('Product not found in inventory.');
     }
+    final currentStock = (productData['stock_quantity'] as num?)?.toInt() ?? 0;
+    final productName = productData['name'] as String? ?? 'Unknown Product';
+    
     if (currentStock < item.quantity) {
-      throw StateError('Insufficient stock for product ${item.productId}. Available: $currentStock, required: ${item.quantity}.');
+      throw StateError('Insufficient stock for "$productName". Available: $currentStock, required: ${item.quantity}. Please update inventory or edit the draft.');
     }
   }
 
   for (final item in items) {
-    final currentStock = stockById[item.productId]!;
+    final currentStock = (stockById[item.productId]!['stock_quantity'] as num?)?.toInt() ?? 0;
     await supabase
         .from('products')
         .update({'stock_quantity': currentStock - item.quantity})
@@ -273,10 +275,12 @@ Future<Map<String, dynamic>> updateDraftDiscount({
     final originalItemsJson = (approvalData['original_items'] as List<dynamic>? ?? approvalData['proposed_items'] as List<dynamic>?) ?? const [];
     final originalItems = originalItemsJson.map((itemJson) {
       final json = Map<String, dynamic>.from(itemJson as Map);
+      final rawGstRate = (json['gstRate'] as num?)?.toDouble() ?? 0.0;
       return CartItem(
         productId: json['productId'] as String,
         quantity: json['quantity'] as int,
         unitPrice: (json['unitPrice'] as num).toDouble(),
+        gstRate: rawGstRate > 0 ? rawGstRate : 18.0,
       );
     }).toList();
 
@@ -347,6 +351,7 @@ Future<Map<String, dynamic>> updateDraftDiscount({
         'tax_slab': taxBreakdown.taxSlab,
         'total_amount': taxBreakdown.totalAmount,
         'breakdown': taxBreakdown.breakdown,
+        'rate_wise_summary': taxBreakdown.rateWiseSummary,
       },
       'proposed_total': taxBreakdown.totalAmount,
       'subtotal_before_discount': subtotalBeforeDiscount,
@@ -411,10 +416,12 @@ Future<Map<String, dynamic>> approveDraftInvoice({
 
     final items = proposedItems.map((itemJson) {
       final json = Map<String, dynamic>.from(itemJson as Map);
+      final rawGstRate = (json['gstRate'] as num?)?.toDouble() ?? 0.0;
       return CartItem(
         productId: json['productId'] as String,
         quantity: json['quantity'] as int,
         unitPrice: (json['unitPrice'] as num).toDouble(),
+        gstRate: rawGstRate > 0 ? rawGstRate : 18.0,
       );
     }).toList();
 
@@ -571,10 +578,12 @@ Future<Map<String, dynamic>> switchGstType({
     final shopId = approvalData['shop_id'] as String;
     final proposedItems = (approvalData['proposed_items'] as List).map((itemJson) {
       final json = Map<String, dynamic>.from(itemJson as Map);
+      final rawGstRate = (json['gstRate'] as num?)?.toDouble() ?? 0.0;
       return CartItem(
         productId: json['productId'] as String,
         quantity: json['quantity'] as int,
         unitPrice: (json['unitPrice'] as num).toDouble(),
+        gstRate: rawGstRate > 0 ? rawGstRate : 18.0,
       );
     }).toList();
 
@@ -618,6 +627,7 @@ Future<Map<String, dynamic>> switchGstType({
         'tax_slab': newTaxBreakdown.taxSlab,
         'total_amount': newTaxBreakdown.totalAmount,
         'breakdown': newTaxBreakdown.breakdown,
+        'rate_wise_summary': newTaxBreakdown.rateWiseSummary,
       },
       'proposed_total': newTaxBreakdown.totalAmount,
       'gst_type': newGstType,

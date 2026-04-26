@@ -16,6 +16,7 @@ abstract class Product with _$Product {
     @JsonKey(name: 'is_service') @Default(false) bool isService,
     @JsonKey(name: 'gst_rate') @Default(0) double gstRate,
     @JsonKey(name: 'hsn_sac_code') String? hsnSacCode,
+    @JsonKey(name: 'cost_price') @Default(0) double costPrice,
     @Default({}) Map<String, dynamic> metadata,
   }) = _Product;
 

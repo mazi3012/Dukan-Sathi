@@ -37,6 +37,11 @@ class ApprovalFormatter {
     return '';
   }
 
+  /// Format a rate value for display — drop decimals if whole number
+  static String _formatRate(double rate) {
+    return rate == rate.roundToDouble() ? rate.toInt().toString() : rate.toStringAsFixed(1);
+  }
+
   /// Main formatted invoice for Telegram - GST-compliant format
   /// Follows hierarchy: Items Total → Discount → Taxable Value → Taxes → Grand Total → Paid → Due
   static String formatApprovalMessage({
@@ -89,17 +94,37 @@ class ApprovalFormatter {
     billingSummary.writeln('Taxable Value: ₹${_formatPrice(taxableValue)}');
     billingSummary.writeln('');
 
-    // 4. TAX LINES (CGST/SGST or IGST)
+    // 4. TAX LINES — show per-rate breakdown if available
     if (isUnregistered) {
       billingSummary.writeln('GST:           None (Unregistered)');
     } else if (isComposite) {
       final taxAmt = approval.proposedTotal - taxableValue;
       billingSummary.writeln('Composite GST (3%): ₹${_formatPrice(taxAmt)}');
-    } else if (isIGST) {
-      billingSummary.writeln('IGST (18%):    ₹${_formatPrice(tax.igstAmount)}');
+    } else if (tax.rateWiseSummary.isNotEmpty) {
+      // Per-rate breakdown — GST-compliant multi-rate display
+      for (final entry in tax.rateWiseSummary) {
+        final rate = (entry['rate'] as num).toDouble();
+        if (rate <= 0) continue; // Skip exempt items in tax section
+        final rateStr = _formatRate(rate);
+        if (isIGST) {
+          final igst = (entry['igst'] as num).toDouble();
+          billingSummary.writeln('IGST ($rateStr%):   ₹${_formatPrice(igst)}');
+        } else {
+          final halfRate = _formatRate(rate / 2);
+          final cgst = (entry['cgst'] as num).toDouble();
+          final sgst = (entry['sgst'] as num).toDouble();
+          billingSummary.writeln('CGST ($halfRate%):   ₹${_formatPrice(cgst)}');
+          billingSummary.writeln('SGST ($halfRate%):   ₹${_formatPrice(sgst)}');
+        }
+      }
     } else {
-      billingSummary.writeln('CGST (9%):     ₹${_formatPrice(tax.cgstAmount)}');
-      billingSummary.writeln('SGST (9%):     ₹${_formatPrice(tax.sgstAmount)}');
+      // Fallback for old data without rateWiseSummary
+      if (isIGST) {
+        billingSummary.writeln('IGST (18%):    ₹${_formatPrice(tax.igstAmount)}');
+      } else {
+        billingSummary.writeln('CGST (9%):     ₹${_formatPrice(tax.cgstAmount)}');
+        billingSummary.writeln('SGST (9%):     ₹${_formatPrice(tax.sgstAmount)}');
+      }
     }
 
     // 5. GRAND TOTAL (must appear before payment info)

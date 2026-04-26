@@ -192,7 +192,7 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
 
       final sales = await supabase
           .from('sales')
-          .select('id, invoice_id, shop_id, amount, timestamp, status, payment_method')
+          .select('id, invoice_id, shop_id, amount, subtotal_after_discount, timestamp, status, payment_method')
           .eq('shop_id', shopId)
           .order('timestamp', ascending: false);
 
@@ -241,14 +241,14 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
       if (productIds.isNotEmpty) {
         final products = await supabase
             .from('products')
-            .select('id, metadata')
+            .select('id, cost_price, metadata')
             .inFilter('id', productIds);
 
         for (final row in products as List<dynamic>) {
           final data = Map<String, dynamic>.from(row as Map);
           final productId = data['id']?.toString();
-          final costPerUnit = _extractCostPerUnit(data);
-          if (productId != null && costPerUnit != null) {
+          final costPerUnit = (data['cost_price'] as num?)?.toDouble() ?? _extractCostPerUnit(data);
+          if (productId != null && costPerUnit != null && costPerUnit > 0) {
             productCostMap[productId] = costPerUnit;
           }
         }
@@ -260,7 +260,9 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
 
       for (final record in saleRecords) {
         final invoiceId = record['invoice_id']?.toString();
-        final items = invoiceId == null ? const <Map<String, dynamic>>[] : invoiceItemMap[invoiceId] ?? const <Map<String, dynamic>>[];
+        final items = invoiceId == null
+            ? const <Map<String, dynamic>>[]
+            : invoiceItemMap[invoiceId] ?? const <Map<String, dynamic>>[];
         var cogs = 0.0;
 
         for (final item in items) {
@@ -279,8 +281,24 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
           cogs += costPerUnit * quantity;
         }
 
-        estimatedGrossProfit += _safeNum(record['amount']) - cogs;
+        final revenueBasis = _safeNum(record['subtotal_after_discount'] ?? record['amount']);
+        estimatedGrossProfit += revenueBasis - cogs;
       }
+
+      int totalItemsSold = 0;
+      int itemsWithCost = 0;
+      for (final items in invoiceItemMap.values) {
+        for (final item in items) {
+          totalItemsSold += _safeNum(item['quantity']).toInt();
+          final productId = item['productId']?.toString();
+          if (productId != null && productCostMap.containsKey(productId)) {
+            itemsWithCost += _safeNum(item['quantity']).toInt();
+          }
+        }
+      }
+      final costBasisCoverage = totalItemsSold > 0 ? (itemsWithCost / totalItemsSold) : 0.0;
+      final isCompleteCostBasis = costBasisCoverage >= 0.99; // effectively 100%
+      final isZeroCostBasis = costBasisCoverage <= 0.01; // effectively 0%
 
       final approvedCount = approvalRecords.where((record) => record['approval_status'] == 'APPROVED').length;
       final pendingCount = approvalRecords.where((record) => record['approval_status'] == 'PENDING').length;
@@ -312,12 +330,19 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
       };
 
       if (metric == 'profit' || metric == 'overview' || metric == 'time_period') {
-        response['gross_profit'] = hasMissingCostBasis ? null : estimatedGrossProfit;
-        response['gross_profit_estimate'] = estimatedGrossProfit;
-        response['gross_profit_status'] = hasMissingCostBasis ? 'partial_cost_basis' : 'complete';
-        response['gross_profit_message'] = hasMissingCostBasis
-            ? 'Gross profit is partially estimated because some products do not yet have cost data.'
-            : 'Gross profit calculated from finalized sales and invoice items.';
+        response['gross_profit'] = isCompleteCostBasis ? estimatedGrossProfit : null;
+        response['gross_profit_estimate'] = isZeroCostBasis ? 0.0 : estimatedGrossProfit;
+        response['gross_profit_status'] = isCompleteCostBasis ? 'complete' : (isZeroCostBasis ? 'no_cost_basis' : 'partial_cost_basis');
+        response['cost_basis_coverage'] = costBasisCoverage;
+        
+        if (isZeroCostBasis) {
+          response['gross_profit_message'] = 'Profit cannot be calculated because none of your products have cost data saved in their metadata.';
+        } else if (!isCompleteCostBasis) {
+          response['gross_profit_message'] = 'Gross profit is partially estimated (${(costBasisCoverage * 100).toStringAsFixed(1)}% coverage) because some products lack cost data.';
+        } else {
+          response['gross_profit_message'] = 'Gross profit calculated from finalized sales and complete cost records.';
+        }
+        
         if (missingCostProducts.isNotEmpty) {
           response['missing_cost_product_ids'] = missingCostProducts.toList();
         }
