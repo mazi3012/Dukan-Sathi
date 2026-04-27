@@ -213,7 +213,7 @@ Future<Map<String, dynamic>> updateDraftPaymentStatus({
         .single();
 
     final approvalData = Map<String, dynamic>.from(approvalRows as Map);
-    final proposedTotal = (approvalData['proposed_total'] as num).toDouble();
+    final proposedTotal = (approvalData['proposed_total'] as num?)?.toDouble() ?? 0.0;
     final normalized = paymentStatus.toUpperCase();
 
     double resolvedAmountPaid;
@@ -270,16 +270,16 @@ Future<Map<String, dynamic>> updateDraftDiscount({
         .single();
 
     final approvalData = Map<String, dynamic>.from(approvalRows as Map);
-    final shopId = approvalData['shop_id'] as String;
-    final customerState = approvalData['customer_state'] as String?;
+    final shopId = (approvalData['shop_id'] ?? '').toString();
+    final customerState = approvalData['customer_state']?.toString();
     final originalItemsJson = (approvalData['original_items'] as List<dynamic>? ?? approvalData['proposed_items'] as List<dynamic>?) ?? const [];
     final originalItems = originalItemsJson.map((itemJson) {
       final json = Map<String, dynamic>.from(itemJson as Map);
       final rawGstRate = (json['gstRate'] as num?)?.toDouble() ?? 0.0;
       return CartItem(
-        productId: json['productId'] as String,
-        quantity: json['quantity'] as int,
-        unitPrice: (json['unitPrice'] as num).toDouble(),
+        productId: (json['productId'] ?? '').toString(),
+        quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+        unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
         gstRate: rawGstRate > 0 ? rawGstRate : 18.0,
       );
     }).toList();
@@ -575,14 +575,14 @@ Future<Map<String, dynamic>> switchGstType({
         .single();
 
     final approvalData = Map<String, dynamic>.from(approvalRows as Map);
-    final shopId = approvalData['shop_id'] as String;
+    final shopId = (approvalData['shop_id'] ?? '').toString();
     final proposedItems = (approvalData['proposed_items'] as List).map((itemJson) {
       final json = Map<String, dynamic>.from(itemJson as Map);
       final rawGstRate = (json['gstRate'] as num?)?.toDouble() ?? 0.0;
       return CartItem(
-        productId: json['productId'] as String,
-        quantity: json['quantity'] as int,
-        unitPrice: (json['unitPrice'] as num).toDouble(),
+        productId: (json['productId'] ?? '').toString(),
+        quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+        unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
         gstRate: rawGstRate > 0 ? rawGstRate : 18.0,
       );
     }).toList();
@@ -594,7 +594,7 @@ Future<Map<String, dynamic>> switchGstType({
         .eq('id', shopId)
         .single();
     final shopData = Map<String, dynamic>.from(shopRows as Map);
-    final shopState = shopData['state'] as String;
+    final shopState = (shopData['state'] ?? 'DL').toString();
 
     // Recalculate tax for IGST (inter-state) or CGST+SGST (intra-state)
     final isInterState = newGstType == 'IGST';
@@ -604,10 +604,10 @@ Future<Map<String, dynamic>> switchGstType({
     final shopConfig = ShopConfig(
       shopId: shopId,
       state: shopState,
-      gstRegistrationNumber: shopData['gst_registration_number'] as String?,
+      gstRegistrationNumber: shopData['gst_registration_number']?.toString(),
       gstMode: GSTMode.registered,
-      businessType: shopData['business_type'] as String? ?? 'Retail',
-      createdAt: DateTime.parse(shopData['created_at'] as String),
+      businessType: shopData['business_type']?.toString() ?? 'Retail',
+      createdAt: DateTime.tryParse(shopData['created_at']?.toString() ?? '') ?? DateTime.now(),
     );
 
     final newTaxBreakdown = GSTCalculator.calculateTax(

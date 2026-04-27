@@ -11,7 +11,7 @@ class HsnGstLookup {
   /// Covers essentials, FMCG, grocery, electronics, clothing, services
   static const Map<String, double> hsnToRate = {
     // ─── 0% (Exempt / Nil rated) ─────────────────────────────────────────
-    '0713': 0,      // Dried leguminous vegetables (unbranded)
+    // '0713': 0,      // Duplicate of line 25
     '0201': 0,      // Meat of bovine animals, fresh
     '0301': 0,      // Live fish
     '0401': 0,      // Milk, not concentrated (fresh milk)
@@ -30,7 +30,7 @@ class HsnGstLookup {
     '0808': 0,      // Apples, fresh
     '0810': 0,      // Other fruit, fresh
     '1001': 0,      // Wheat and meslin (unbranded)
-    '1006': 0,      // Rice (unbranded, not put up in unit container)
+    // '1006': 0,      // Duplicate of line 44 (branded override)
     '1007': 0,      // Grain sorghum
     '0409': 0,      // Natural honey
     '0801': 0,      // Coconuts, fresh
@@ -46,7 +46,7 @@ class HsnGstLookup {
     '1702': 5,      // Sugar (other than cane sugar)
     '1701': 5,      // Cane or beet sugar
     '1704': 5,      // Sugar confectionery
-    '2106': 5,      // Food preparations NES
+    // '2106': 5,      // Duplicate of line 97 (branded override)
     '1902': 5,      // Pasta
     '0910': 5,      // Ginger, saffron, turmeric, spices
     '0904': 5,      // Pepper
@@ -58,7 +58,7 @@ class HsnGstLookup {
     '1511': 5,      // Palm oil
     '1512': 5,      // Sunflower oil
     '1515': 5,      // Mustard oil
-    '3401': 5,      // Soap (for household use)
+    // '3401': 5,      // Duplicate of line 101 (premium override)
     '4802': 5,      // Newsprint
     '9988': 5,      // SAC: Transport services
 
@@ -69,7 +69,7 @@ class HsnGstLookup {
     '1901': 12,     // Malt extract, food preparations
     '2009': 12,     // Fruit juices
     '2202': 12,     // Flavoured/sweetened water, soft drinks base
-    '3304': 12,     // Beauty/makeup preparations
+    // '3304': 12,     // Duplicate of line 98 (premium override)
     '3307': 12,     // Deodorants, perfumes
     '3924': 12,     // Household articles of plastics
     '4818': 12,     // Toilet/tissue paper
@@ -131,7 +131,7 @@ class HsnGstLookup {
     '8528': 18,     // Monitors, projectors, TVs
     '8544': 18,     // Insulated wire, cables
     '9403': 18,     // Other furniture
-    '9504': 18,     // Video games, entertainment
+    // '9504': 18,     // Duplicate of line 158 (premium override)
     '9971': 18,     // SAC: Financial services
     '9973': 18,     // SAC: Leasing services
     '9982': 18,     // SAC: Legal services

@@ -82,17 +82,26 @@ final expenseTool = logExpense;
 final getExpensesTool = getExpenses;
 
 // ─── HELPER: check if user has already completed onboarding ────────────────
-Future<bool> _isUserOnboarded(String userIdentifier) async {
+Future<bool> _isUserOnboarded(int chatId) async {
   try {
-    await supabase
+    // Check if there's a user with this telegram_id who owns a shop
+    final user = await supabase
+        .from('users')
+        .select('id')
+        .eq('telegram_id', chatId)
+        .maybeSingle();
+    
+    if (user == null) return false;
+
+    final shop = await supabase
         .from('shops')
         .select('id')
-        .eq('created_by', userIdentifier)
+        .eq('owner_id', user['id'])
         .eq('onboarding_completed', true)
-        .single();
-    return true;
+        .maybeSingle();
+        
+    return shop != null;
   } catch (e) {
-    // No onboarded shop found for this user
     return false;
   }
 }
@@ -1325,14 +1334,77 @@ Future<void> main(List<String> arguments) async {
     }
   });
 
-  // ─── MESSAGE HANDLER ────────────────────────────────────────────────────
-  bot.onMessage().listen((message) async {
-    print('Incoming message from ${message.chat.id}: ${message.text}');
-    final text = message.text?.trim();
+  // ─── SHARED MESSAGE HANDLER ─────────────────────────────────────────────
+  Future<void> handleIncomingMessage(tg.TeleDartMessage message) async {
+    final text = message.text?.trim() ?? '';
+    if (text.isEmpty) return;
+    
+    print('[bot] RAW message from ${message.chat.id}: "$text"');
     final caption = message.caption?.trim();
 
     final chatId = message.chat.id;
     final userIdentifier = message.from?.username ?? message.from?.firstName ?? chatId.toString();
+
+    final cleanText = text.toLowerCase();
+
+    // ── /login command (Magic Code for web login) ─────────────────
+    if (cleanText == '/login' || cleanText.startsWith('/login@')) {
+      print('[bot] Matching /login for chat=$chatId');
+      try {
+        // Check if user is onboarded first
+        final isOnboarded = await _isUserOnboarded(chatId);
+        print('[bot] /login isOnboarded=$isOnboarded for chat=$chatId');
+        if (!isOnboarded) {
+          await bot.sendMessage(chatId,
+            '⚠️ You need to set up your shop first!\n\nSend /start to begin onboarding.',
+            parseMode: 'Markdown');
+          return;
+        }
+
+        // Find or create user in unified users table
+        final userRow = await supabase
+            .from('users')
+            .upsert({
+              'telegram_id': chatId,
+              'full_name': userIdentifier,
+              'updated_at': DateTime.now().toIso8601String(),
+            }, onConflict: 'telegram_id')
+            .select('id')
+            .single();
+        final userId = userRow['id'] as String;
+
+        // Generate 6-digit code
+        final random = DateTime.now().millisecondsSinceEpoch;
+        final code = ((random % 900000) + 100000).toString();
+
+        // Invalidate any existing codes for this user
+        await supabase
+            .from('login_codes')
+            .delete()
+            .eq('user_id', userId);
+
+        // Insert new code (expires in 5 minutes)
+        await supabase.from('login_codes').insert({
+          'user_id': userId,
+          'code': code,
+          'expires_at': DateTime.now().add(const Duration(minutes: 5)).toIso8601String(),
+          'used': false,
+        });
+
+        await bot.sendMessage(chatId,
+          '🔐 *Web Login Code*\n\n'
+          '```\n$code\n```\n\n'
+          '📱 Enter this code on the Dukan Sathi web app to sign in.\n\n'
+          '⏰ This code expires in *5 minutes*.\n'
+          '⚠️ Do NOT share this code with anyone!',
+          parseMode: 'Markdown');
+        print('[bot] /login code sent to $chatId');
+      } catch (e) {
+        stderr.writeln('[login-code] chat=$chatId error: $e');
+        await bot.sendMessage(chatId, '❌ Could not generate login code. Please try again.');
+      }
+      return;
+    }
 
     // ── Image-only intake for inventory import ─────────────────────────
     if ((message.photo?.isNotEmpty ?? false)) {
@@ -1390,7 +1462,7 @@ Future<void> main(List<String> arguments) async {
       return;
     }
 
-    if (text == null || text.isEmpty) return;
+    if (text.isEmpty) return;
 
     // ── Handle pending partial-payment amount input ─────────────────────
     if (pendingPartialPaymentEdits.containsKey(chatId)) {
@@ -1632,7 +1704,7 @@ Future<void> main(List<String> arguments) async {
     }
 
     // ── Auto-start onboarding for new users ─────────────────────────
-    final isOnboarded = await _isUserOnboarded(userIdentifier);
+    final isOnboarded = await _isUserOnboarded(chatId);
     if (!isOnboarded) {
       try {
         final result = await startOnboarding(chatId, userIdentifier);
@@ -1924,7 +1996,12 @@ Future<void> main(List<String> arguments) async {
       await bot.sendMessage(chatId, 'Sorry, something went wrong. Please try again.');
       stderr.writeln('telegram_bot error for chat $chatId: $e');
     }
-  });
+  }
+
+  bot.onMessage().listen(handleIncomingMessage);
+  bot.onCommand('login').listen(handleIncomingMessage);
+  bot.onCommand('start').listen(handleIncomingMessage);
+  bot.onCommand('join').listen(handleIncomingMessage);
 
   print('🤖 Telegram Bot is starting...');
   final me = await bot.getMe();

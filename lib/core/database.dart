@@ -1,22 +1,14 @@
-import 'dart:io';
-
-import 'package:dotenv/dotenv.dart';
 import 'package:supabase/supabase.dart';
+import 'env_stub.dart'
+    if (dart.library.io) 'env_io.dart'
+    if (dart.library.html) 'env_web.dart';
 
-final DotEnv _env = (() {
-  final env = DotEnv(includePlatformEnvironment: true);
-  if (File('.env').existsSync()) {
-    env.load(['.env']);
-  }
-  return env;
-})();
+final _loader = getLoader()..load();
 
 String _readEnv(String key) {
-  final fromPlatform = Platform.environment[key];
-  if (fromPlatform != null && fromPlatform.isNotEmpty) {
-    return fromPlatform;
-  }
-  return _env[key] ?? '';
+  final fromDartDefine = String.fromEnvironment(key);
+  if (fromDartDefine.isNotEmpty) return fromDartDefine;
+  return _loader.get(key) ?? '';
 }
 
 final String _supabaseUrl = _readEnv('SUPABASE_URL');
@@ -43,16 +35,33 @@ Future<String> getShopIdForUser(String? userIdentifier) async {
     throw StateError('Missing userIdentifier');
   }
 
-  final response = await supabase
+  // 1. Try unified lookup (by UUID, Google ID, or Email)
+  try {
+    final unifiedRes = await supabase
+        .from('users')
+        .select('shops!fk_shops_owner(id)')
+        .or('id.eq."$userIdentifier",google_id.eq."$userIdentifier",email.eq."$userIdentifier"')
+        .maybeSingle();
+
+    if (unifiedRes != null && unifiedRes['shops'] != null) {
+      final shops = unifiedRes['shops'] as List;
+      if (shops.isNotEmpty) return shops.first['id'] as String;
+    }
+  } catch (e) {
+    // Fall through to legacy if UUID format is invalid or other error
+  }
+
+  // 2. Fallback to legacy created_by lookup (backwards compatibility for Telegram)
+  final legacyResponse = await supabase
       .from('shops')
       .select('id')
       .eq('created_by', userIdentifier)
       .eq('onboarding_completed', true)
       .maybeSingle();
 
-  if (response == null) {
+  if (legacyResponse == null) {
     throw StateError('No active shop found for user $userIdentifier. Please complete /start onboarding first.');
   }
 
-  return response['id'] as String;
+  return legacyResponse['id'] as String;
 }

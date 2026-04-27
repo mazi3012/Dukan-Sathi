@@ -175,19 +175,23 @@ Future<OnboardingResult> startOnboarding(int chatId, String createdBy) async {
   _lastCallback.remove(chatId);
 
   try {
-    final existing = await supabase
-        .from('shops')
-        .select('id,name')
-        .eq('created_by', createdBy)
-        .eq('onboarding_completed', true)
+    // Check if user already has a shop linked to their telegram_id
+    final userWithShop = await supabase
+        .from('users')
+        .select('id, shops!fk_shops_owner(id, name)')
+        .eq('telegram_id', chatId)
         .maybeSingle();
-    if (existing != null) {
+
+    if (userWithShop != null && userWithShop['shops'] != null) {
+      final shop = (userWithShop['shops'] as List).first;
       return OnboardingResult(
-        text: '👋 *Welcome back!* Your shop *${existing['name']}* is already set up.\n\nHow can I help you today?',
+        text: '👋 *Welcome back!* Your shop *${shop['name']}* is already set up.\n\nHow can I help you today?',
         done: true,
       );
     }
-  } catch (_) {}
+  } catch (e) {
+    print('[onboarding][start] Error checking existing user: $e');
+  }
 
   final session = OnboardingSession(chatId: chatId, createdBy: createdBy);
   _sessions[chatId] = session;
@@ -370,8 +374,21 @@ Future<OnboardingResult?> processOnboardingCallback(int chatId, String data) asy
 // ─── APPROVE: persist shop ────────────────────────────────────────────────────
 Future<OnboardingResult> _approveOnboarding(OnboardingSession s) async {
   try {
-    final shopId  = _uuid.v4();
-    final ownerId = _uuid.v5(Uuid.NAMESPACE_URL, 'telegram:${s.createdBy}');
+    final shopId = _uuid.v4();
+    
+    // 1. Ensure user exists in 'users' table
+    // We upsert based on telegram_id to unify identity
+    final userRow = await supabase
+        .from('users')
+        .upsert({
+          'telegram_id': s.chatId,
+          'full_name':   s.createdBy,
+          'updated_at':  DateTime.now().toIso8601String(),
+        }, onConflict: 'telegram_id')
+        .select('id')
+        .single();
+    
+    final ownerId = userRow['id'] as String;
 
     final insert = <String, dynamic>{
       'id':                       shopId,

@@ -51,6 +51,34 @@ String? _normalizeCustomerName(dynamic value) {
   return normalized.replaceAll(RegExp(r'\s+'), ' ');
 }
 
+String? _extractCustomerNameFromPrompt(String input) {
+  var text = input.toLowerCase().trim();
+  text = text
+      .replaceAll(RegExp(r'^(please\s+)?(make|create|generate|draft)\s+(a\s+)?(bill|invoice)\s*(for|with|to)?\s*'), '')
+      .replaceAll(RegExp(r'\.$'), '')
+      .trim();
+
+  if (text.isEmpty) return null;
+
+  final stopWords = {
+    'he', 'she', 'they', 'customer', 'buyer', 'bought', 'took', 'takes', 'take',
+    'brought', 'want', 'needs', 'need', 'please', 'for', 'to', 'the', 'a', 'an',
+    'of', 'item', 'items', 'product', 'products', 'with', 'and', 'plus', 'has', 'have', 'got'
+  };
+
+  final tokens = text.split(RegExp(r'\s+')).where((token) => token.isNotEmpty).toList();
+  final nameTokens = <String>[];
+  for (final token in tokens) {
+    if (RegExp(r'^\d+$').hasMatch(token)) break;
+    if (stopWords.contains(token)) break;
+    nameTokens.add(token);
+  }
+
+  if (nameTokens.isEmpty) return null;
+
+  return nameTokens.map((token) => token[0].toUpperCase() + token.substring(1)).join(' ');
+}
+
 double _roundToTwoDecimals(double value) => (value * 100).round() / 100;
 
 bool _isMissingColumnError(Object error) {
@@ -177,6 +205,7 @@ final SchemanticType<Map<String, dynamic>> createDraftInvoiceInputSchema =
         'type': 'object',
         'additionalProperties': {'type': 'integer'},
       },
+      'userPrompt': {'type': 'string'},
     },
     'required': ['requestedItems'],
     'additionalProperties': false,
@@ -203,6 +232,15 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
   final shopId = (input['shopId'] as String?) ?? await getShopIdForUser(userIdentifier);
   final customerId = input['customerId'] as String?;
   final customerNameInput = _normalizeCustomerName(input['customerName']);
+  final userPrompt = input['userPrompt'] as String?;
+  
+  // Fallback name extraction from prompt if missing
+  String? extractedName;
+  if (customerNameInput == null && userPrompt != null) {
+    extractedName = _extractCustomerNameFromPrompt(userPrompt);
+  }
+
+  final customerName = customerNameInput ?? extractedName;
   final customerState = input['customerState'] as String?;
   final discountType = _normalizeDiscountType(input['discountType']);
   final discountValue = (input['discountValue'] as num?)?.toDouble();
@@ -217,7 +255,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
   }
 
   String? resolvedCustomerId = customerId;
-  String? resolvedCustomerName = customerNameInput;
+  String? resolvedCustomerName = customerName;
 
   if (resolvedCustomerName != null && resolvedCustomerId == null) {
     final customerRows = await supabase
