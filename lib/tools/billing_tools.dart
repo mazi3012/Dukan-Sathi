@@ -344,6 +344,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
       items.add(
         CartItem(
           productId: productId,
+          productName: product['name']?.toString() ?? productName,
           quantity: quantity,
           unitPrice: unitPrice,
           gstRate: gstRate,

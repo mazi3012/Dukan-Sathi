@@ -1,17 +1,51 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+class CartItem {
+  final String productId;
+  final String? productName;
+  final int quantity;
+  final double unitPrice;
+  final double gstRate;
 
-part 'cart_item.freezed.dart';
-part 'cart_item.g.dart';
+  const CartItem({
+    required this.productId,
+    this.productName,
+    required this.quantity,
+    required this.unitPrice,
+    this.gstRate = 18.0,
+  });
 
-@freezed
-abstract class CartItem with _$CartItem {
-  const factory CartItem({
-    required String productId,
-    required int quantity,
-    required double unitPrice,
-    @Default(18.0) double gstRate,
-  }) = _CartItem;
+  factory CartItem.fromJson(Map<String, dynamic> json) {
+    return CartItem(
+      productId: json['productId'] as String,
+      productName: json['productName'] as String?,
+      quantity: (json['quantity'] as num).toInt(),
+      unitPrice: (json['unitPrice'] as num).toDouble(),
+      gstRate: (json['gstRate'] as num?)?.toDouble() ?? 18.0,
+    );
+  }
 
-  factory CartItem.fromJson(Map<String, dynamic> json) =>
-      _$CartItemFromJson(json);
+  Map<String, dynamic> toJson() {
+    return {
+      'productId': productId,
+      if (productName != null) 'productName': productName,
+      'quantity': quantity,
+      'unitPrice': unitPrice,
+      'gstRate': gstRate,
+    };
+  }
+
+  CartItem copyWith({
+    String? productId,
+    String? productName,
+    int? quantity,
+    double? unitPrice,
+    double? gstRate,
+  }) {
+    return CartItem(
+      productId: productId ?? this.productId,
+      productName: productName ?? this.productName,
+      quantity: quantity ?? this.quantity,
+      unitPrice: unitPrice ?? this.unitPrice,
+      gstRate: gstRate ?? this.gstRate,
+    );
+  }
 }

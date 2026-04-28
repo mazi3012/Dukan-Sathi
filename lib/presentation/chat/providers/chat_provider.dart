@@ -4,15 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../models/chat_message.dart';
 import '../../../core/session.dart';
-
 final chatControllerProvider = StateNotifierProvider<ChatController, List<ChatMessage>>((ref) {
   return ChatController();
 });
-
 class ChatController extends StateNotifier<List<ChatMessage>> {
   final _uuid = const Uuid();
   final String _sessionId = const Uuid().v4();
-
   ChatController() : super([
     ChatMessage(
       id: const Uuid().v4(),
@@ -20,10 +17,8 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
       type: MessageType.aiText,
     ),
   ]);
-
   Future<void> sendMessage(String text) async {
     if (text.trim().isEmpty) return;
-
     // 1. Add User Message
     state = [
       ...state,
@@ -33,7 +28,6 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
         type: MessageType.user,
       ),
     ];
-
     // 2. Add "Typing" Indicator
     final typingId = _uuid.v4();
     state = [
@@ -45,12 +39,13 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
         isTyping: true,
       ),
     ];
-
     try {
       // 3. Use the SMART /api/chat endpoint (same capabilities as Telegram bot)
       final response = await http.post(
         Uri.parse('http://localhost:3100/api/chat'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: jsonEncode({
           'input': text,
           'sessionId': _sessionId,
@@ -58,15 +53,12 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
           'userId': UserSession().userId,
         }),
       );
-
       // Remove typing indicator
       state = state.where((m) => m.id != typingId).toList();
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final aiText = data['text'] as String? ?? '';
         final card = data['card'] as Map<String, dynamic>?;
-
         // Determine card type from structured backend response
         MessageType? cardType;
         if (card != null) {
@@ -77,7 +69,6 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
             cardType = MessageType.aiDraftInvoice;
           }
         }
-
         state = [
           ...state,
           ChatMessage(

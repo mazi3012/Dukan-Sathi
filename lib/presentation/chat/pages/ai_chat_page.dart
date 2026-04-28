@@ -8,6 +8,7 @@ import '../models/chat_message.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/invoice_draft_card.dart';
 import '../widgets/inventory_draft_card.dart';
+import '../widgets/ai_thinking_indicator.dart';
 
 class AiChatPage extends ConsumerStatefulWidget {
   const AiChatPage({super.key});
@@ -173,11 +174,7 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: isTyping
-                ? const SizedBox(
-                    width: 30,
-                    height: 20,
-                    child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
-                  )
+                ? const AiThinkingIndicator()
                 : Text(text, style: const TextStyle(color: Colors.white, fontSize: 15)),
           ),
         ),

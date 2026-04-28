@@ -320,6 +320,17 @@ Future<void> main(List<String> arguments) async {
               paymentStatus: pStatus,
               amountPaid: (data['amountPaid'] as num?)?.toDouble(),
             );
+          } else if (type == 'edit_item') {
+            final productId = data['productId']?.toString();
+            final quantity = (data['quantity'] as num?)?.toInt();
+            final unitPrice = (data['unitPrice'] as num?)?.toDouble();
+            if (productId == null || quantity == null) throw Exception("Missing productId or quantity for edit_item");
+            result = await updateDraftItem(
+              approvalId: approvalId,
+              productId: productId,
+              newQuantity: quantity,
+              newUnitPrice: unitPrice,
+            );
           } else {
             result = {'success': false, 'error': 'Invalid update type: $type'};
           }

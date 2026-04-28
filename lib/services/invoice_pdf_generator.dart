@@ -308,52 +308,60 @@ class InvoicePdfGenerator {
       ),
     );
 
-    // 3. ITEMS TABLE
+    // 3. ITEMS TABLE — Indian GST Invoice format
     final itemRows = approval.proposedItems.asMap().entries.map((entry) {
       final index = entry.key + 1;
       final item = entry.value;
       final details = productDetails[item.productId];
-      final itemName = details?['name'] as String? ?? item.productId;
+      final itemName = details?['name'] as String? ?? item.productName ?? item.productId;
       final hsn = details?['hsn_sac_code'] as String? ?? '-';
       final gstRate = item.gstRate;
       final rateStr = gstRate == gstRate.roundToDouble() ? '${gstRate.toInt()}%' : '${gstRate.toStringAsFixed(1)}%';
-      final amount = item.quantity * item.unitPrice;
+      final taxableValue = item.quantity * item.unitPrice;
+      final taxAmount = taxableValue * (gstRate / 100);
+      final totalWithTax = taxableValue + taxAmount;
       return [
         index.toString(),
         itemName,
         hsn,
-        rateStr,
         item.quantity.toString(),
         _money(item.unitPrice),
-        _money(amount),
+        _money(taxableValue),
+        rateStr,
+        _money(taxAmount),
+        _money(totalWithTax),
       ];
     }).toList();
 
     final itemsTable = pw.TableHelper.fromTextArray(
-      headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 8),
-      cellStyle: pw.TextStyle(fontSize: 8, color: darkText),
+      headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 7),
+      cellStyle: pw.TextStyle(fontSize: 7, color: darkText),
       headerDecoration: pw.BoxDecoration(color: tealColor),
       border: pw.TableBorder.all(color: borderColor, width: 0.5),
       cellHeight: 22,
       cellAlignments: {
-        0: pw.Alignment.centerLeft,
+        0: pw.Alignment.center,
         1: pw.Alignment.centerLeft,
         2: pw.Alignment.centerLeft,
-        3: pw.Alignment.centerRight,
+        3: pw.Alignment.center,
         4: pw.Alignment.centerRight,
         5: pw.Alignment.centerRight,
-        6: pw.Alignment.centerRight,
+        6: pw.Alignment.center,
+        7: pw.Alignment.centerRight,
+        8: pw.Alignment.centerRight,
       },
       columnWidths: const {
-        0: pw.FixedColumnWidth(25),
-        1: pw.FlexColumnWidth(3.0),
-        2: pw.FixedColumnWidth(55),
-        3: pw.FixedColumnWidth(40),
-        4: pw.FixedColumnWidth(35),
-        5: pw.FixedColumnWidth(65),
-        6: pw.FixedColumnWidth(75),
+        0: pw.FixedColumnWidth(20),   // #
+        1: pw.FlexColumnWidth(3.0),   // Item Description
+        2: pw.FixedColumnWidth(45),   // HSN/SAC
+        3: pw.FixedColumnWidth(25),   // Qty
+        4: pw.FixedColumnWidth(55),   // Rate
+        5: pw.FixedColumnWidth(60),   // Taxable Value
+        6: pw.FixedColumnWidth(30),   // GST %
+        7: pw.FixedColumnWidth(55),   // Tax Amt
+        8: pw.FixedColumnWidth(65),   // Total
       },
-      headers: const ['#', 'Item Description', 'HSN/SAC', 'GST', 'Qty', 'Rate', 'Amount'],
+      headers: const ['#', 'Item Description', 'HSN', 'Qty', 'Rate', 'Taxable', 'GST', 'Tax Amt', 'Total'],
       data: itemRows,
     );
 
@@ -427,21 +435,56 @@ class InvoicePdfGenerator {
                 children: [
                   if (approval.discountAmount != null && approval.discountAmount! > 0) ...[
                     _summaryRow('Subtotal', _money(approval.subtotalBeforeDiscount ?? tax.subtotal)),
-                    _summaryRow('Discount', '-${_money(approval.discountAmount!)}', color: PdfColors.green700),
+                    _summaryRow(
+                      approval.discountType == 'PERCENT' && approval.discountValue != null
+                          ? 'Discount (${approval.discountValue!.toStringAsFixed(1)}%)'
+                          : 'Discount',
+                      '-${_money(approval.discountAmount!)}',
+                      color: PdfColors.green700,
+                    ),
                   ],
                   _summaryRow('Taxable Value', _money(approval.subtotalAfterDiscount ?? tax.subtotal)),
                   pw.SizedBox(height: 4),
-                  if (isIgst) _summaryRow('IGST', _money(tax.igstAmount)),
-                  if (!isIgst && !isNonGst) ...[
-                    _summaryRow('CGST', _money(tax.cgstAmount)),
-                    _summaryRow('SGST', _money(tax.sgstAmount)),
+                  // Rate-wise GST breakdown
+                  if (tax.rateWiseSummary.isNotEmpty)
+                    ...tax.rateWiseSummary.where((e) => (e['rate'] as num).toDouble() > 0).expand((entry) {
+                      final rate = (entry['rate'] as num).toDouble();
+                      final rateStr = rate == rate.roundToDouble() ? rate.toInt().toString() : rate.toStringAsFixed(1);
+                      if (isIgst) {
+                        final igst = (entry['igst'] as num).toDouble();
+                        return [_summaryRow('IGST ($rateStr%)', _money(igst))];
+                      } else {
+                        final cgst = (entry['cgst'] as num).toDouble();
+                        final sgst = (entry['sgst'] as num).toDouble();
+                        final halfRate = rate / 2;
+                        final halfRateStr = halfRate == halfRate.roundToDouble() ? halfRate.toInt().toString() : halfRate.toStringAsFixed(1);
+                        return [
+                          _summaryRow('CGST ($halfRateStr%)', _money(cgst)),
+                          _summaryRow('SGST ($halfRateStr%)', _money(sgst)),
+                        ];
+                      }
+                    })
+                  else ...[
+                    if (isIgst) _summaryRow('IGST', _money(tax.igstAmount)),
+                    if (!isIgst && !isNonGst) ...[
+                      _summaryRow('CGST', _money(tax.cgstAmount)),
+                      _summaryRow('SGST', _money(tax.sgstAmount)),
+                    ],
                   ],
                   pw.Divider(color: borderColor, thickness: 1),
                   pw.SizedBox(height: 4),
                   _summaryRow('Grand Total', _money(approval.proposedTotal), isBold: true, fontSize: 12, color: tealColor),
                   pw.SizedBox(height: 8),
-                  if (approval.amountPaid > 0) _summaryRow('Amount Paid', _money(approval.amountPaid), color: darkText),
-                  if (approval.dueAmount > 0) _summaryRow('Balance Due', _money(approval.dueAmount), color: PdfColors.red700, isBold: true),
+                  // Always show payment breakdown when status is PARTIAL or PAID
+                  if (approval.paymentStatus == 'PARTIAL') ...[
+                    _summaryRow('Amount Paid', _money(approval.amountPaid), color: PdfColors.green700),
+                    _summaryRow('Balance Due', _money(approval.dueAmount > 0 ? approval.dueAmount : approval.proposedTotal - approval.amountPaid), color: PdfColors.red700, isBold: true),
+                  ] else if (approval.paymentStatus == 'PAID') ...[
+                    _summaryRow('Amount Paid', _money(approval.proposedTotal), color: PdfColors.green700),
+                  ] else ...[
+                    // UNPAID — show full amount as due
+                    _summaryRow('Balance Due', _money(approval.proposedTotal), color: PdfColors.red700, isBold: true),
+                  ],
                 ],
               ),
             ),

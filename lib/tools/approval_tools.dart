@@ -223,8 +223,8 @@ Future<Map<String, dynamic>> updateDraftPaymentStatus({
       dueAmount = 0.0;
     } else if (normalized == 'PARTIAL') {
       resolvedAmountPaid = amountPaid ?? (approvalData['amount_paid'] as num?)?.toDouble() ?? 0.0;
-      if (resolvedAmountPaid <= 0) {
-        throw StateError('amountPaid must be greater than 0 for PARTIAL payments.');
+      if (resolvedAmountPaid < 0) {
+        throw StateError('amountPaid cannot be negative.');
       }
       if (resolvedAmountPaid > proposedTotal) {
         throw StateError('amountPaid cannot exceed the invoice total.');
@@ -256,6 +256,148 @@ Future<Map<String, dynamic>> updateDraftPaymentStatus({
   }
 }
 
+Future<Map<String, dynamic>> updateDraftItem({
+  required String approvalId,
+  required String productId,
+  required int newQuantity,
+  double? newUnitPrice,
+}) async {
+  try {
+    final approvalRows = await supabase
+        .from('draft_approvals')
+        .select()
+        .eq('approval_id', approvalId)
+        .eq('approval_status', 'PENDING')
+        .single();
+
+    final approvalData = Map<String, dynamic>.from(approvalRows as Map);
+    final shopId = (approvalData['shop_id'] ?? '').toString();
+    final customerState = approvalData['customer_state']?.toString();
+    final discountType = approvalData['discount_type']?.toString();
+    final discountValue = (approvalData['discount_value'] as num?)?.toDouble();
+
+    final originalItemsJson = (approvalData['original_items'] as List<dynamic>? ?? approvalData['proposed_items'] as List<dynamic>?) ?? const [];
+    
+    bool itemFound = false;
+    final originalItems = originalItemsJson.map((itemJson) {
+      final json = Map<String, dynamic>.from(itemJson as Map);
+      final rawGstRate = (json['gstRate'] as num?)?.toDouble() ?? 0.0;
+      final currentProductId = (json['productId'] ?? '').toString();
+      
+      if (currentProductId == productId) {
+        itemFound = true;
+        return CartItem(
+          productId: currentProductId,
+          productName: json['productName']?.toString(),
+          quantity: newQuantity,
+          unitPrice: newUnitPrice ?? (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
+          gstRate: rawGstRate > 0 ? rawGstRate : 18.0,
+        );
+      }
+      
+      return CartItem(
+        productId: currentProductId,
+        productName: json['productName']?.toString(),
+        quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+        unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
+        gstRate: rawGstRate > 0 ? rawGstRate : 18.0,
+      );
+    }).toList();
+
+    if (!itemFound) {
+      throw StateError('Product not found in draft items.');
+    }
+
+    final billingAdjustments = _applyDiscountToItems(
+      items: originalItems,
+      discountType: discountType,
+      discountValue: discountValue,
+    );
+    final adjustedItems = billingAdjustments['items'] as List<CartItem>;
+    final subtotalBeforeDiscount = billingAdjustments['subtotalBeforeDiscount'] as double;
+    final discountAmount = billingAdjustments['discountAmount'] as double;
+    final subtotalAfterDiscount = billingAdjustments['subtotalAfterDiscount'] as double;
+
+    final shopRows = await supabase
+        .from('shops')
+        .select('id, state, gst_registration_number, gst_mode, business_type, created_at')
+        .eq('id', shopId)
+        .single();
+
+    final shopData = Map<String, dynamic>.from(shopRows as Map);
+    final gstModeStr = shopData['gst_mode'] as String? ?? 'REGISTERED';
+    final gstMode = GSTMode.values.firstWhere(
+      (e) => e.name == gstModeStr.toLowerCase(),
+      orElse: () => GSTMode.registered,
+    );
+
+    final shopConfig = ShopConfig(
+      shopId: shopId,
+      state: shopData['state'] as String,
+      gstRegistrationNumber: shopData['gst_registration_number'] as String?,
+      gstMode: gstMode,
+      businessType: shopData['business_type'] as String? ?? 'Retail',
+      createdAt: DateTime.parse(shopData['created_at'] as String),
+    );
+
+    final taxBreakdown = GSTCalculator.calculateTax(
+      items: adjustedItems,
+      shopConfig: shopConfig,
+      customerState: customerState,
+    );
+
+    final paymentStatus = _normalizePaymentStatus(
+      approvalData['payment_status'],
+      (approvalData['amount_paid'] as num?)?.toDouble() ?? 0.0,
+      taxBreakdown.totalAmount,
+    );
+
+    final amountPaid = paymentStatus == 'PAID'
+        ? taxBreakdown.totalAmount
+        : paymentStatus == 'PARTIAL'
+            ? ((_roundToTwoDecimals((approvalData['amount_paid'] as num?)?.toDouble() ?? 0.0)).clamp(0.0, taxBreakdown.totalAmount) as double)
+            : 0.0;
+    final dueAmount = _roundToTwoDecimals(taxBreakdown.totalAmount - amountPaid);
+
+    await supabase.from('draft_approvals').update({
+      'original_items': originalItems.map((item) => item.toJson()).toList(),
+      'proposed_items': adjustedItems.map((item) => item.toJson()).toList(),
+      'proposed_tax_breakdown': {
+        'subtotal': taxBreakdown.subtotal,
+        'cgst_amount': taxBreakdown.cgstAmount,
+        'sgst_amount': taxBreakdown.sgstAmount,
+        'igst_amount': taxBreakdown.igstAmount,
+        'gst_mode': taxBreakdown.gstMode,
+        'applicable_state': taxBreakdown.applicableState,
+        'tax_slab': taxBreakdown.taxSlab,
+        'total_amount': taxBreakdown.totalAmount,
+        'breakdown': taxBreakdown.breakdown,
+        'rate_wise_summary': taxBreakdown.rateWiseSummary,
+      },
+      'proposed_total': taxBreakdown.totalAmount,
+      'subtotal_before_discount': subtotalBeforeDiscount,
+      'subtotal_after_discount': subtotalAfterDiscount,
+      'discount_amount': discountAmount,
+      'payment_status': paymentStatus,
+      'amount_paid': amountPaid,
+      'due_amount': dueAmount,
+    }).eq('approval_id', approvalId);
+
+    return {
+      'success': true,
+      'approvalId': approvalId,
+      'paymentStatus': paymentStatus,
+      'amountPaid': amountPaid,
+      'dueAmount': dueAmount,
+    };
+  } catch (e) {
+    return {
+      'success': false,
+      'error': 'Failed to update item: $e',
+    };
+  }
+}
+
 Future<Map<String, dynamic>> updateDraftDiscount({
   required String approvalId,
   required String discountType,
@@ -278,6 +420,7 @@ Future<Map<String, dynamic>> updateDraftDiscount({
       final rawGstRate = (json['gstRate'] as num?)?.toDouble() ?? 0.0;
       return CartItem(
         productId: (json['productId'] ?? '').toString(),
+        productName: json['productName']?.toString(),
         quantity: (json['quantity'] as num?)?.toInt() ?? 1,
         unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
         gstRate: rawGstRate > 0 ? rawGstRate : 18.0,
@@ -419,6 +562,7 @@ Future<Map<String, dynamic>> approveDraftInvoice({
       final rawGstRate = (json['gstRate'] as num?)?.toDouble() ?? 0.0;
       return CartItem(
         productId: json['productId'] as String,
+        productName: json['productName']?.toString(),
         quantity: json['quantity'] as int,
         unitPrice: (json['unitPrice'] as num).toDouble(),
         gstRate: rawGstRate > 0 ? rawGstRate : 18.0,
@@ -441,6 +585,15 @@ Future<Map<String, dynamic>> approveDraftInvoice({
         : paymentStatus == 'PARTIAL'
             ? amountPaidDraft
             : 0.0;
+
+    // Guard: PARTIAL must have a positive amountPaid
+    if (paymentStatus == 'PARTIAL' && amountPaid <= 0) {
+      return {
+        'success': false,
+        'error': 'Please enter the paid amount before approving a partial payment invoice.',
+      };
+    }
+
     final dueAmount = _roundToTwoDecimals(proposedTotal.toDouble() - amountPaid);
 
     await _deductInventoryStock(shopId: shopId, items: items);
@@ -581,6 +734,7 @@ Future<Map<String, dynamic>> switchGstType({
       final rawGstRate = (json['gstRate'] as num?)?.toDouble() ?? 0.0;
       return CartItem(
         productId: (json['productId'] ?? '').toString(),
+        productName: json['productName']?.toString(),
         quantity: (json['quantity'] as num?)?.toInt() ?? 1,
         unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
         gstRate: rawGstRate > 0 ? rawGstRate : 18.0,
