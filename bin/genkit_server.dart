@@ -654,7 +654,7 @@ class WebChatSession {
     text = text.replaceAll(RegExp(r'^(please\s+)?(make|create|generate)\s+(a\s+)?(bill|invoice)\s*(for|with|to)?\s*'), '').replaceAll(RegExp(r'\.$'), '').trim();
     if (text.isEmpty) return {};
     final requested = <String, int>{};
-    final pattern = RegExp(r'(\d+)\s*x?\s+([a-z0-9][a-z0-9\s\-()\/]*?)(?=(?:\s+(?:and|with|plus|,|;|\.|$))|$)', caseSensitive: false);
+    final pattern = RegExp(r'(\d+)\s*x?\s+([a-z0-9][a-z0-9\s\-()\/]*?)(?=\s*(?:and|with|plus|,|;|\.|$))', caseSensitive: false);
     for (final match in pattern.allMatches(text.replaceAll(RegExp(r'\s+'), ' ').trim())) {
       final qty = int.tryParse(match.group(1) ?? '');
       var name = match.group(2)?.trim() ?? '';

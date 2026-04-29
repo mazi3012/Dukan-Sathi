@@ -1,72 +1,182 @@
 #!/bin/bash
-# Dukan Sathi Pro - App Starter Script
+# Dukan Sathi Pro - Advanced App Starter Script
 
-# Ensure Dart is in PATH
-for dart_dir in "/workspaces/dukansathi-new/.tooling/dart-sdk/bin" "$HOME/dart-sdk/bin" "/tmp/dart-sdk/bin" "/opt/flutter/bin/cache/dart-sdk/bin"; do
-	if [ -x "$dart_dir/dart" ]; then
-		export PATH="$dart_dir:$PATH"
-		break
-	fi
-done
+# --- Configuration ---
+FLUTTER_SDK_PATH="/home/mazidur/flutter"
+PROJECT_ROOT=$(pwd)
+ADMIN_DASHBOARD_DIR="flutter_admin_dashboard"
 
-# Navigate to project root
-cd "$(dirname "$0")"
+# Port Configuration
+GENKIT_UI_PORT=4000
+GENKIT_SERVER_PORT=3100
+ADMIN_PORT=5000
+MAIN_APP_PORT=8080
 
-echo "🚀 Starting Dukan Sathi Pro Services..."
+# --- Environment Setup ---
+export PATH="$FLUTTER_SDK_PATH/bin:$PATH"
+export PATH="$FLUTTER_SDK_PATH/bin/cache/dart-sdk/bin:$PATH"
 
-# 1. Update dependencies
-echo "📦 Updating dependencies..."
-dart pub get
+# Colors
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-# 2. Kill existing processes if running
-echo "🧹 Cleaning up old processes..."
-[ -f genkit_dev.pid ] && kill $(cat genkit_dev.pid) 2>/dev/null
-[ -f genkit_server.pid ] && kill $(cat genkit_server.pid) 2>/dev/null
-[ -f telegram_bot.pid ] && kill $(cat telegram_bot.pid) 2>/dev/null
-[ -f flutter_admin.pid ] && kill $(cat flutter_admin.pid) 2>/dev/null
-fuser -k 4000/tcp 2>/dev/null
-fuser -k 3100/tcp 2>/dev/null
-fuser -k 5000/tcp 2>/dev/null
+# --- Functions ---
 
-# 3. Start Genkit UI Server (Port 4000)
-echo "📊 Starting Genkit UI Server (Port 4000)..."
-if command -v stdbuf >/dev/null 2>&1; then
-	nohup stdbuf -oL -eL dart bin/genkit_ui.dart > genkit_dev.log 2>&1 &
-else
-	nohup dart bin/genkit_ui.dart > genkit_dev.log 2>&1 &
-fi
-echo $! > genkit_dev.pid
+log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
+log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-# 4. Start Genkit Server (Port 3100)
-echo "🌐 Starting API & Admin Dashboard (Port 3100)..."
-if command -v stdbuf >/dev/null 2>&1; then
-	nohup stdbuf -oL -eL dart bin/genkit_server.dart > genkit_server.log 2>&1 &
-else
-	nohup dart bin/genkit_server.dart > genkit_server.log 2>&1 &
-fi
-echo $! > genkit_server.pid
+check_dependencies() {
+    log_info "Checking dependencies..."
+    if ! command -v flutter >/dev/null 2>&1; then
+        log_error "Flutter not found. Please ensure it's installed at $FLUTTER_SDK_PATH"
+        exit 1
+    fi
+}
 
-# 5. Start Telegram Bot
-echo "🤖 Starting Telegram Bot..."
-if command -v stdbuf >/dev/null 2>&1; then
-	nohup stdbuf -oL -eL dart bin/telegram_bot.dart > telegram_bot.log 2>&1 &
-else
-	nohup dart bin/telegram_bot.dart > telegram_bot.log 2>&1 &
-fi
-echo $! > telegram_bot.pid
+check_env() {
+    if [ ! -f ".env" ]; then
+        if [ -f ".env.example" ]; then
+            log_warn ".env file missing. Copying from .env.example..."
+            cp .env.example .env
+        else
+            log_error ".env and .env.example missing! Please create a .env file."
+        fi
+    fi
+}
 
-# 6. Start Flutter Admin Dashboard (Port 5000)
-echo "📱 Starting Flutter Admin Dashboard (Port 5000)..."
-if [ -d "flutter_admin_dashboard/build/web" ]; then
-	nohup python3 flutter_admin_dashboard/serve_with_cors.py > flutter_admin.log 2>&1 &
-	echo $! > flutter_admin.pid
-else
-	echo "⚠️  Flutter web build not found, skipping..."
-fi
+stop_services() {
+    log_info "🧹 Cleaning up old processes..."
+    [ -f genkit_dev.pid ] && kill $(cat genkit_dev.pid) 2>/dev/null && rm genkit_dev.pid
+    [ -f genkit_server.pid ] && kill $(cat genkit_server.pid) 2>/dev/null && rm genkit_server.pid
+    [ -f telegram_bot.pid ] && kill $(cat telegram_bot.pid) 2>/dev/null && rm telegram_bot.pid
+    [ -f flutter_admin.pid ] && kill $(cat flutter_admin.pid) 2>/dev/null && rm flutter_admin.pid
+    [ -f flutter_main.pid ] && kill $(cat flutter_main.pid) 2>/dev/null && rm flutter_main.pid
 
-echo "✅ Services started!"
-echo "   - Genkit UI: http://localhost:4000"
-echo "   - API/Admin: http://localhost:3100"
-echo "   - Flutter Dashboard: http://localhost:5000"
-echo "   - Logs: genkit_dev.log, genkit_server.log, telegram_bot.log, flutter_admin.log"
-echo "   - PIDs: genkit_dev.pid, genkit_server.pid, telegram_bot.pid, flutter_admin.pid"
+    # Force kill by port as fallback
+    fuser -k $GENKIT_UI_PORT/tcp 2>/dev/null
+    fuser -k $GENKIT_SERVER_PORT/tcp 2>/dev/null
+    fuser -k $ADMIN_PORT/tcp 2>/dev/null
+    fuser -k $MAIN_APP_PORT/tcp 2>/dev/null
+    
+    log_info "All services stopped."
+}
+
+start_services() {
+    check_dependencies
+    check_env
+    
+    log_info "🚀 Starting Dukan Sathi Pro Services..."
+    
+    # Update dependencies
+    log_info "📦 Syncing Flutter dependencies..."
+    flutter pub get > /dev/null
+    
+    # Utility for buffered output
+    BUF_CMD=""
+    if command -v stdbuf >/dev/null 2>&1; then
+        BUF_CMD="stdbuf -oL -eL"
+    fi
+
+    # 1. Genkit UI
+    log_info "📊 Starting Genkit UI (Port $GENKIT_UI_PORT)..."
+    nohup $BUF_CMD dart bin/genkit_ui.dart > genkit_dev.log 2>&1 &
+    echo $! > genkit_dev.pid
+    
+    # 2. Genkit Server
+    log_info "🌐 Starting API & Admin Dashboard (Port $GENKIT_SERVER_PORT)..."
+    nohup $BUF_CMD dart bin/genkit_server.dart > genkit_server.log 2>&1 &
+    echo $! > genkit_server.pid
+    
+    # 3. Telegram Bot
+    log_info "🤖 Starting Telegram Bot..."
+    nohup $BUF_CMD dart bin/telegram_bot.dart > telegram_bot.log 2>&1 &
+    echo $! > telegram_bot.pid
+    
+    # 4. Flutter Admin Dashboard
+    if [ -d "$ADMIN_DASHBOARD_DIR/build/web" ]; then
+        log_info "📱 Starting Flutter Admin Dashboard (Port $ADMIN_PORT)..."
+        nohup python3 $ADMIN_DASHBOARD_DIR/serve_with_cors.py > flutter_admin.log 2>&1 &
+        echo $! > flutter_admin.pid
+    else
+        log_warn "Flutter Admin web build not found. Skipping..."
+    fi
+
+    # 5. Main App (Web)
+    log_info "💻 Starting Main Flutter App (Port $MAIN_APP_PORT)..."
+    nohup flutter run -d web-server --web-port $MAIN_APP_PORT > flutter_main.log 2>&1 &
+    echo $! > flutter_main.pid
+
+    log_info "⌛ Waiting for services to initialize..."
+    sleep 5
+    check_status
+}
+
+check_status() {
+    echo -e "\n--- Service Status ---"
+    printf "%-25s %-10s %-20s\n" "Service" "Status" "URL"
+    check_port $GENKIT_UI_PORT "Genkit UI" "http://localhost:$GENKIT_UI_PORT"
+    check_port $GENKIT_SERVER_PORT "API/Genkit Server" "http://localhost:$GENKIT_SERVER_PORT"
+    check_port $ADMIN_PORT "Admin Dashboard" "http://localhost:$ADMIN_PORT"
+    check_port $MAIN_APP_PORT "Main App" "http://localhost:$MAIN_APP_PORT"
+    
+    if [ -f telegram_bot.pid ] && ps -p $(cat telegram_bot.pid) > /dev/null; then
+        printf "%-25s %-10s %-20s\n" "Telegram Bot" "${GREEN}RUNNING${NC}" "N/A"
+    else
+        printf "%-25s %-10s %-20s\n" "Telegram Bot" "${RED}STOPPED${NC}" "N/A"
+    fi
+}
+
+check_port() {
+    local PORT=$1
+    local NAME=$2
+    local URL=$3
+    
+    # Try nc (netcat) first as it's lightweight
+    if command -v nc >/dev/null 2>&1; then
+        if nc -z localhost $PORT >/dev/null 2>&1; then
+            printf "%-25s %-10s %-20s\n" "$NAME" "${GREEN}RUNNING${NC}" "$URL"
+            return 0
+        fi
+    fi
+
+    # Fallback to lsof
+    if command -v lsof >/dev/null 2>&1; then
+        if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+            printf "%-25s %-10s %-20s\n" "$NAME" "${GREEN}RUNNING${NC}" "$URL"
+            return 0
+        fi
+    fi
+
+    printf "%-25s %-10s %-20s\n" "$NAME" "${RED}STOPPED${NC}" "$URL"
+}
+
+# --- Main Logic ---
+
+case "$1" in
+    stop)
+        stop_services
+        ;;
+    status)
+        check_status
+        ;;
+    restart)
+        stop_services
+        sleep 2
+        start_services "${@:2}"
+        ;;
+    help)
+        echo "Usage: ./start.sh [start|stop|restart|status]"
+        echo "  start:   Starts all backend services (default)"
+        echo "  stop:    Stops all services"
+        echo "  restart: Restarts all services"
+        echo "  status:  Checks service health"
+        ;;
+    *)
+        start_services "$@"
+        ;;
+esac
+

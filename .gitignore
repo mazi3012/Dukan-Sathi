@@ -39,6 +39,7 @@ logs/
 # Test and scratch scripts
 bin/test_billing.dart
 bin/test_*.dart
+test_*.dart
 scratch/
 
 # Genkit runtime artifacts
