@@ -7,6 +7,7 @@ import '../../../core/session.dart';
 import '../../dashboard/pages/dashboard_page.dart';
 import '../../inventory/pages/inventory_page.dart';
 import '../../billing/pages/billing_page.dart';
+import '../../customers/pages/customers_page.dart';
 import '../../chat/pages/ai_chat_page.dart';
 import '../../auth/pages/login_page.dart';
 
@@ -24,6 +25,7 @@ class _MainLayoutState extends State<MainLayout> {
     const DashboardPage(),
     const InventoryPage(),
     const BillingPage(),
+    const CustomersPage(),
     const AiChatPage(),
   ];
 
@@ -130,7 +132,8 @@ class _MainLayoutState extends State<MainLayout> {
               _buildNavItem(0, Iconsax.home_2, "Home"),
               _buildNavItem(1, Iconsax.box, "Stock"),
               _buildNavItem(2, Iconsax.receipt_2, "Bills"),
-              _buildNavItem(3, Iconsax.message_programming, "AI Assistant"),
+              _buildNavItem(3, Iconsax.people, "Customers"),
+              _buildNavItem(4, Iconsax.message_programming, "AI Chat"),
             ],
           ),
         ),

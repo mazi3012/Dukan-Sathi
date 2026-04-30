@@ -5,18 +5,21 @@ import 'env_stub.dart'
 
 final _loader = getLoader()..load();
 
-String _readEnv(String key) {
-  final fromDartDefine = String.fromEnvironment(key);
-  if (fromDartDefine.isNotEmpty) return fromDartDefine;
+final String _supabaseUrl = const String.fromEnvironment('SUPABASE_URL', defaultValue: '');
+final String _supabaseAnonKey = const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+final String _supabaseServiceRoleKey = const String.fromEnvironment('SUPABASE_SERVICE_ROLE_KEY', defaultValue: '');
+
+String _getEnv(String key, String dartDefineValue) {
+  if (dartDefineValue.isNotEmpty) return dartDefineValue;
   return _loader.get(key) ?? '';
 }
 
-final String _supabaseUrl = _readEnv('SUPABASE_URL');
-final String _supabaseAnonKey = _readEnv('SUPABASE_ANON_KEY');
-final String _supabaseServiceRoleKey = _readEnv('SUPABASE_SERVICE_ROLE_KEY');
+final String resolvedSupabaseUrl = _getEnv('SUPABASE_URL', _supabaseUrl);
+final String resolvedSupabaseAnonKey = _getEnv('SUPABASE_ANON_KEY', _supabaseAnonKey);
+final String resolvedSupabaseServiceRoleKey = _getEnv('SUPABASE_SERVICE_ROLE_KEY', _supabaseServiceRoleKey);
 
 void _validateSupabaseEnv() {
-  if (_supabaseUrl.isEmpty || _supabaseAnonKey.isEmpty) {
+  if (resolvedSupabaseUrl.isEmpty || resolvedSupabaseAnonKey.isEmpty) {
     throw StateError(
       'SUPABASE_URL and SUPABASE_ANON_KEY must be set in environment variables.',
     );
@@ -25,8 +28,8 @@ void _validateSupabaseEnv() {
 
 final SupabaseClient supabase = (() {
   _validateSupabaseEnv();
-  final key = _supabaseServiceRoleKey.isNotEmpty ? _supabaseServiceRoleKey : _supabaseAnonKey;
-  return SupabaseClient(_supabaseUrl, key);
+  final key = resolvedSupabaseServiceRoleKey.isNotEmpty ? resolvedSupabaseServiceRoleKey : resolvedSupabaseAnonKey;
+  return SupabaseClient(resolvedSupabaseUrl, key);
 })();
 
 /// Helper to get the shop ID for a given user identifier.

@@ -107,12 +107,29 @@ start_services() {
 
     # 5. Main App (Web)
     log_info "💻 Starting Main Flutter App (Port $MAIN_APP_PORT)..."
-    nohup flutter run -d web-server --web-port $MAIN_APP_PORT > flutter_main.log 2>&1 &
+    nohup flutter run -d web-server --web-port $MAIN_APP_PORT --dart-define-from-file=.env > flutter_main.log 2>&1 &
     echo $! > flutter_main.pid
 
     log_info "⌛ Waiting for services to initialize..."
     sleep 5
     check_status
+    
+    echo -e "\n${BLUE}======================================================${NC}"
+    echo -e "${GREEN}All services are running!${NC}"
+    echo -e "${BLUE}Main App (Dashboard):${NC} http://localhost:$MAIN_APP_PORT"
+    echo -e "${BLUE}API/Admin Server:${NC}    http://localhost:$GENKIT_SERVER_PORT"
+    echo -e "${BLUE}Genkit UI:${NC}           http://localhost:$GENKIT_UI_PORT"
+    echo -e "${BLUE}======================================================${NC}"
+    echo -e "\n${YELLOW}Streaming backend logs... Press Ctrl+C to stop all services and exit.${NC}\n"
+
+    # Ensure logs exist so tail doesn't fail
+    touch genkit_server.log flutter_main.log telegram_bot.log
+
+    # Trap Ctrl+C (INT) and termination signals to cleanly stop services
+    trap stop_services EXIT INT TERM
+
+    # Tail the logs continuously
+    tail -f genkit_server.log flutter_main.log telegram_bot.log
 }
 
 check_status() {

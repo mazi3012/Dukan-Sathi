@@ -16,6 +16,9 @@ class InventoryPage extends StatefulWidget {
 class _InventoryPageState extends State<InventoryPage> {
   List<Map<String, dynamic>> _products = [];
   bool _isLoading = true;
+  double _totalValue = 0;
+  String _selectedCategory = 'All';
+  List<String> _categories = ['All', 'Low Stock'];
 
   @override
   void initState() {
@@ -37,8 +40,22 @@ class _InventoryPageState extends State<InventoryPage> {
           .order('name');
       
       if (mounted) {
+        double value = 0;
+        Set<String> cats = {};
+        for (var p in res) {
+          final price = (p['price'] as num?)?.toDouble() ?? 0;
+          final stock = (p['stock_quantity'] as int?) ?? 0;
+          value += price * stock;
+          final cat = p['category'];
+          if (cat != null && cat.toString().isNotEmpty) {
+            cats.add(cat.toString());
+          }
+        }
+
         setState(() {
           _products = List<Map<String, dynamic>>.from(res);
+          _totalValue = value;
+          _categories = ['All', 'Low Stock', ...cats];
           _isLoading = false;
         });
       }
@@ -67,6 +84,9 @@ class _InventoryPageState extends State<InventoryPage> {
             child: Column(
               children: [
                 _buildAppBar(),
+                if (!_isLoading) _buildValuationCard(),
+                if (!_isLoading && _products.isNotEmpty) _buildCategoryFilters(),
+                const SizedBox(height: 10),
                 Expanded(
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
@@ -74,6 +94,7 @@ class _InventoryPageState extends State<InventoryPage> {
                           ? _buildEmptyState()
                           : _buildProductList(),
                 ),
+                const SizedBox(height: 80), // padding for bottom bar
               ],
             ),
           ),
@@ -122,55 +143,197 @@ class _InventoryPageState extends State<InventoryPage> {
     );
   }
 
-  Widget _buildProductList() {
-    return ListView.builder(
+  Widget _buildValuationCard() {
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: _products.length,
-      itemBuilder: (context, index) {
-        final product = _products[index];
-        final name = product['name'] ?? 'Unknown';
-        final price = (product['price'] as num?)?.toDouble() ?? 0;
-        final stock = product['stock_quantity'] ?? 0;
-        final category = product['category'] ?? 'General';
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 15),
-          child: GlassBox(
-            child: ListTile(
-              contentPadding: const EdgeInsets.all(15),
-              leading: Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Iconsax.box, color: AppColors.primary),
-              ),
-              title: Text(
-                name,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              subtitle: Text(
-                category,
-                style: const TextStyle(color: Colors.white54),
-              ),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
+      child: GlassBox(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Text("Total Stock Value", style: TextStyle(color: Colors.white54, fontSize: 14)),
+                  const SizedBox(height: 5),
                   Text(
-                    "₹${price.toStringAsFixed(0)}",
-                    style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 16),
+                    "₹${_totalValue.toStringAsFixed(0)}",
+                    style: const TextStyle(color: AppColors.success, fontSize: 28, fontWeight: FontWeight.bold),
                   ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Iconsax.chart_2, color: AppColors.primary),
+              ),
+            ],
+          ),
+        ),
+      ).animate().slideY(begin: 0.2, curve: Curves.easeOut).fadeIn(),
+    );
+  }
+
+  Widget _buildCategoryFilters() {
+    return Container(
+      height: 60,
+      margin: const EdgeInsets.only(top: 20),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: _categories.length,
+        itemBuilder: (context, index) {
+          final cat = _categories[index];
+          final isSelected = _selectedCategory == cat;
+          final isLowStock = cat == 'Low Stock';
+          
+          return GestureDetector(
+            onTap: () => setState(() => _selectedCategory = cat),
+            child: Container(
+              margin: const EdgeInsets.only(right: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                color: isSelected 
+                    ? (isLowStock ? AppColors.error : AppColors.primary)
+                    : Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected ? Colors.transparent : Colors.white10,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Row(
+                children: [
+                  if (isLowStock) ...[
+                    const Icon(Iconsax.warning_2, size: 16, color: Colors.white),
+                    const SizedBox(width: 6),
+                  ],
                   Text(
-                    "Stock: $stock",
+                    cat,
                     style: TextStyle(
-                      color: stock < 10 ? AppColors.error : Colors.white54,
-                      fontSize: 12,
+                      color: isSelected ? Colors.white : Colors.white70,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                 ],
+              ),
+            ),
+          ).animate().fadeIn(delay: (index * 50).ms);
+        },
+      ),
+    );
+  }
+
+  Future<void> _restockProduct(Map<String, dynamic> product) async {
+    final newStock = (product['stock_quantity'] as int? ?? 0) + 10;
+    try {
+      await supabase.from('products').update({'stock_quantity': newStock}).eq('id', product['id']);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Restocked +10 for ${product['name']}', style: const TextStyle(color: Colors.white)), backgroundColor: AppColors.success));
+      _fetchProducts();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to restock: $e'), backgroundColor: AppColors.error));
+    }
+  }
+
+  Widget _buildProductList() {
+    final filtered = _products.where((p) {
+      if (_selectedCategory == 'All') return true;
+      if (_selectedCategory == 'Low Stock') return (p['stock_quantity'] as int? ?? 0) < 10;
+      return p['category'] == _selectedCategory;
+    }).toList();
+
+    if (filtered.isEmpty) {
+      return Center(
+        child: Text("No products in '$_selectedCategory'", style: const TextStyle(color: Colors.white54)),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: filtered.length,
+      itemBuilder: (context, index) {
+        final product = filtered[index];
+        final name = product['name'] ?? 'Unknown';
+        final price = (product['price'] as num?)?.toDouble() ?? 0;
+        final stock = product['stock_quantity'] as int? ?? 0;
+        final category = product['category'] ?? 'General';
+        final isLowStock = stock < 10;
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 15),
+          child: Dismissible(
+            key: Key(product['id'].toString()),
+            direction: DismissDirection.endToStart,
+            background: Container(
+              padding: const EdgeInsets.only(right: 20),
+              alignment: Alignment.centerRight,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text("Restock +10", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  SizedBox(width: 10),
+                  Icon(Iconsax.add_circle, color: Colors.white),
+                ],
+              ),
+            ),
+            confirmDismiss: (direction) async {
+              await _restockProduct(product);
+              return false; // don't remove from list
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: isLowStock ? [
+                  BoxShadow(color: AppColors.error.withOpacity(0.2), blurRadius: 15, spreadRadius: 2)
+                ] : null,
+              ),
+              child: GlassBox(
+                child: ListTile(
+                  contentPadding: const EdgeInsets.all(15),
+                  leading: Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: isLowStock ? AppColors.error.withOpacity(0.1) : AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Iconsax.box, color: isLowStock ? AppColors.error : AppColors.primary),
+                  ),
+                  title: Text(
+                    name,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  subtitle: Text(
+                    category,
+                    style: const TextStyle(color: Colors.white54),
+                  ),
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        "₹${price.toStringAsFixed(0)}",
+                        style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      Text(
+                        "Stock: $stock",
+                        style: TextStyle(
+                          color: isLowStock ? AppColors.error : Colors.white54,
+                          fontSize: 12,
+                          fontWeight: isLowStock ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
