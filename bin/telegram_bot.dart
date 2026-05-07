@@ -17,6 +17,8 @@ import 'package:dukansathi_new/models/draft_approval.dart';
 import 'package:dukansathi_new/tools/inventory_tools.dart';
 import 'package:dukansathi_new/tools/utility_tools.dart';
 import 'package:dukansathi_new/tools/expense_tools.dart';
+import 'package:dukansathi_new/tools/customer_tools.dart';
+import 'package:dukansathi_new/tools/invoice_lookup_tools.dart';
 import 'package:genkit/genkit.dart';
 import 'package:teledart/teledart.dart' as tg;
 import 'package:teledart/model.dart' as tg;
@@ -51,7 +53,8 @@ const String _systemPrompt =
   "10. For product deletion, use deleteProduct and always include 'Delete Request ID: [ID]' in the response so Telegram can show approval buttons.\n"
   "11. For weather, use getWeather. If the user hasn't provided a 6-digit PIN code, ask for it first.\n"
   "12. For reminders, use setReminder. First, ALWAYS ask the user if they want a 'heads-up' 25 mins early. AFTER they answer YES or NO, YOU MUST execute the setReminder tool to save it. Never just say it is set without calling the tool.\n"
-  "13. For shop expenses (rent, electricity, repairs), use logExpense to record them, and getExpenses to retrieve or check past expenses.";
+  "13. For shop expenses (rent, electricity, repairs), use logExpense to record them, and getExpenses to retrieve or check past expenses.\n"
+  "14. For customer dues, balances, or payments, use checkCustomerDue, listCustomersDue, recordPayment, and invoiceLookup.";
 
 DateTime _nowIst() => DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
 
@@ -80,6 +83,10 @@ final weatherTool = getWeather;
 final reminderTool = setReminder;
 final expenseTool = logExpense;
 final getExpensesTool = getExpenses;
+final checkCustomerDueTool = checkCustomerDue;
+final listCustomersDueTool = listCustomersDue;
+final recordPaymentTool = recordPayment;
+final invoiceLookupTool = invoiceLookup;
 
 // ─── HELPER: check if user has already completed onboarding ────────────────
 Future<bool> _isUserOnboarded(int chatId) async {
@@ -718,6 +725,22 @@ class Chat {
       n.contains('date range') || n.contains('between') || n.contains('from ') || n.contains('to ');
   }
 
+  bool _isCustomerDueIntent(String input) {
+    final n = input.toLowerCase();
+    return n.contains('due') || n.contains('owe') || n.contains('owes') || 
+           n.contains('balance') || n.contains('settle') || n.contains('udhar') ||
+           n.contains('baki') || n.contains('how much does') || n.contains('payment received') ||
+           n.contains('received payment') || n.contains('customer paid') ||
+           n.contains('just paid') || n.contains('who owes');
+  }
+
+  bool _isInvoiceLookupIntent(String input) {
+    final n = input.toLowerCase();
+    return n.contains('lookup') || n.contains('find bill') || n.contains('past invoice') ||
+           n.contains('show bill') || n.contains('unpaid invoice') || n.contains('unpaid bill') ||
+           n.contains('search invoice') || n.contains('old invoice') || n.contains('last bill');
+  }
+
   bool _isAddProductIntent(String input) {
     final n = input.toLowerCase();
     return n.contains('add product') || n.contains('add item') || n.contains('new product') ||
@@ -962,6 +985,10 @@ class Chat {
       selectedTools = ['setReminder'];
     } else if (_isExpenseIntent(input)) {
       selectedTools = ['logExpense', 'getExpenses'];
+    } else if (_isCustomerDueIntent(input)) {
+      selectedTools = ['checkCustomerDue', 'listCustomersDue', 'recordPayment', 'invoiceLookup'];
+    } else if (_isInvoiceLookupIntent(input)) {
+      selectedTools = ['invoiceLookup'];
     }
 
     Future<dynamic> runGenerate() => ai.generate(
@@ -1845,6 +1872,10 @@ Future<void> main(List<String> arguments) async {
           weatherTool.name,
           reminderTool.name,
           expenseTool.name,
+          checkCustomerDueTool.name,
+          listCustomersDueTool.name,
+          recordPaymentTool.name,
+          invoiceLookupTool.name,
         ],
         systemPrompt: _systemPrompt,
         userIdentifier: userIdentifier,

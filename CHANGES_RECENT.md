@@ -62,3 +62,11 @@ Date: 2026-04-23
 - Refactored billing draft creation into a reusable request function and added fuzzy product matching for shorthand names.
 - Added deterministic billing parsing in Telegram for common messages like `Make a bill for 2 parle g biscuit` to reduce model-only fallback failures.
 - Updated Genkit UI/server views to surface flows, tools, and functions for easier system tracking.
+Customer Intelligence & Due Management
+Date: 2026-05-07
+
+- Created Phase 5 Customer Intelligence integration.
+- Added `payments` table to Supabase with proper RLS constraints.
+- Implemented `checkCustomerDue`, `listCustomersDue`, `recordPayment`, and `invoiceLookup` in new Genkit tools.
+- Refined intent routing in `bin/telegram_bot.dart` and `lib/flows/retail_assistant.dart` using specific keywords (due, balance, baki, udhar) to avoid conflict with normal invoice and expense intents.
+- Documented changes in `docs/PHASE5_CUSTOMER_INTELLIGENCE.md`.

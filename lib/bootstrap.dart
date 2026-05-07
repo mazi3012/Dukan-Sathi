@@ -4,6 +4,8 @@ import 'tools/billing_tools.dart';
 import 'tools/inventory_tools.dart';
 import 'tools/utility_tools.dart';
 import 'tools/expense_tools.dart';
+import 'tools/customer_tools.dart';
+import 'tools/invoice_lookup_tools.dart';
 
 void initializeBackend() {
   checkInventory;
@@ -16,5 +18,9 @@ void initializeBackend() {
   setReminder;
   logExpense;
   getExpenses;
+  checkCustomerDue;
+  listCustomersDue;
+  recordPayment;
+  invoiceLookup;
   retailAssistantFlow;
 }

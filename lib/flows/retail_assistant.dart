@@ -57,6 +57,28 @@ final retailAssistantFlow = ai.defineFlow(
       toolNames.add('logExpense');
       toolNames.add('getExpenses');
     }
+    if (normalizedPrompt.contains('due') ||
+        normalizedPrompt.contains('owe') ||
+        normalizedPrompt.contains('balance') ||
+        normalizedPrompt.contains('settle') ||
+        normalizedPrompt.contains('udhar') ||
+        normalizedPrompt.contains('baki') ||
+        normalizedPrompt.contains('who owes') ||
+        normalizedPrompt.contains('just paid') ||
+        normalizedPrompt.contains('customer paid')) {
+      toolNames.add('checkCustomerDue');
+      toolNames.add('listCustomersDue');
+      toolNames.add('recordPayment');
+      toolNames.add('invoiceLookup');
+    }
+    if (normalizedPrompt.contains('lookup') ||
+        normalizedPrompt.contains('find bill') ||
+        normalizedPrompt.contains('past invoice') ||
+        normalizedPrompt.contains('show bill') ||
+        normalizedPrompt.contains('unpaid invoice') ||
+        normalizedPrompt.contains('last bill')) {
+      toolNames.add('invoiceLookup');
+    }
 
     final response = await ai.generate(
       model: appModel(),
@@ -72,7 +94,8 @@ final retailAssistantFlow = ai.defineFlow(
                   "3. For business analytics (revenue, profit, orders), use businessInsightsTool. Present results clearly: 'Total Revenue: ₹X | Orders: Y'.\n"
                   "4. For product additions, use proposeProducts. For deletions, use requestProductDeletion. Both require human approval.\n"
                   "5. For expenses, use logExpense and getExpenses.\n"
-                  "6. Use India Standard Time for all date-based queries. Reply concisely and professionally.\n"
+                  "6. For customer dues, balances, or payments, use checkCustomerDue, listCustomersDue, recordPayment, and invoiceLookup.\n"
+                  "7. Use India Standard Time for all date-based queries. Reply concisely and professionally.\n"
                   "Summarize the action taken and mention that an interactive card will appear for their final approval.",
             ),
           ],

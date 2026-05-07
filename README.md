@@ -59,6 +59,9 @@ dart run bin/telegram_bot.dart
 - `browseCatalogTool`: Lists available products, optional category filter.
 - `createDraftInvoice`: Creates draft invoices in `draft_invoices`.
 - `businessInsightsTool`: Revenue and invoice count analytics.
+- `checkCustomerDue` / `listCustomersDue`: Queries customer balances and un-paid invoices.
+- `recordPayment`: Records incoming payments and updates customer balance.
+- `invoiceLookup`: Searches past invoices by number, customer, or payment status.
 
 ## Supabase Schema & Security
 

@@ -107,7 +107,7 @@ start_services() {
 
     # 5. Main App (Web)
     log_info "💻 Starting Main Flutter App (Port $MAIN_APP_PORT)..."
-    nohup flutter run -d web-server --web-port $MAIN_APP_PORT --dart-define-from-file=.env > flutter_main.log 2>&1 &
+    nohup flutter run -d web-server --web-port $MAIN_APP_PORT --no-dds --dart-define-from-file=.env > flutter_main.log 2>&1 &
     echo $! > flutter_main.pid
 
     log_info "⌛ Waiting for services to initialize..."
