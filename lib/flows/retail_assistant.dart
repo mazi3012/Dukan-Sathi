@@ -10,21 +10,33 @@ final retailAssistantFlow = ai.defineFlow(
   fn: (prompt, context) async {
     final normalizedPrompt = prompt.toLowerCase();
     final toolNames = <String>[];
+    
     if (normalizedPrompt.contains('bill') ||
         normalizedPrompt.contains('invoice') ||
         normalizedPrompt.contains('draft')) {
       toolNames.add('createDraftInvoice');
     }
+    
     if (normalizedPrompt.contains('price') ||
         normalizedPrompt.contains('stock') ||
         normalizedPrompt.contains('inventory')) {
       toolNames.add('checkInventory');
     }
+    
+    if (normalizedPrompt.contains('browse') ||
+        normalizedPrompt.contains('catalog') ||
+        normalizedPrompt.contains('what do you sell') ||
+        normalizedPrompt.contains('list product') ||
+        normalizedPrompt.contains('show me item')) {
+      toolNames.add('browseCatalogTool');
+    }
+    
     if (normalizedPrompt.contains('add') ||
         normalizedPrompt.contains('create') ||
         normalizedPrompt.contains('new product')) {
       toolNames.add('proposeProducts');
     }
+    
     if (normalizedPrompt.contains('delete') ||
         normalizedPrompt.contains('remove') ||
         normalizedPrompt.contains('archive') ||
@@ -32,6 +44,7 @@ final retailAssistantFlow = ai.defineFlow(
         normalizedPrompt.contains('kill product')) {
       toolNames.add('requestProductDeletion');
     }
+    
     if (normalizedPrompt.contains('revenue') ||
         normalizedPrompt.contains('sales') ||
         normalizedPrompt.contains('profit') ||
@@ -48,6 +61,7 @@ final retailAssistantFlow = ai.defineFlow(
         normalizedPrompt.contains('order')) {
       toolNames.add('businessInsightsTool');
     }
+    
     if (normalizedPrompt.contains('expense') ||
         normalizedPrompt.contains('spent') ||
         normalizedPrompt.contains('bill paid') ||
@@ -57,6 +71,7 @@ final retailAssistantFlow = ai.defineFlow(
       toolNames.add('logExpense');
       toolNames.add('getExpenses');
     }
+    
     if (normalizedPrompt.contains('due') ||
         normalizedPrompt.contains('owe') ||
         normalizedPrompt.contains('balance') ||
@@ -71,6 +86,7 @@ final retailAssistantFlow = ai.defineFlow(
       toolNames.add('recordPayment');
       toolNames.add('invoiceLookup');
     }
+    
     if (normalizedPrompt.contains('lookup') ||
         normalizedPrompt.contains('find bill') ||
         normalizedPrompt.contains('past invoice') ||
@@ -88,14 +104,15 @@ final retailAssistantFlow = ai.defineFlow(
           content: [
             TextPart(
                 text:
-                  "You are the AI brain for Dukan Sathi Pro. Shop ID is 'b6ff658b-c750-4c9a-b9ce-909ef6c52674'. CRITICAL RULES:\n"
+                  "You are the AI brain for Dukan Sathi Pro. CRITICAL RULES:\n"
                   "1. When a user asks about prices or stock, use checkInventory.\n"
-                  "2. When a user asks to create a bill/invoice, use createDraftInvoice. IMPORTANT: If a customer name is mentioned (e.g., 'bill for Rahul'), pass it as 'customerName'. ALWAYS pass the raw user prompt as 'userPrompt' to this tool.\n"
-                  "3. For business analytics (revenue, profit, orders), use businessInsightsTool. Present results clearly: 'Total Revenue: ₹X | Orders: Y'.\n"
-                  "4. For product additions, use proposeProducts. For deletions, use requestProductDeletion. Both require human approval.\n"
-                  "5. For expenses, use logExpense and getExpenses.\n"
-                  "6. For customer dues, balances, or payments, use checkCustomerDue, listCustomersDue, recordPayment, and invoiceLookup.\n"
-                  "7. Use India Standard Time for all date-based queries. Reply concisely and professionally.\n"
+                  "2. When a user asks to see your catalog or list products, use browseCatalogTool.\n"
+                  "3. When a user asks to create a bill/invoice, use createDraftInvoice. IMPORTANT: If a customer name is mentioned (e.g., 'bill for Rahul'), pass it as 'customerName'. ALWAYS pass the raw user prompt as 'userPrompt' to this tool.\n"
+                  "4. For business analytics (revenue, profit, orders), use businessInsightsTool. Present results clearly: 'Total Revenue: ₹X | Orders: Y | Approved: Z'.\n"
+                  "5. For product additions, use proposeProducts. For deletions, use requestProductDeletion. Both require human approval.\n"
+                  "6. For expenses, use logExpense and getExpenses.\n"
+                  "7. For customer dues, balances, or payments, use checkCustomerDue, listCustomersDue, recordPayment, and invoiceLookup.\n"
+                  "8. Use India Standard Time for all date-based queries. Reply concisely and professionally.\n"
                   "Summarize the action taken and mention that an interactive card will appear for their final approval.",
             ),
           ],
@@ -106,8 +123,10 @@ final retailAssistantFlow = ai.defineFlow(
         ),
       ],
       toolNames: toolNames,
+      context: context.context,
     );
 
     return response.text;
   },
 );
+

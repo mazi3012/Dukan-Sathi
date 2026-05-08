@@ -404,37 +404,65 @@ List<Map<String, dynamic>> _parseBulkProductDraft(String text) {
     var line = rawLine.trim();
     if (line.isEmpty) continue;
 
-    line = line.replaceFirst(RegExp(r'^[\-\*\d\s\.)\]]+'), '');
-    if (!line.contains('|') && !line.contains(',')) {
-      continue;
+    // Remove list markers and common prefixes
+    line = line.replaceAll(RegExp(r'^\s*[\-\*•\d\s\.)\]]+\s*|^(add product|add item|new product|new item)\s*[:\-]?\s*', caseSensitive: false), '').trim();
+    if (line.isEmpty) continue;
+
+    final product = <String, dynamic>{};
+
+    // Check for delimited format: "Name | Price | Category | Stock"
+    if (line.contains('|')) {
+      final parts = line.split('|').map((p) => p.trim()).toList();
+      if (parts.isNotEmpty) product['name'] = parts[0];
+      if (parts.length > 1) product['price'] = double.tryParse(parts[1].replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+      if (parts.length > 2) product['category'] = parts[2];
+      if (parts.length > 3) product['stock_quantity'] = int.tryParse(parts[3].replaceAll(RegExp(r'[^\d]'), '')) ?? 0;
+    } else if (line.contains(',') && !line.contains(':')) {
+       // Old comma-separated format: "Name, Price, Category, Stock"
+       final parts = line.split(',').map((p) => p.trim()).toList();
+       if (parts.isNotEmpty) product['name'] = parts[0];
+       if (parts.length > 1) product['price'] = double.tryParse(parts[1].replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+       if (parts.length > 2) product['category'] = parts[2];
+       if (parts.length > 3) product['stock_quantity'] = int.tryParse(parts[3].replaceAll(RegExp(r'[^\d]'), '')) ?? 0;
+    } else {
+      // Natural language key-value parsing
+      // Name (first part before any comma or colon)
+      final nameMatch = RegExp(r'^([^,:]+)').firstMatch(line);
+      if (nameMatch != null) product['name'] = nameMatch.group(1)!.trim();
+      
+      // Find Price
+      final priceMatch = RegExp(r'(?:price|at|rs\.?|₹)\s*[:\-]?\s*(\d+(?:\.\d+)?)', caseSensitive: false).firstMatch(line);
+      if (priceMatch != null) product['price'] = double.tryParse(priceMatch.group(1)!);
+      
+      // Find Category
+      final catMatch = RegExp(r'category\s*[:\-]?\s*([a-z0-9\s]+)', caseSensitive: false).firstMatch(line);
+      if (catMatch != null) product['category'] = catMatch.group(1)!.trim();
+      
+      // Find Stock
+      final stockMatch = RegExp(r'(?:stock|qty|quantity)\s*[:\-]?\s*(\d+)', caseSensitive: false).firstMatch(line);
+      if (stockMatch != null) product['stock_quantity'] = int.tryParse(stockMatch.group(1)!);
+      
+      // Find GST
+      final gstMatch = RegExp(r'gst\s*[:\-]?\s*(\d+)', caseSensitive: false).firstMatch(line);
+      if (gstMatch != null) product['gst_rate'] = double.tryParse(gstMatch.group(1)!);
     }
 
-    final parts = line.contains('|')
-        ? line.split('|').map((part) => part.trim()).where((part) => part.isNotEmpty).toList()
-        : line.split(',').map((part) => part.trim()).where((part) => part.isNotEmpty).toList();
-
-    if (parts.length < 3) continue;
-
-    final name = parts[0];
-    final priceText = parts[1].replaceAll(RegExp(r'[^0-9.]'), '');
-    final price = double.tryParse(priceText);
-    final category = parts[2];
-    final stockText = parts.length >= 4 ? parts[3].replaceAll(RegExp(r'[^0-9]'), '') : '0';
-    final stock = int.tryParse(stockText) ?? 0;
-    final description = parts.length >= 5 ? parts.sublist(4).join(' | ') : null;
-
-    if (name.isEmpty || price == null || category.isEmpty) continue;
-
-    products.add({
-      'name': name,
-      'price': price,
-      'stock_quantity': stock,
-      'category': category,
-      if (description != null && description.isNotEmpty) 'description': description,
-      'is_service': false,
-      'gst_rate': 0,
-      'metadata': {},
-    });
+    if (product.containsKey('name') && product['name']!.toString().isNotEmpty) {
+      product['price'] ??= 0.0;
+      product['category'] ??= 'General';
+      product['stock_quantity'] ??= 0;
+      product['gst_rate'] ??= 0.0;
+      
+      products.add({
+        'name': product['name'],
+        'price': product['price'],
+        'stock_quantity': product['stock_quantity'],
+        'category': product['category'],
+        'gst_rate': product['gst_rate'],
+        'is_service': false,
+        'metadata': {},
+      });
+    }
   }
 
   return products;

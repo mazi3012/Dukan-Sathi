@@ -63,7 +63,7 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
         MessageType? cardType;
         if (card != null) {
           final type = card['type'] as String?;
-          if (type == 'inventory') {
+          if (type == 'inventory' || type == 'batch') {
             cardType = MessageType.aiDraftInventory;
           } else if (type == 'invoice') {
             cardType = MessageType.aiDraftInvoice;

@@ -15,8 +15,12 @@ import 'package:dukansathi_new/services/invoice_pdf_generator.dart';
 import 'package:genkit/genkit.dart';
 
 Future<void> main(List<String> arguments) async {
-  // Initialize all tools and flows
-  initializeBackend();
+  print('--- Genkit Server Initializing ---');
+  try {
+    initializeBackend();
+  } catch (e) {
+    print('❌ Error during initializeBackend: $e');
+  }
   
   // Get port from environment or use default
   final port = int.tryParse(Platform.environment['PORT'] ?? '3100') ?? 3100;
@@ -182,8 +186,9 @@ Future<void> main(List<String> arguments) async {
           final input = data['input'] as String?;
           
           if (key == '/flow/retailAssistantFlow' && input != null) {
-            // Run the retail assistant flow
-            final result = await retailAssistantFlow(input);
+            // Run the retail assistant flow with context
+            final userId = data['userId']?.toString() ?? 'web-user';
+            final result = await retailAssistantFlow(input, context: {'userIdentifier': userId});
             request.response
               ..statusCode = 200
               ..headers.contentType = ContentType.json
@@ -361,6 +366,37 @@ Future<void> main(List<String> arguments) async {
         } catch (e) {
           request.response..statusCode = 500..write(e.toString())..close();
         }
+      } else if (request.method == 'POST' && request.uri.path == '/api/approve-batch') {
+        // ─── APPROVE PRODUCT BATCH ───────────────────────────────────────
+        var body = await utf8.decodeStream(request);
+        try {
+          final data = jsonDecode(body) as Map<String, dynamic>;
+          final batchId = data['batchId'] as String;
+          final reviewedBy = data['userId'] ?? 'web-user';
+          
+          final result = await approveProductBatch(batchId: batchId, reviewedBy: reviewedBy);
+          
+          request.response
+            ..statusCode = 200
+            ..headers.contentType = ContentType.json
+            ..write(jsonEncode(result))
+            ..close();
+        } catch (e) {
+          request.response..statusCode = 500..write(e.toString())..close();
+        }
+      } else if (request.method == 'GET' && request.uri.path == '/api/get-batch') {
+        // ─── GET BATCH DETAILS ───────────────────────────────────────────
+        final batchId = request.uri.queryParameters['batchId'];
+        if (batchId == null) {
+          request.response..statusCode = 400..close();
+          return;
+        }
+        final batch = await supabase.from('draft_product_batches').select().eq('id', batchId).maybeSingle();
+        request.response
+          ..statusCode = batch != null ? 200 : 404
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode(batch))
+          ..close();
       } else if (request.method == 'POST' && request.uri.path == '/api/verify-code') {
         // ─── MAGIC CODE LOGIN VERIFICATION ──────────────────────────────
         var body = await utf8.decodeStream(request);
@@ -603,13 +639,14 @@ const String _webSystemPrompt =
   "2. If inventory/catalog is empty, say so plainly — never invent sample products. "
   "3. No narration (never say 'I am checking' or 'Let me look up'). Use tools silently, output final result only. "
   "4. If you create a draft invoice, ALWAYS include the Approval ID. "
-  "5. customerId, customerName, and customerState are OPTIONAL — do NOT ask for them; call the tool immediately. "
-  "6. For specific product lookups, use checkInventory. For full product lists, use browseCatalogTool. "
-  "7. For business analytics (revenue, orders, approval status), use businessInsightsTool. "
-  "8. Present analytics in clear format: 'Total Revenue: ₹X | Orders: Y | Approved: Z'. "
-  "9. For product deletion, use deleteProduct. "
-  "10. For shop expenses, use logExpense to record and getExpenses to retrieve. "
-  "11. Always reply concisely in a friendly, professional manner.";
+  "5. If you propose adding products, ALWAYS include the Batch ID in the response. "
+  "6. customerId, customerName, and customerState are OPTIONAL — do NOT ask for them; call the tool immediately. "
+  "7. For specific product lookups, use checkInventory. For full product lists, use browseCatalogTool. "
+  "8. For business analytics (revenue, orders, approval status), use businessInsightsTool. "
+  "9. Present analytics in clear format: 'Total Revenue: ₹X | Orders: Y | Approved: Z'. "
+  "10. For product additions, use proposeProducts. For product deletion, use requestProductDeletion. "
+  "11. For shop expenses, use logExpense to record and getExpenses to retrieve. "
+  "12. Always reply concisely in a friendly, professional manner.";
 
 DateTime _nowIst() => DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
 String _twoDigits(int v) => v.toString().padLeft(2, '0');
@@ -634,7 +671,11 @@ class WebChatSession {
   bool _isCatalogIntent(String n) => n.contains('what item') || n.contains('what items') || n.contains('catalog') || n.contains('list product') ||
       n.contains('show product') || n.contains('show item') || n.contains('what do you have') || n.contains('what do we have') ||
       n.contains('items do we have') || n.contains('items do you have') || n.contains('our product') || n.contains('our inventory') ||
-      n.contains('show inventory') || n.contains('view product') || n.contains('what do you sell') || n.contains('what do we sell');
+      n.contains('show inventory') || n.contains('view product') || n.contains('what do you sell') || n.contains('what do we sell') ||
+      n.contains('browse');
+  bool _isAddProductIntent(String n) => n.contains('add product') || n.contains('add item') || n.contains('new product') ||
+      n.contains('new item') || n.contains('create product') || n.contains('add service') ||
+      n.contains('add these') || n.contains('bulk add') || n.contains('upload');
   bool _isInventoryIntent(String n) => n.contains('stock') || n.contains('inventory') || n.contains('price') || n.contains('how many') || n.contains('quantity');
   bool _isBillingIntent(String n) => n.contains('bill') || n.contains('invoice') || n.contains('draft');
   bool _isAnalyticsIntent(String n) => n.contains('revenue') || n.contains('sales') || n.contains('analytics') || n.contains('insight') ||
@@ -678,6 +719,64 @@ class WebChatSession {
     }
     if (nameTokens.isEmpty) return null;
     return nameTokens.map((t) => t[0].toUpperCase() + t.substring(1)).join(' ');
+  }
+
+  List<Map<String, dynamic>> _parseAddProductRequest(String input) {
+    final text = input.toLowerCase().trim();
+    // Example: "Add product: Det Soap, price 48, category General, stock 150, gst 18%"
+    // We look for name, price, category, stock/quantity, gst
+    
+    final products = <Map<String, dynamic>>[];
+    
+    // Split by newlines or list markers if it looks like a list
+    final lines = text.split(RegExp(r'\n|(?=\-)'));
+    
+    for (var line in lines) {
+      line = line.replaceAll(RegExp(r'^\s*[\-\*•]\s*|^(add product|add item|new product|new item)\s*[:\-]?\s*', caseSensitive: false), '').trim();
+      if (line.isEmpty) continue;
+      
+      // Try to parse key-value pairs or delimited format
+      final product = <String, dynamic>{};
+      
+      // Check for delimited format: "Name | Price | Category | Stock"
+      if (line.contains('|')) {
+        final parts = line.split('|').map((p) => p.trim()).toList();
+        if (parts.isNotEmpty) product['name'] = parts[0];
+        if (parts.length > 1) product['price'] = double.tryParse(parts[1].replaceAll(RegExp(r'[^\d.]'), '')) ?? 0.0;
+        if (parts.length > 2) product['category'] = parts[2];
+        if (parts.length > 3) product['stock_quantity'] = int.tryParse(parts[3].replaceAll(RegExp(r'[^\d]'), '')) ?? 0;
+      } else {
+        // Try to find Name
+        final nameMatch = RegExp(r'^([^,:]+)').firstMatch(line);
+        if (nameMatch != null) product['name'] = nameMatch.group(1)!.trim();
+        
+        // Find Price
+        final priceMatch = RegExp(r'(?:price|at|rs\.?|₹)\s*[:\-]?\s*(\d+(?:\.\d+)?)', caseSensitive: false).firstMatch(line);
+        if (priceMatch != null) product['price'] = double.tryParse(priceMatch.group(1)!);
+        
+        // Find Category
+        final catMatch = RegExp(r'category\s*[:\-]?\s*([a-z0-9\s]+)', caseSensitive: false).firstMatch(line);
+        if (catMatch != null) product['category'] = catMatch.group(1)!.trim();
+        
+        // Find Stock
+        final stockMatch = RegExp(r'(?:stock|qty|quantity)\s*[:\-]?\s*(\d+)', caseSensitive: false).firstMatch(line);
+        if (stockMatch != null) product['stock_quantity'] = int.tryParse(stockMatch.group(1)!);
+        
+        // Find GST
+        final gstMatch = RegExp(r'gst\s*[:\-]?\s*(\d+)', caseSensitive: false).firstMatch(line);
+        if (gstMatch != null) product['gst_rate'] = double.tryParse(gstMatch.group(1)!);
+      }
+      
+      if (product.containsKey('name') && product['name']!.toString().isNotEmpty) {
+        // Defaults
+        product['price'] ??= 0.0;
+        product['category'] ??= 'General';
+        product['stock_quantity'] ??= 0;
+        products.add(product);
+      }
+    }
+    
+    return products;
   }
 
   // ─── MAIN MESSAGE HANDLER ─────────────────────────────────────────────
@@ -736,8 +835,31 @@ class WebChatSession {
       }
     }
 
-    // Inventory (specific product lookup)
-    if (_isInventoryIntent(n) && !_isBillingIntent(n)) {
+    // Add product intent → direct tool call (MUST be checked before inventory!)
+    if (_isAddProductIntent(n)) {
+      final products = _parseAddProductRequest(input);
+      if (products.isNotEmpty) {
+        try {
+          final result = await createProductBatchRequest(
+            userIdentifier: userIdentifier,
+            products: products,
+          );
+          final text = 'Product draft created! Batch ID: ${result['batchId']}';
+          _addToHistory(input, text);
+          return {
+            'text': text,
+            'card': {'type': 'batch', ...result},
+          };
+        } catch (e) {
+          final text = '⚠️ Error creating product draft: $e';
+          _addToHistory(input, text);
+          return {'text': text};
+        }
+      }
+    }
+
+    // Inventory (specific product lookup) — skip if it's an add/billing intent
+    if (_isInventoryIntent(n) && !_isBillingIntent(n) && !_isAddProductIntent(n)) {
       final query = _extractInventoryQuery(input);
       final products = await findInventoryProducts(query.isEmpty ? input : query, shopId!);
       if (products.isEmpty) {
