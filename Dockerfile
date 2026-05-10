@@ -1,44 +1,35 @@
-# Stage 1: Build Flutter Web
-FROM debian:latest AS build-env
+# ─── Stage 1: Build Flutter Web ───────────────────────────────────────────────
+# Use the official Flutter image (has Flutter + Dart SDK pre-installed)
+FROM ghcr.io/cirruslabs/flutter:stable AS build-env
 
-# Install dependencies
-RUN apt-get update && apt-get install -y \
-    curl git wget unzip xz-utils libglu1-mesa \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# Run as root (required for system-level operations on Render)
+USER root
 
-# Install Flutter
-RUN git clone https://github.com/flutter/flutter.git -b stable /usr/local/flutter
-ENV PATH="/usr/local/flutter/bin:/usr/local/flutter/bin/cache/dart-sdk/bin:${PATH}"
-RUN flutter precache --web
-
-# Set up working directory
 WORKDIR /app
 
 # Copy the entire project
 COPY . .
 
-# Build Flutter web
+# Build Flutter web app
 RUN flutter pub get
-RUN flutter build web --release
+RUN flutter build web --release --no-sound-null-safety 2>/dev/null || flutter build web --release
 
-# Stage 2: Runtime
+# ─── Stage 2: Dart Backend Runtime ────────────────────────────────────────────
 FROM dart:stable AS runtime
 
 WORKDIR /app
 
-# Copy project files for backend
+# Copy the full source from the build stage
 COPY --from=build-env /app /app
 
-# Build the backend executable
+# Get backend dependencies and compile the server binary
 RUN dart pub get
 RUN dart compile exe bin/genkit_server.dart -o bin/server
 
-# Ensure the public directory exists and contains the Flutter web build
-RUN mkdir -p public && cp -r build/web/* public/
+# Copy the Flutter web build into the public directory
+RUN mkdir -p public && cp -r build/web/. public/
 
-# Expose the port (Render provides this via PORT env var)
+# Render provides PORT environment variable
 EXPOSE 3100
 
-# Start the unified server
 CMD ["./bin/server"]
