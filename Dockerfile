@@ -5,18 +5,14 @@ FROM dart:stable
 
 WORKDIR /app
 
-# Copy project files
-COPY pubspec.yaml pubspec.lock ./
+# Copy the server-only pubspec (no Flutter SDK deps)
+COPY pubspec_server.yaml pubspec.yaml
+
+# Copy source code
 COPY lib/ lib/
 COPY bin/ bin/
 
-# Get dependencies (dart pub, not flutter pub)
-# Override flutter SDK dependency for server-only build
-RUN sed -i '/flutter_test/,/sdk: flutter/d' pubspec.yaml && \
-    sed -i '/flutter:/,/sdk: flutter/d' pubspec.yaml && \
-    sed -i '/uses-material-design/d' pubspec.yaml && \
-    sed -i '/flutter:/d' pubspec.yaml
-
+# Get dependencies using pure Dart (no Flutter SDK needed)
 RUN dart pub get
 
 # Compile the server binary
