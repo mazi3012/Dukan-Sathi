@@ -66,6 +66,7 @@ Future<void> main(List<String> arguments) async {
   print('');
 
   // ─── START TELEGRAM BOT ────────────────────────────────────────────────
+  TelegramService? globalTelegramService;
   final botToken = Platform.environment['TELEGRAM_BOT_TOKEN'];
   if (botToken != null && botToken.isNotEmpty) {
     print('🤖 Initializing Telegram Bot...');
@@ -80,8 +81,6 @@ Future<void> main(List<String> arguments) async {
   } else {
     print('⚠️ TELEGRAM_BOT_TOKEN not found, skipping bot initialization.');
   }
-
-  TelegramService? globalTelegramService;
 
   // ─── WEB CHAT SESSION (mirrors Telegram Chat class) ─────────────────────
   final Map<String, WebChatSession> webSessions = {};
