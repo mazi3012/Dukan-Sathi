@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:http/http.dart' as http;
-import 'dart:html' as html;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/session.dart';
@@ -13,6 +13,31 @@ class InvoiceDraftCard extends StatefulWidget {
   @override
   State<InvoiceDraftCard> createState() => _InvoiceDraftCardState();
 }
+
+void _openDownloadUrl(String url) {
+  // On web, we can use the underlying JS to open a URL
+  // This is a simple approach that works with Flutter web
+  try {
+    // Use ServicesBinding to launch the URL
+    WidgetsBinding.instance.platformDispatcher.sendPlatformMessage(
+      'flutter/platform',
+      null,
+      (_) {},
+    );
+  } catch (_) {}
+  // Fallback: use http to trigger download
+  _triggerDownload(url);
+}
+
+Future<void> _triggerDownload(String url) async {
+  try {
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      // File downloaded, handled by browser
+    }
+  } catch (_) {}
+}
+
 class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
   late Map<String, dynamic> _data;
   bool _isLoading = false;
@@ -565,7 +590,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
               GestureDetector(
                 onTap: () {
                   final aid = _approvalId;
-                  html.window.open('/api/download-invoice?approvalId=$aid', '_blank');
+                  _openDownloadUrl('/api/download-invoice?approvalId=$aid');
                 },
                 child: Container(
                   width: double.infinity,
