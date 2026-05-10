@@ -8,7 +8,7 @@ class UserSession extends ChangeNotifier {
   factory UserSession() => _instance;
   UserSession._();
 
-  static const String _baseUrl = 'http://localhost:3100';
+  static const String _baseUrl = String.fromEnvironment('API_URL', defaultValue: '');
   static const String _userIdKey = 'ds_user_id';
   static const String _userNameKey = 'ds_user_name';
   static const String _shopIdKey = 'ds_shop_id';

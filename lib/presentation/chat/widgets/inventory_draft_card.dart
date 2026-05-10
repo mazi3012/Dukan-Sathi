@@ -58,7 +58,7 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
     try {
       final userId = UserSession().userId;
       final response = await http.post(
-        Uri.parse('http://localhost:3100/api/approve-batch'),
+        Uri.parse('/api/approve-batch'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'batchId': _batchId,

@@ -55,7 +55,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
     setState(() => _isLoading = true);
     try {
       final response = await http.post(
-        Uri.parse('http://localhost:3100/api/update-draft'),
+        Uri.parse('/api/update-draft'),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -68,7 +68,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       if (response.statusCode == 200) {
         // Refresh draft data
         final refreshResp = await http.get(
-          Uri.parse('http://localhost:3100/api/get-draft?approvalId=$aid'),
+          Uri.parse('/api/get-draft?approvalId=$aid'),
         );
         if (refreshResp.statusCode == 200) {
           setState(() {
@@ -185,7 +185,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       final userId = UserSession().userId;
       final aid = _approvalId;
       final response = await http.post(
-        Uri.parse('http://localhost:3100/api/approve-draft'),
+        Uri.parse('/api/approve-draft'),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -565,7 +565,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
               GestureDetector(
                 onTap: () {
                   final aid = _approvalId;
-                  html.window.open('http://localhost:3100/api/download-invoice?approvalId=$aid', '_blank');
+                  html.window.open('/api/download-invoice?approvalId=$aid', '_blank');
                 },
                 child: Container(
                   width: double.infinity,

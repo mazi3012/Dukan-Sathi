@@ -42,7 +42,7 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
     try {
       // 3. Use the SMART /api/chat endpoint (same capabilities as Telegram bot)
       final response = await http.post(
-        Uri.parse('http://localhost:3100/api/chat'),
+        Uri.parse('/api/chat'),
         headers: {
           'Content-Type': 'application/json',
         },
