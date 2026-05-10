@@ -6,7 +6,7 @@ class EnvLoaderImpl implements EnvLoader {
   final DotEnv _env = DotEnv(includePlatformEnvironment: true);
 
   @override
-  DotEnv load() {
+  dynamic load() {
     if (File('.env').existsSync()) {
       _env.load(['.env']);
     }

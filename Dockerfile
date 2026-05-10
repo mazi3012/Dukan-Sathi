@@ -1,35 +1,28 @@
-# ─── Stage 1: Build Flutter Web ───────────────────────────────────────────────
-# Use the official Flutter image (has Flutter + Dart SDK pre-installed)
-FROM ghcr.io/cirruslabs/flutter:stable AS build-env
-
-# Run as root (required for system-level operations on Render)
-USER root
+# ─── Render: Dart Backend Only ────────────────────────────────────────────────
+# Vercel handles the Flutter web frontend separately.
+# This Dockerfile ONLY builds the Dart API server.
+FROM dart:stable
 
 WORKDIR /app
 
-# Copy the entire project
-COPY . .
+# Copy project files
+COPY pubspec.yaml pubspec.lock ./
+COPY lib/ lib/
+COPY bin/ bin/
 
-# Build Flutter web app
-RUN flutter pub get
-RUN flutter build web --release --no-sound-null-safety 2>/dev/null || flutter build web --release
+# Get dependencies (dart pub, not flutter pub)
+# Override flutter SDK dependency for server-only build
+RUN sed -i '/flutter_test/,/sdk: flutter/d' pubspec.yaml && \
+    sed -i '/flutter:/,/sdk: flutter/d' pubspec.yaml && \
+    sed -i '/uses-material-design/d' pubspec.yaml && \
+    sed -i '/flutter:/d' pubspec.yaml
 
-# ─── Stage 2: Dart Backend Runtime ────────────────────────────────────────────
-FROM dart:stable AS runtime
-
-WORKDIR /app
-
-# Copy the full source from the build stage
-COPY --from=build-env /app /app
-
-# Get backend dependencies and compile the server binary
 RUN dart pub get
+
+# Compile the server binary
 RUN dart compile exe bin/genkit_server.dart -o bin/server
 
-# Copy the Flutter web build into the public directory
-RUN mkdir -p public && cp -r build/web/. public/
-
-# Render provides PORT environment variable
+# Expose the port (Render provides PORT env var)
 EXPOSE 3100
 
 CMD ["./bin/server"]
