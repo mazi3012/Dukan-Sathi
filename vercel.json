@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "public": true,
+  "name": "dukan-sathi-pro",
+  "builds": [
+    {
+      "src": "pubspec.yaml",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build/web"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "https://dukan-sathi-pro.onrender.com/api/$1"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "installCommand": "flutter pub get",
+  "buildCommand": "flutter build web --release"
+}

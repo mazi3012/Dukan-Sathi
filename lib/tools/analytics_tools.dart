@@ -159,6 +159,7 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
       'Get comprehensive business analytics including revenue, profit, approval status, and date-range insights in IST. Supports: overview, revenue, profit, approval_status, and time_period.',
   inputSchema: businessInsightsInputSchema,
   fn: (input, context) async {
+    print("Tool Context: \${context.context}");
     final shopId = (input['shopId'] as String?) ?? await getShopIdForUser(context.context?['userIdentifier'] as String?);
     if (shopId.isEmpty) {
       return {
@@ -192,7 +193,7 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
 
       final sales = await supabase
           .from('sales')
-          .select('id, invoice_id, shop_id, amount, subtotal_after_discount, timestamp, status, payment_method')
+          .select('id, invoice_id, shop_id, amount, subtotal_after_discount, timestamp, status, payment_method, customer_id, customer_name')
           .eq('shop_id', shopId)
           .order('timestamp', ascending: false);
 
@@ -310,6 +311,26 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
           .where((record) => record['approval_status'] == 'REJECTED')
           .fold<double>(0.0, (sum, record) => sum + _safeNum(record['proposed_total']));
       final totalRevenue = saleRecords.fold<double>(0.0, (sum, record) => sum + _safeNum(record['amount']));
+      
+      final customerRevenueMap = <String, double>{};
+      final customerNameMap = <String, String>{};
+      for (final record in saleRecords) {
+        final cid = record['customer_id']?.toString();
+        final cname = record['customer_name']?.toString() ?? 'Walk-in';
+        if (cid != null) {
+          customerRevenueMap[cid] = (customerRevenueMap[cid] ?? 0.0) + _safeNum(record['amount']);
+          customerNameMap[cid] = cname;
+        }
+      }
+      String? topCustomerId;
+      double topCustomerRevenue = 0.0;
+      customerRevenueMap.forEach((id, rev) {
+        if (rev > topCustomerRevenue) {
+          topCustomerRevenue = rev;
+          topCustomerId = id;
+        }
+      });
+      final topCustomerName = topCustomerId != null ? customerNameMap[topCustomerId] : null;
 
       final response = <String, dynamic>{
         'status': 'success',
@@ -319,6 +340,8 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
         'fromDate': from?.toIso8601String(),
         'toDate': to?.toIso8601String(),
         'total_revenue': totalRevenue,
+        'top_customer_name': topCustomerName,
+        'top_customer_revenue': topCustomerRevenue,
         'total_orders': saleRecords.length,
         'approved_count': approvedCount,
         'pending_count': pendingCount,

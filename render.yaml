@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: dukan-sathi-pro
+    env: docker
+    plan: free
+    region: singapore # Change as needed
+    dockerCommand: ./bin/server
+    envVars:
+      - key: PORT
+        value: 3100
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: GOOGLE_GENAI_API_KEY
+        sync: false
+      - key: MODEL_ID
+        value: gemini-3.1-flash-lite-preview
+    autoDeploy: true
