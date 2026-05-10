@@ -2,15 +2,6 @@
   "version": 2,
   "public": true,
   "name": "dukan-sathi-pro",
-  "builds": [
-    {
-      "src": "pubspec.yaml",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build/web"
-      }
-    }
-  ],
   "routes": [
     {
       "src": "/api/(.*)",
@@ -24,6 +15,7 @@
       "dest": "/index.html"
     }
   ],
-  "installCommand": "flutter pub get",
-  "buildCommand": "flutter build web --release --dart-define=SUPABASE_URL=$SUPABASE_URL --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
+  "outputDirectory": "build/web",
+  "buildCommand": "bash vercel-build.sh",
+  "installCommand": "echo 'handled in buildCommand'"
 }
