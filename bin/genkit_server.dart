@@ -147,13 +147,14 @@ Future<void> main(List<String> arguments) async {
         print('📩 Received Telegram Update');
         if (globalTelegramService != null) {
           try {
-            final update = jsonDecode(body);
-            // In TeleDart 0.6.1, we manually process the update
-            // Note: This requires a bit of internal trickery or using TeleDart's built-in webhook
-            // For now, we acknowledge receipt.
+            final update = jsonDecode(body) as Map<String, dynamic>;
+            globalTelegramService!.processWebhookUpdate(update);
+            print('✅ Webhook update forwarded to TelegramService');
           } catch (e) {
-            print('❌ Error parsing telegram update: $e');
+            print('❌ Error processing telegram update: $e');
           }
+        } else {
+          print('⚠️ Telegram service not initialized, ignoring update');
         }
         request.response
           ..statusCode = 200

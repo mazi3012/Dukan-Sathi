@@ -27,6 +27,7 @@ import 'package:genkit/genkit.dart';
 
 class TelegramService {
   late tg.TeleDart bot;
+  late tg.Event _event;
   final String token;
   final String model;
 
@@ -59,7 +60,8 @@ class TelegramService {
   TelegramService({required this.token, this.model = 'gemini-3.1-flash-lite-preview'});
 
   Future<void> init() async {
-    bot = tg.TeleDart(token, tg.Event(''));
+    _event = tg.Event('');
+    bot = tg.TeleDart(token, _event);
     _setupHandlers();
     
     print('🤖 Telegram Bot Service Starting...');
@@ -67,6 +69,17 @@ class TelegramService {
     print('✅ Bot is running as @${me.username}');
     
     _startReminderProcessor();
+  }
+
+  /// Process a raw webhook update from Telegram.
+  /// Call this from the HTTP webhook endpoint.
+  void processWebhookUpdate(Map<String, dynamic> updateJson) {
+    try {
+      final update = tg.Update.fromJson(updateJson);
+      _event.emitUpdate(update);
+    } catch (e) {
+      print('❌ Error processing webhook update: $e');
+    }
   }
 
   void _setupHandlers() {
