@@ -221,7 +221,7 @@ class TelegramService {
     // Onboarding check
     final onboarded = await _isUserOnboarded(chatId);
     if (!onboarded && !text.startsWith('/start') && !text.startsWith('ob_')) {
-      final result = await startOnboardingFlow(chatId);
+      final result = await startOnboarding(chatId, message.from?.firstName ?? 'User');
       await bot.sendMessage(chatId, result.text, parseMode: 'Markdown', replyMarkup: result.keyboard);
       return;
     }
@@ -231,10 +231,10 @@ class TelegramService {
       final target = pendingRejections.remove(chatId)!;
       if (target.startsWith('delete:')) {
         final reqId = target.replaceFirst('delete:', '');
-        final res = await rejectProductDeletion(requestId: reqId, reason: text, reviewedBy: userIdentifier);
+        final res = await rejectProductDeletion(requestId: reqId, rejectionReason: text, reviewedBy: userIdentifier);
         await bot.sendMessage(chatId, res['message'] as String);
       } else {
-        final res = await rejectDraftInvoice(approvalId: target, reason: text, reviewedBy: userIdentifier);
+        final res = await rejectDraftInvoice(approvalId: target, rejectionReason: text, reviewedBy: userIdentifier);
         await bot.sendMessage(chatId, res['message'] as String);
       }
       return;
@@ -301,8 +301,9 @@ class TelegramService {
       final match = RegExp(r'Batch ID: ([\w-]+)').firstMatch(reply);
       if (match != null) {
         final batchId = match.group(1)!;
-        final products = await getProductBatch(batchId);
-        if (products != null) {
+        final batchDetails = await getProductBatchDetails(batchId);
+        if (batchDetails != null) {
+          final products = batchDetails['proposed_products'] as List<dynamic>;
           final msg = _buildProductBatchMessage(batchId, products);
           await bot.sendMessage(chatId, msg, parseMode: 'Markdown', replyMarkup: tg.InlineKeyboardMarkup(
             inlineKeyboard: [[
