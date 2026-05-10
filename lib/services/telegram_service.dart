@@ -233,9 +233,15 @@ class TelegramService {
 
     // Onboarding check
     final onboarded = await _isUserOnboarded(chatId);
-    if (!onboarded && !text.startsWith('/start') && !text.startsWith('ob_')) {
+    if (!onboarded && !text.startsWith('/start') && !text.startsWith('/login') && !text.startsWith('ob_')) {
       final result = await startOnboarding(chatId, message.from?.firstName ?? 'User');
       await bot.sendMessage(chatId, result.text, parseMode: 'Markdown', replyMarkup: result.keyboard);
+      return;
+    }
+
+    // Handle Login Command
+    if (text.startsWith('/login')) {
+      await _handleLoginCode(chatId, userIdentifier);
       return;
     }
 
@@ -341,6 +347,49 @@ class TelegramService {
       final shop = await supabase.from('shops').select('id').eq('owner_id', user['id']).eq('onboarding_completed', true).maybeSingle();
       return shop != null;
     } catch (_) { return false; }
+  }
+
+  Future<void> _handleLoginCode(int chatId, String userIdentifier) async {
+    try {
+      // Ensure user exists
+      final userRow = await supabase
+          .from('users')
+          .upsert({
+            'telegram_id': chatId,
+            'full_name': userIdentifier,
+            'updated_at': DateTime.now().toIso8601String(),
+          }, onConflict: 'telegram_id')
+          .select('id')
+          .single();
+      final userId = userRow['id'] as String;
+
+      // Generate 6-digit code
+      final random = DateTime.now().millisecondsSinceEpoch;
+      final code = ((random % 900000) + 100000).toString();
+
+      // Invalidate any existing codes for this user
+      await supabase.from('login_codes').delete().eq('user_id', userId);
+
+      // Insert new code (expires in 5 minutes)
+      await supabase.from('login_codes').insert({
+        'user_id': userId,
+        'code': code,
+        'expires_at': DateTime.now().add(const Duration(minutes: 5)).toIso8601String(),
+        'used': false,
+      });
+
+      await bot.sendMessage(chatId,
+        '🔐 *Web Login Code*\n\n'
+        '```\n$code\n```\n\n'
+        '📱 Enter this code on the Dukan Sathi web app to sign in.\n\n'
+        '⏰ This code expires in *5 minutes*.\n'
+        '⚠️ Do NOT share this code with anyone!',
+        parseMode: 'Markdown');
+      print('[bot] /login code sent to $chatId');
+    } catch (e) {
+      stderr.writeln('[login-code] chat=$chatId error: $e');
+      await bot.sendMessage(chatId, '❌ Could not generate login code. Please try again.');
+    }
   }
 
   tg.InlineKeyboardMarkup _buildInvoiceKeyboard(String approvalId, String currentGstType, bool isRegistered) {
