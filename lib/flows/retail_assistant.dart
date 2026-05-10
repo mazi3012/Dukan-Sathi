@@ -122,7 +122,7 @@ final retailAssistantFlow = ai.defineFlow(
           content: [TextPart(text: prompt)],
         ),
       ],
-      toolNames: toolNames,
+      toolNames: toolNames.isNotEmpty ? toolNames : null,
       context: context.context,
     );
 

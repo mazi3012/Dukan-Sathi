@@ -233,6 +233,16 @@ class TelegramService {
 
     // Onboarding check
     final onboarded = await _isUserOnboarded(chatId);
+    final inOnboarding = isInOnboarding(chatId);
+
+    if (inOnboarding) {
+      final result = await processOnboardingText(chatId, text);
+      if (result.text.isNotEmpty) {
+        await bot.sendMessage(chatId, result.text, parseMode: 'Markdown', replyMarkup: result.keyboard);
+      }
+      return;
+    }
+
     if (!onboarded && !text.startsWith('/start') && !text.startsWith('/login') && !text.startsWith('ob_')) {
       final result = await startOnboarding(chatId, message.from?.firstName ?? 'User');
       await bot.sendMessage(chatId, result.text, parseMode: 'Markdown', replyMarkup: result.keyboard);

@@ -1037,18 +1037,23 @@ class WebChatSession {
 
     _history.add(Message(role: Role.user, content: [TextPart(text: input)]));
 
-    final allTools = [
-      'checkInventory',
-      'browseCatalogTool',
-      'createDraftInvoice',
-      'businessInsightsTool',
-      'proposeProducts',
-      'requestProductDeletion',
-      'getWeather',
-      'setReminder',
-      'logExpense',
-      'getExpenses',
-    ];
+    // Simple intent routing to avoid overloading Groq with unnecessary tools
+    List<String> selectedTools = [];
+    if (n.contains('inventory') || n.contains('stock') || n.contains('price') || n.contains('atta') || n.contains('dal') || n.contains('oil')) {
+      selectedTools = ['checkInventory', 'browseCatalogTool'];
+    } else if (n.contains('revenue') || n.contains('analytics') || n.contains('orders') || n.contains('sales')) {
+      selectedTools = ['businessInsightsTool'];
+    } else if (n.contains('add product') || n.contains('import')) {
+      selectedTools = ['proposeProducts'];
+    } else if (n.contains('delete')) {
+      selectedTools = ['requestProductDeletion'];
+    } else if (n.contains('weather')) {
+      selectedTools = ['getWeather'];
+    } else if (n.contains('remind') || n.contains('reminder')) {
+      selectedTools = ['setReminder'];
+    } else if (n.contains('expense') || n.contains('rent') || n.contains('bill')) {
+      selectedTools = ['logExpense', 'getExpenses'];
+    }
 
     try {
       final response = await ai.generate(
@@ -1059,7 +1064,7 @@ class WebChatSession {
           ]),
           ..._history,
         ],
-        toolNames: allTools,
+        toolNames: selectedTools.isNotEmpty ? selectedTools : null,
         context: {'userIdentifier': userIdentifier},
       );
       final reply = response.text.trim();
