@@ -57,7 +57,7 @@ class TelegramService {
       "13. For shop expenses (rent, electricity, repairs), use logExpense to record them, and getExpenses to retrieve or check past expenses.\n"
       "14. For customer dues, balances, or payments, use checkCustomerDue, listCustomersDue, recordPayment, and invoiceLookup.";
 
-  TelegramService({required this.token, this.model = 'gemini-3.1-flash-lite-preview'});
+  TelegramService({required this.token, String? model}) : model = model ?? modelId;
 
   Future<void> init() async {
     _event = tg.Event('');
@@ -436,7 +436,7 @@ class ChatSession {
   final List<Message> _history = [];
   final String model;
 
-  ChatSession({required this.userIdentifier, this.model = 'gemini-3.1-flash-lite-preview'});
+  ChatSession({required this.userIdentifier, String? model}) : model = model ?? modelId;
 
   Future<String> sendMessage(String text) async {
     _history.add(Message(role: Role.user, content: [TextPart(text: text)]));
