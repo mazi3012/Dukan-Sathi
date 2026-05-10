@@ -1,14 +1,11 @@
-import 'package:dotenv/dotenv.dart';
 import 'env_stub.dart';
 
 class EnvLoaderImpl implements EnvLoader {
-  final DotEnv _env = DotEnv(includePlatformEnvironment: false);
+  @override
+  dynamic load() => null;
 
   @override
-  DotEnv load() => _env;
-
-  @override
-  String? get(String key) => _env[key];
+  String? get(String key) => null;
 }
 
 EnvLoader getLoader() => EnvLoaderImpl();
