@@ -16,7 +16,10 @@ class _ShopSetupPageState extends State<ShopSetupPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _businessTypeController = TextEditingController();
+  final _gstController = TextEditingController();
+  final _upiController = TextEditingController();
   String _selectedState = 'West Bengal';
+  String _gstMode = 'UNREGISTERED';
   bool _isLoading = false;
 
   final List<String> _indianStates = [
@@ -33,9 +36,12 @@ class _ShopSetupPageState extends State<ShopSetupPage> {
     setState(() => _isLoading = true);
 
     final result = await UserSession().createShop(
-      _nameController.text,
-      _selectedState,
-      _businessTypeController.text,
+      name: _nameController.text,
+      state: _selectedState,
+      businessType: _businessTypeController.text,
+      gstNumber: _gstController.text.isNotEmpty ? _gstController.text : null,
+      gstMode: _gstMode,
+      upiId: _upiController.text.isNotEmpty ? _upiController.text : null,
     );
 
     if (mounted) {
@@ -110,6 +116,30 @@ class _ShopSetupPageState extends State<ShopSetupPage> {
                   
                   _buildLabel("State"),
                   _buildDropdown().animate().fadeIn(delay: 600.ms),
+                  
+                  const SizedBox(height: 24),
+                  
+                  _buildLabel("GST Registration"),
+                  _buildGstModeSelector().animate().fadeIn(delay: 650.ms),
+                  
+                  if (_gstMode != 'UNREGISTERED') ...[
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      controller: _gstController,
+                      hint: "Enter 15-digit GSTIN",
+                      icon: Iconsax.document_text,
+                      validator: (v) => v!.isEmpty ? "Enter GST number" : null,
+                    ).animate().fadeIn(),
+                  ],
+                  
+                  const SizedBox(height: 24),
+                  
+                  _buildLabel("UPI ID for Payments (Optional)"),
+                  _buildTextField(
+                    controller: _upiController,
+                    hint: "e.g. shopname@okicici",
+                    icon: Iconsax.wallet_check,
+                  ).animate().fadeIn(delay: 700.ms),
                   
                   const SizedBox(height: 48),
                   
@@ -197,6 +227,40 @@ class _ShopSetupPageState extends State<ShopSetupPage> {
           }
         },
       ),
+    );
+  }
+
+  Widget _buildGstModeSelector() {
+    return Row(
+      children: ['UNREGISTERED', 'REGISTERED', 'COMPOSITE'].map((mode) {
+        final isSelected = _gstMode == mode;
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => setState(() => _gstMode = mode),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.primary.withOpacity(0.2) : Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : Colors.white10,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  mode.split('_')[0],
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.white54,
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

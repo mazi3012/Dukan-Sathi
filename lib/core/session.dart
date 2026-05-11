@@ -29,6 +29,28 @@ class UserSession extends ChangeNotifier {
   bool get hasShop => _shopId != null;
   bool get isLoading => _isLoading;
 
+  Future<void> _fetchAndPersistShop(String userId) async {
+    try {
+      final shopResult = await supabase
+          .from('shops')
+          .select('id, name')
+          .eq('owner_id', userId)
+          .eq('onboarding_completed', true)
+          .maybeSingle();
+
+      if (shopResult != null) {
+        _shopId = shopResult['id'] as String?;
+        _shopName = shopResult['name'] as String?;
+
+        final prefs = await SharedPreferences.getInstance();
+        if (_shopId != null) await prefs.setString(_shopIdKey, _shopId!);
+        if (_shopName != null) await prefs.setString(_shopNameKey, _shopName!);
+      }
+    } catch (e) {
+      debugPrint('[Session] Fetch shop error: $e');
+    }
+  }
+
   /// Initialize session from local storage on app start.
   Future<void> init() async {
     _isLoading = true;
@@ -41,12 +63,16 @@ class UserSession extends ChangeNotifier {
       _shopId = prefs.getString(_shopIdKey);
       _shopName = prefs.getString(_shopNameKey);
 
-      // We still want to ensure we have a valid Supabase session
-      if (_userId != null && supabase.auth.currentSession == null) {
-        // If local state exists but Supabase session is gone, we might need to re-auth or clear
-        // For now, we trust the local state if Supabase has a user (which it usually does if logged in)
+      if (_userId != null) {
+        // Always try to refresh shop info if we have a user but no shop ID locally
+        // or just to ensure the session is still valid.
         if (supabase.auth.currentUser == null) {
+          // If Supabase session is gone, we might need to re-auth or clear
+          // but we'll try to keep the userId if it's still valid in the eyes of the app
+          // Actually, if currentUser is null, we should probably clear.
           await _clearLocal();
+        } else if (_shopId == null) {
+          await _fetchAndPersistShop(_userId!);
         }
       }
     } catch (e) {
@@ -169,6 +195,7 @@ class UserSession extends ChangeNotifier {
           'email': email,
           'password': password,
           'data': {'full_name': fullName},
+          'redirect_to': kIsWeb ? Uri.base.origin : null,
         }),
       );
 
@@ -225,7 +252,14 @@ class UserSession extends ChangeNotifier {
   }
 
   /// Create a new shop for the user
-  Future<Map<String, dynamic>> createShop(String name, String state, String businessType) async {
+  Future<Map<String, dynamic>> createShop({
+    required String name,
+    required String state,
+    required String businessType,
+    String? gstNumber,
+    String gstMode = 'UNREGISTERED',
+    String? upiId,
+  }) async {
     if (_userId == null) return {'success': false, 'error': 'No user logged in'};
 
     try {
@@ -234,6 +268,9 @@ class UserSession extends ChangeNotifier {
         'name': name,
         'state': state,
         'business_type': businessType,
+        'gst_registration_number': gstNumber,
+        'gst_mode': gstMode,
+        'upi_id': upiId,
         'onboarding_completed': true,
       }).select().single();
 
