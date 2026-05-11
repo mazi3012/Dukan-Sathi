@@ -318,5 +318,12 @@ class UserSession extends ChangeNotifier {
     await prefs.remove(_shopIdKey);
     await prefs.remove(_shopNameKey);
   }
+
+  /// Mark the current user's email as verified and notify listeners.
+  /// Use this when handling deep-link callbacks from verification emails.
+  void markEmailVerified() {
+    _emailVerified = true;
+    notifyListeners();
+  }
 }
 

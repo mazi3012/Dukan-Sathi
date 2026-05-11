@@ -49,8 +49,7 @@ class DukanSathiApp extends StatelessWidget {
       // For now, just log and proceed to AuthGate
       // In production, you would verify the code with Supabase
       // For now, assume email is verified after clicking link
-      UserSession()._emailVerified = true;
-      UserSession().notifyListeners();
+      UserSession().markEmailVerified();
       
       // Return null to let MaterialApp handle routing to home
       return null;

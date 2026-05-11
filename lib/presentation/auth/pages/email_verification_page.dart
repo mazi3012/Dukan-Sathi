@@ -127,7 +127,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                   )
                       .animate()
                       .fadeIn(duration: 600.ms)
-                      .scale(begin: Alignment.center),
+                      .scale(alignment: Alignment.center),
                   const SizedBox(height: 40),
                   // Title
                   Text(
