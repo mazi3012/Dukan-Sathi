@@ -3,6 +3,8 @@ import 'package:iconsax/iconsax.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
+import '../../../core/widgets/skeleton.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/database.dart';
 import '../../../core/session.dart';
 import 'customer_details_page.dart';
@@ -27,10 +29,13 @@ class _CustomersPageState extends State<CustomersPage> {
   }
 
   Future<void> _fetchCustomers() async {
-    final shopId = UserSession().shopId;
-    if (shopId == null) return;
-
     setState(() => _isLoading = true);
+    
+    final shopId = UserSession().shopId;
+    if (shopId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
 
     try {
       final res = await supabase
@@ -93,7 +98,7 @@ class _CustomersPageState extends State<CustomersPage> {
                 _buildFilterChips(),
                 Expanded(
                   child: _isLoading
-                      ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                      ? _buildListSkeleton()
                       : _filteredCustomers.isEmpty
                           ? _buildEmptyState()
                           : _buildCustomerList(),
@@ -244,18 +249,22 @@ class _CustomersPageState extends State<CustomersPage> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Iconsax.people, size: 80, color: Colors.white10),
-          const SizedBox(height: 20),
-          const Text(
-            "No customers found",
-            style: TextStyle(color: Colors.white54, fontSize: 18),
-          ),
-        ],
-      ).animate().fadeIn(),
+    return EmptyState(
+      title: "No Customers Yet",
+      subtitle: "Add your first customer to start tracking dues and sales.",
+      icon: Iconsax.user_search,
+      actionLabel: "Add Customer",
+      onAction: () {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add Customer coming soon!')));
+      },
+    );
+  }
+
+  Widget _buildListSkeleton() {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: 6,
+      itemBuilder: (context, index) => const SkeletonListTile(),
     );
   }
 

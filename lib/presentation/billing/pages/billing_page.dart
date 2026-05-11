@@ -4,6 +4,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
+import '../../../core/widgets/skeleton.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/database.dart';
 import '../../../core/session.dart';
 
@@ -26,10 +28,13 @@ class _BillingPageState extends State<BillingPage> {
   }
 
   Future<void> _fetchSales() async {
-    final shopId = UserSession().shopId;
-    if (shopId == null) return;
-
     setState(() => _isLoading = true);
+    
+    final shopId = UserSession().shopId;
+    if (shopId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
 
     try {
       final res = await supabase
@@ -86,7 +91,7 @@ class _BillingPageState extends State<BillingPage> {
                 const SizedBox(height: 10),
                 Expanded(
                   child: _isLoading
-                      ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                      ? _buildListSkeleton()
                       : _sales.isEmpty
                           ? _buildEmptyState()
                           : _buildSalesList(),
@@ -131,23 +136,22 @@ class _BillingPageState extends State<BillingPage> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Iconsax.receipt_item, size: 80, color: Colors.white10),
-          const SizedBox(height: 20),
-          const Text(
-            "No sales recorded yet",
-            style: TextStyle(color: Colors.white54, fontSize: 18),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            "Use Sathi AI in Telegram to create invoices!",
-            style: TextStyle(color: AppColors.primary.withOpacity(0.5)),
-          ),
-        ],
-      ).animate().fadeIn(),
+    return EmptyState(
+      title: "No Invoices Yet",
+      subtitle: "Once you create bills via AI Chat or Manual entry, they'll appear here.",
+      icon: Iconsax.receipt_21,
+      actionLabel: "Generate New Bill",
+      onAction: () {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening AI Invoice Generator...')));
+      },
+    );
+  }
+
+  Widget _buildListSkeleton() {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: 6,
+      itemBuilder: (context, index) => const SkeletonListTile(),
     );
   }
 

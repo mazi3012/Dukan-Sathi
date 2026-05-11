@@ -3,6 +3,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
+import '../../../core/widgets/skeleton.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../chat/pages/ai_chat_page.dart';
 
 import '../../../core/database.dart';
@@ -22,6 +24,7 @@ class _DashboardPageState extends State<DashboardPage> {
   int _productCount = 0;
   List<Map<String, dynamic>> _recentActivity = [];
   bool _isLoading = true;
+  bool _hasError = false;
 
   @override
   void initState() {
@@ -30,10 +33,16 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _fetchDashboardData() async {
-    final shopId = UserSession().shopId;
-    if (shopId == null) return;
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
 
-    setState(() => _isLoading = true);
+    final shopId = UserSession().shopId;
+    if (shopId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
 
     try {
       // 1. Fetch Total Sales
@@ -92,7 +101,12 @@ class _DashboardPageState extends State<DashboardPage> {
       }
     } catch (e) {
       debugPrint('[Dashboard] Fetch error: $e');
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
+      }
     }
   }
 
@@ -125,13 +139,13 @@ class _DashboardPageState extends State<DashboardPage> {
                       _buildWelcomeSection(context),
                       const SizedBox(height: 30),
                       _isLoading 
-                        ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                        ? _buildStatsSkeleton()
                         : _buildStatsGrid(),
                       const SizedBox(height: 30),
                       _buildSectionTitle(context, "Recent Activity"),
                       const SizedBox(height: 15),
                       _isLoading 
-                        ? const SizedBox() 
+                        ? _buildActivitySkeleton()
                         : _buildActivityList(),
                       const SizedBox(height: 100), // Spacer for bottom bar
                     ]),
@@ -251,15 +265,32 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildActivityList() {
     if (_recentActivity.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(20),
-          child: Text("No recent activity found", style: TextStyle(color: Colors.white54)),
-        ),
+      return const EmptyState(
+        title: "No Recent Sales",
+        subtitle: "Once you create invoices, they will appear here.",
+        icon: Iconsax.receipt_item,
       );
     }
     return Column(
       children: _recentActivity.map((activity) => _buildActivityItem(activity)).toList(),
+    );
+  }
+
+  Widget _buildStatsSkeleton() {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      crossAxisSpacing: 15,
+      mainAxisSpacing: 15,
+      childAspectRatio: 1.5,
+      children: List.generate(4, (index) => const SkeletonCard()),
+    );
+  }
+
+  Widget _buildActivitySkeleton() {
+    return Column(
+      children: List.generate(3, (index) => const SkeletonListTile()),
     );
   }
 

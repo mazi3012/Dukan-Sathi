@@ -3,6 +3,8 @@ import 'package:iconsax/iconsax.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
+import '../../../core/widgets/skeleton.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/database.dart';
 import '../../../core/session.dart';
 
@@ -27,10 +29,13 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   Future<void> _fetchProducts() async {
-    final shopId = UserSession().shopId;
-    if (shopId == null) return;
-
     setState(() => _isLoading = true);
+    
+    final shopId = UserSession().shopId;
+    if (shopId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
 
     try {
       final res = await supabase
@@ -89,7 +94,7 @@ class _InventoryPageState extends State<InventoryPage> {
                 const SizedBox(height: 10),
                 Expanded(
                   child: _isLoading
-                      ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                      ? _buildListSkeleton()
                       : _products.isEmpty
                           ? _buildEmptyState()
                           : _buildProductList(),
@@ -123,23 +128,20 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Iconsax.box, size: 80, color: Colors.white10),
-          const SizedBox(height: 20),
-          const Text(
-            "No products found",
-            style: TextStyle(color: Colors.white54, fontSize: 18),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            "Ask Sathi AI in Telegram to add products!",
-            style: TextStyle(color: AppColors.primary.withOpacity(0.5)),
-          ),
-        ],
-      ).animate().fadeIn(),
+    return EmptyState(
+      title: "No Products Found",
+      subtitle: "Ask Sathi AI in Telegram to add products or sync your inventory.",
+      icon: Iconsax.box_search,
+      actionLabel: "Refresh Inventory",
+      onAction: _fetchProducts,
+    );
+  }
+
+  Widget _buildListSkeleton() {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: 6,
+      itemBuilder: (context, index) => const SkeletonListTile(),
     );
   }
 
