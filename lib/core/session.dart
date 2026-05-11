@@ -65,8 +65,9 @@ class UserSession extends ChangeNotifier {
         password: password,
       );
 
-      if (response.user != null) {
-        final userId = response.user!.id;
+      final user = response.user;
+      if (user != null) {
+        final userId = user.id;
         
         // Fetch additional info from our public tables
         final userResult = await supabase
@@ -97,9 +98,10 @@ class UserSession extends ChangeNotifier {
         notifyListeners();
         return {'success': true};
       } else {
-        return {'success': false, 'error': 'Login failed'};
+        return {'success': false, 'error': 'Login failed: No user returned'};
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('[Session] login error: $e\n$stack');
       String msg = e.toString().replaceAll('Exception: ', '');
       if (msg.contains('Email not confirmed')) {
         msg = 'Please check your email and confirm your account before logging in.';
@@ -117,8 +119,9 @@ class UserSession extends ChangeNotifier {
         data: {'full_name': fullName},
       );
 
-      if (response.user != null) {
-        final userId = response.user!.id;
+      final user = response.user;
+      if (user != null) {
+        final userId = user.id;
         if (response.session != null) {
           _userId = userId;
           _userName = fullName;
@@ -136,10 +139,11 @@ class UserSession extends ChangeNotifier {
           'needsConfirmation': response.session == null,
         };
       } else {
-        return {'success': false, 'error': 'Registration failed'};
+        return {'success': false, 'error': 'Registration failed: No user returned'};
       }
-    } catch (e) {
-      return {'success': false, 'error': e.toString().replaceAll('Exception: ', '')};
+    } catch (e, stack) {
+      debugPrint('[Session] register error: $e\n$stack');
+      return {'success': false, 'error': 'Auth Error: ${e.toString().replaceAll('Exception: ', '')}'};
     }
   }
 
