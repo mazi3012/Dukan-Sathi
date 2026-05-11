@@ -103,6 +103,28 @@ class UserSession extends ChangeNotifier {
     }
   }
 
+  /// Register a new user with Email & Password
+  Future<Map<String, dynamic>> register(String email, String password, String fullName) async {
+    try {
+      final response = await supabase.auth.signUp(
+        email: email,
+        password: password,
+        data: {'full_name': fullName},
+      );
+
+      if (response.user != null) {
+        return {
+          'success': true, 
+          'needsConfirmation': response.session == null,
+        };
+      } else {
+        return {'success': false, 'error': 'Registration failed'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': e.toString().replaceAll('Exception: ', '')};
+    }
+  }
+
   /// Logout and clear session.
   Future<void> logout() async {
     await supabase.auth.signOut();

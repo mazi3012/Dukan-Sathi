@@ -18,8 +18,10 @@ class _LoginPageState extends State<LoginPage> {
   // Email login controllers
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  
   bool _isPasswordVisible = false;
-
+  bool _isSignUp = false;
   bool _isLoading = false;
   String? _error;
 
@@ -27,27 +29,40 @@ class _LoginPageState extends State<LoginPage> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
-  Future<void> _loginEmail() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      setState(() => _error = 'Please enter both email and password');
+  Future<void> _handleAuth() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final name = _nameController.text.trim();
+
+    if (email.isEmpty || password.isEmpty || (_isSignUp && name.isEmpty)) {
+      setState(() => _error = 'Please fill in all fields');
       return;
     }
 
     setState(() { _isLoading = true; _error = null; });
-    final result = await UserSession().loginWithEmail(
-      _emailController.text.trim(),
-      _passwordController.text.trim(),
-    );
+    
+    Map<String, dynamic> result;
+    if (_isSignUp) {
+      result = await UserSession().register(email, password, name);
+    } else {
+      result = await UserSession().loginWithEmail(email, password);
+    }
+
     if (!mounted) return;
     setState(() => _isLoading = false);
 
     if (result['success'] == true) {
-      _navigateToDashboard();
+      if (_isSignUp && result['needsConfirmation'] == true) {
+        setState(() => _error = 'Registration successful! Please check your email for confirmation.');
+      } else {
+        _navigateToDashboard();
+      }
     } else {
-      setState(() => _error = result['error'] ?? 'Login failed');
+      setState(() => _error = result['error'] ?? 'Authentication failed');
     }
   }
 
@@ -79,6 +94,8 @@ class _LoginPageState extends State<LoginPage> {
                     _buildLogo(),
                     const SizedBox(height: 48),
                     _buildCard(),
+                    const SizedBox(height: 24),
+                    _buildToggleMode(),
                   ],
                 ),
               ),
@@ -125,9 +142,9 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildHeaderPill() {
-    const color = AppColors.accent;
-    const icon = Iconsax.sms;
-    const label = 'Email Sign In';
+    final color = _isSignUp ? AppColors.accent : AppColors.primary;
+    final icon = _isSignUp ? Iconsax.user_add : Iconsax.login;
+    final label = _isSignUp ? 'Create New Account' : 'Welcome Back';
 
     return Center(
       child: Container(
@@ -137,11 +154,11 @@ class _LoginPageState extends State<LoginPage> {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: color.withOpacity(0.4)),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, color: color, size: 18),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
           ],
         ),
@@ -152,10 +169,19 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildEmailForm() {
     return Column(
       children: [
+        if (_isSignUp) ...[
+          _buildTextField(
+            controller: _nameController,
+            label: 'Full Name',
+            icon: Iconsax.user,
+            hint: 'Enter your name',
+          ),
+          const SizedBox(height: 20),
+        ],
         _buildTextField(
           controller: _emailController,
           label: 'Email Address',
-          icon: Iconsax.user,
+          icon: Iconsax.sms,
           hint: 'Enter your email',
           keyboardType: TextInputType.emailAddress,
         ),
@@ -217,7 +243,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildSubmitButton() {
-    final bool canSubmit = _emailController.text.isNotEmpty && _passwordController.text.isNotEmpty;
+    final bool canSubmit = _emailController.text.isNotEmpty && _passwordController.text.isNotEmpty && (!_isSignUp || _nameController.text.isNotEmpty);
 
     return SizedBox(
       width: double.infinity,
@@ -232,7 +258,7 @@ class _LoginPageState extends State<LoginPage> {
           ] : [],
         ),
         child: ElevatedButton(
-          onPressed: _isLoading ? null : _loginEmail,
+          onPressed: _isLoading ? null : _handleAuth,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
@@ -240,15 +266,15 @@ class _LoginPageState extends State<LoginPage> {
           ),
           child: _isLoading
               ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-              : const Row(
+              : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Sign In', 
-                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+                      _isSignUp ? 'Sign Up' : 'Sign In', 
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
                     ),
-                    SizedBox(width: 8),
-                    Icon(Iconsax.login_1, color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    Icon(_isSignUp ? Iconsax.user_add : Iconsax.login_1, color: Colors.white, size: 20),
                   ],
                 ),
         ),
@@ -256,20 +282,56 @@ class _LoginPageState extends State<LoginPage> {
     ).animate().fadeIn(delay: 600.ms);
   }
 
+  Widget _buildToggleMode() {
+    return GestureDetector(
+      onTap: () => setState(() {
+        _isSignUp = !_isSignUp;
+        _error = null;
+      }),
+      child: RichText(
+        text: TextSpan(
+          style: const TextStyle(color: Colors.white54, fontSize: 15),
+          children: [
+            TextSpan(text: _isSignUp ? 'Already have an account? ' : "Don't have an account? "),
+            TextSpan(
+              text: _isSignUp ? 'Sign In' : 'Sign Up',
+              style: const TextStyle(
+                color: AppColors.accent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(delay: 800.ms);
+  }
+
   Widget _buildErrorWidget() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.error.withOpacity(0.1),
+        color: _error!.contains('successful') ? Colors.green.withOpacity(0.1) : AppColors.error.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.error.withOpacity(0.4)),
+        border: Border.all(color: _error!.contains('successful') ? Colors.green.withOpacity(0.4) : AppColors.error.withOpacity(0.4)),
       ),
       child: Row(
         children: [
-          const Icon(Iconsax.warning_2, color: AppColors.error, size: 18),
+          Icon(
+            _error!.contains('successful') ? Iconsax.tick_circle : Iconsax.warning_2, 
+            color: _error!.contains('successful') ? Colors.green : AppColors.error, 
+            size: 18
+          ),
           const SizedBox(width: 8),
-          Expanded(child: Text(_error!, style: const TextStyle(color: AppColors.error, fontSize: 13))),
+          Expanded(
+            child: Text(
+              _error!, 
+              style: TextStyle(
+                color: _error!.contains('successful') ? Colors.green : AppColors.error, 
+                fontSize: 13
+              )
+            )
+          ),
         ],
       ),
     ).animate().shakeX(duration: 400.ms);
