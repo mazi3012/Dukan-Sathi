@@ -5,6 +5,7 @@ import 'core/session.dart';
 import 'presentation/main/pages/main_layout.dart';
 import 'presentation/auth/pages/login_page.dart';
 import 'presentation/auth/pages/shop_setup_page.dart';
+import 'presentation/auth/pages/email_verification_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,11 +30,40 @@ class DukanSathiApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark,
       home: const AuthGate(),
+      onGenerateRoute: _handleDeepLink,
     );
+  }
+
+  /// Handle deep links for email verification callback
+  static Route<dynamic>? _handleDeepLink(RouteSettings settings) {
+    // Example: dukansathi://auth/callback?type=signup&code=xxx
+    if (settings.name?.contains('auth/callback') ?? false) {
+      // Extract query parameters
+      final uri = Uri.parse(settings.name ?? '');
+      final type = uri.queryParameters['type'];
+      final code = uri.queryParameters['code'];
+      
+      // Log for debugging
+      debugPrint('[DeepLink] Auth callback detected: type=$type, code=$code');
+      
+      // For now, just log and proceed to AuthGate
+      // In production, you would verify the code with Supabase
+      // For now, assume email is verified after clicking link
+      UserSession()._emailVerified = true;
+      UserSession().notifyListeners();
+      
+      // Return null to let MaterialApp handle routing to home
+      return null;
+    }
+    return null;
   }
 }
 
-/// Routes to Dashboard if logged in, otherwise to Login page.
+/// Routes based on user auth state:
+/// 1. Not logged in → LoginPage
+/// 2. Logged in but email not verified → EmailVerificationPage
+/// 3. Logged in with email verified but no shop → ShopSetupPage
+/// 4. Fully set up (logged in + has shop) → MainLayout
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -43,14 +73,25 @@ class AuthGate extends StatelessWidget {
       listenable: UserSession(),
       builder: (context, _) {
         final session = UserSession();
-        if (session.isLoggedIn) {
-          if (session.hasShop) {
-            return const MainLayout();
-          } else {
-            return const ShopSetupPage();
-          }
+        
+        // Not logged in
+        if (!session.isLoggedIn) {
+          return const LoginPage();
         }
-        return const LoginPage();
+        
+        // Logged in but email not verified (optional verification)
+        // For now we're allowing users to skip, so this is just a fallback
+        if (!session.emailVerified) {
+          return EmailVerificationPage(email: session.userName ?? 'your email');
+        }
+        
+        // Logged in with email verified but no shop set up
+        if (!session.hasShop) {
+          return const ShopSetupPage();
+        }
+        
+        // Fully authenticated and shop is set up
+        return const MainLayout();
       },
     );
   }

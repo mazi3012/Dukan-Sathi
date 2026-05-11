@@ -56,11 +56,20 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = false);
 
     if (result['success'] == true) {
+      // For signup with email confirmation required, show message then proceed
+      // AuthGate will handle routing to verification page if needed
       if (_isSignUp && result['needsConfirmation'] == true) {
-        setState(() => _error = 'Registration successful! Please check your email for confirmation.');
-      } else {
-        _navigateToDashboard();
+        // Show a brief message but still proceed
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please verify your email by clicking the link sent to your inbox.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
       }
+      // Always navigate - let AuthGate handle the verification page routing
+      _navigateToDashboard();
     } else {
       setState(() => _error = result['error'] ?? 'Authentication failed');
     }

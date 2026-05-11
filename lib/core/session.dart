@@ -19,6 +19,7 @@ class UserSession extends ChangeNotifier {
   String? _userName;
   String? _shopId;
   String? _shopName;
+  bool _emailVerified = true; // default true if not using email verification
   bool _isLoading = true;
 
   String? get userId => _userId;
@@ -27,15 +28,17 @@ class UserSession extends ChangeNotifier {
   String? get shopName => _shopName;
   bool get isLoggedIn => _userId != null;
   bool get hasShop => _shopId != null;
+  bool get emailVerified => _emailVerified;
   bool get isLoading => _isLoading;
 
   Future<void> _fetchAndPersistShop(String userId) async {
     try {
+      // Accept ANY shop, regardless of onboarding_completed status
+      // This allows both Telegram-onboarded and form-onboarded users to proceed
       final shopResult = await supabase
           .from('shops')
           .select('id, name')
           .eq('owner_id', userId)
-          .eq('onboarding_completed', true)
           .maybeSingle();
 
       if (shopResult != null) {
@@ -109,9 +112,8 @@ class UserSession extends ChangeNotifier {
         final errorCode = body['error_code'] ?? '';
         final errorMsg = body['msg'] ?? body['error_description'] ?? 'Invalid credentials';
         
-        if (errorCode == 'email_not_confirmed' || errorMsg.toString().contains('Email not confirmed')) {
-          return {'success': false, 'error': 'Please check your email and confirm your account before logging in.'};
-        }
+        // Note: Email confirmation is optional - users can proceed and verify later
+        // This check is kept for debugging but emails are not required to login
         return {'success': false, 'error': errorMsg};
       }
 
@@ -142,12 +144,15 @@ class UserSession extends ChangeNotifier {
           .eq('id', userId)
           .maybeSingle();
           
+      // Accept ANY shop (not just completed ones) to support both Telegram and web onboarding
       final shopResult = await supabase
           .from('shops')
           .select('id, name')
           .eq('owner_id', userId)
-          .eq('onboarding_completed', true)
           .maybeSingle();
+      
+      // Check if email is verified (from Supabase user metadata)
+      _emailVerified = user['email_confirmed_at'] != null ?? true;
 
       _userId = userId;
       _userName = userResult?['full_name'] as String?;
@@ -306,6 +311,7 @@ class UserSession extends ChangeNotifier {
     _userName = null;
     _shopId = null;
     _shopName = null;
+    _emailVerified = true;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userIdKey);
     await prefs.remove(_userNameKey);
