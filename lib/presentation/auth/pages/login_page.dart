@@ -324,7 +324,7 @@ class _LoginPageState extends State<LoginPage> {
             ],
           ),
           child: const Icon(Iconsax.shop, size: 42, color: Colors.white),
-        ).animate().scale(duration: 600.ms, curve: Curves.elasticOut);
+        ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
         const SizedBox(height: 20),
         const Text(
           'Dukan Sathi Pro',
