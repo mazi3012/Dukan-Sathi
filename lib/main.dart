@@ -4,6 +4,7 @@ import 'core/theme/app_theme.dart';
 import 'core/session.dart';
 import 'presentation/main/pages/main_layout.dart';
 import 'presentation/auth/pages/login_page.dart';
+import 'presentation/auth/pages/shop_setup_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,10 +39,19 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final session = UserSession();
-    if (session.isLoggedIn) {
-      return const MainLayout();
-    }
-    return const LoginPage();
+    return ListenableBuilder(
+      listenable: UserSession(),
+      builder: (context, _) {
+        final session = UserSession();
+        if (session.isLoggedIn) {
+          if (session.hasShop) {
+            return const MainLayout();
+          } else {
+            return const ShopSetupPage();
+          }
+        }
+        return const LoginPage();
+      },
+    );
   }
 }

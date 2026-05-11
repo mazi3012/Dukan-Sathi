@@ -25,7 +25,8 @@ class UserSession extends ChangeNotifier {
   String? get userName => _userName;
   String? get shopId => _shopId;
   String? get shopName => _shopName;
-  bool get isLoggedIn => _userId != null && _shopId != null;
+  bool get isLoggedIn => _userId != null;
+  bool get hasShop => _shopId != null;
   bool get isLoading => _isLoading;
 
   /// Initialize session from local storage on app start.
@@ -99,7 +100,11 @@ class UserSession extends ChangeNotifier {
         return {'success': false, 'error': 'Login failed'};
       }
     } catch (e) {
-      return {'success': false, 'error': e.toString().replaceAll('Exception: ', '')};
+      String msg = e.toString().replaceAll('Exception: ', '');
+      if (msg.contains('Email not confirmed')) {
+        msg = 'Please check your email and confirm your account before logging in.';
+      }
+      return {'success': false, 'error': msg};
     }
   }
 
@@ -113,6 +118,12 @@ class UserSession extends ChangeNotifier {
       );
 
       if (response.user != null) {
+        if (response.session != null) {
+          _userId = response.user!.id;
+          _userName = fullName;
+          notifyListeners();
+        }
+        
         return {
           'success': true, 
           'needsConfirmation': response.session == null,
@@ -120,6 +131,33 @@ class UserSession extends ChangeNotifier {
       } else {
         return {'success': false, 'error': 'Registration failed'};
       }
+    } catch (e) {
+      return {'success': false, 'error': e.toString().replaceAll('Exception: ', '')};
+    }
+  }
+
+  /// Create a new shop for the user
+  Future<Map<String, dynamic>> createShop(String name, String state, String businessType) async {
+    if (_userId == null) return {'success': false, 'error': 'No user logged in'};
+
+    try {
+      final result = await supabase.from('shops').insert({
+        'owner_id': _userId,
+        'name': name,
+        'state': state,
+        'business_type': businessType,
+        'onboarding_completed': true,
+      }).select().single();
+
+      _shopId = result['id'];
+      _shopName = result['name'];
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_shopIdKey, _shopId!);
+      await prefs.setString(_shopNameKey, _shopName!);
+
+      notifyListeners();
+      return {'success': true};
     } catch (e) {
       return {'success': false, 'error': e.toString().replaceAll('Exception: ', '')};
     }
