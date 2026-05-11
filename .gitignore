@@ -45,6 +45,18 @@ scratch/
 # Genkit runtime artifacts
 .genkit/
 
+# Internal Tools & Admin
+flutter_admin_dashboard/
+public/
+scripts/
+docs/
+
+# Helper Scripts
+generate_pdf.py
+serve_main.py
+start.sh
+vercel-build.sh
+
 # OS files
 Thumbs.db
 .env*

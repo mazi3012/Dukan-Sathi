@@ -52,7 +52,6 @@ stop_services() {
     log_info "🧹 Cleaning up old processes..."
     [ -f genkit_dev.pid ] && kill $(cat genkit_dev.pid) 2>/dev/null && rm genkit_dev.pid
     [ -f genkit_server.pid ] && kill $(cat genkit_server.pid) 2>/dev/null && rm genkit_server.pid
-    [ -f telegram_bot.pid ] && kill $(cat telegram_bot.pid) 2>/dev/null && rm telegram_bot.pid
     [ -f flutter_admin.pid ] && kill $(cat flutter_admin.pid) 2>/dev/null && rm flutter_admin.pid
     [ -f flutter_main.pid ] && kill $(cat flutter_main.pid) 2>/dev/null && rm flutter_main.pid
 
@@ -91,11 +90,6 @@ start_services() {
     nohup $BUF_CMD dart bin/genkit_server.dart > genkit_server.log 2>&1 &
     echo $! > genkit_server.pid
     
-    # 3. Telegram Bot
-    log_info "🤖 Starting Telegram Bot..."
-    nohup $BUF_CMD dart bin/telegram_bot.dart > telegram_bot.log 2>&1 &
-    echo $! > telegram_bot.pid
-    
     # 4. Flutter Admin Dashboard
     if [ -d "$ADMIN_DASHBOARD_DIR/build/web" ]; then
         log_info "📱 Starting Flutter Admin Dashboard (Port $ADMIN_PORT)..."
@@ -123,13 +117,13 @@ start_services() {
     echo -e "\n${YELLOW}Streaming backend logs... Press Ctrl+C to stop all services and exit.${NC}\n"
 
     # Ensure logs exist so tail doesn't fail
-    touch genkit_server.log flutter_main.log telegram_bot.log
+    touch genkit_server.log flutter_main.log
 
     # Trap Ctrl+C (INT) and termination signals to cleanly stop services
     trap stop_services EXIT INT TERM
 
     # Tail the logs continuously
-    tail -f genkit_server.log flutter_main.log telegram_bot.log
+    tail -f genkit_server.log flutter_main.log
 }
 
 check_status() {
@@ -140,11 +134,6 @@ check_status() {
     check_port $ADMIN_PORT "Admin Dashboard" "http://localhost:$ADMIN_PORT"
     check_port $MAIN_APP_PORT "Main App" "http://localhost:$MAIN_APP_PORT"
     
-    if [ -f telegram_bot.pid ] && ps -p $(cat telegram_bot.pid) > /dev/null; then
-        printf "%-25s %-10s %-20s\n" "Telegram Bot" "${GREEN}RUNNING${NC}" "N/A"
-    else
-        printf "%-25s %-10s %-20s\n" "Telegram Bot" "${RED}STOPPED${NC}" "N/A"
-    fi
 }
 
 check_port() {

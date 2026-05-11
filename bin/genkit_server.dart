@@ -13,7 +13,6 @@ import 'package:dukansathi_new/tools/billing_tools.dart';
 import 'package:dukansathi_new/tools/analytics_tools.dart';
 import 'package:dukansathi_new/tools/customer_tools.dart' as cust;
 import 'package:dukansathi_new/services/invoice_pdf_generator.dart';
-import 'package:dukansathi_new/services/telegram_service.dart';
 import 'package:genkit/genkit.dart';
 
 Future<void> main(List<String> arguments) async {
@@ -60,27 +59,10 @@ Future<void> main(List<String> arguments) async {
   print('   • proposeProducts ✨ Product Management');
   print('   • requestProductDeletion ✨ Human approval delete flow');
   print('');
-  print('💬 Telegram Bot: @Sathiaibeta_bot');
   print('');
   print('Press Ctrl+C to stop.');
   print('');
 
-  // ─── START TELEGRAM BOT ────────────────────────────────────────────────
-  TelegramService? globalTelegramService;
-  final botToken = Platform.environment['TELEGRAM_BOT_TOKEN'];
-  if (botToken != null && botToken.isNotEmpty) {
-    print('🤖 Initializing Telegram Bot...');
-    try {
-      final telegramService = TelegramService(token: botToken);
-      globalTelegramService = telegramService;
-      await telegramService.init();
-      print('✅ Telegram Bot is ready!');
-    } catch (e) {
-      print('❌ Failed to start Telegram Bot: $e');
-    }
-  } else {
-    print('⚠️ TELEGRAM_BOT_TOKEN not found, skipping bot initialization.');
-  }
 
   // ─── WEB CHAT SESSION (mirrors Telegram Chat class) ─────────────────────
   final Map<String, WebChatSession> webSessions = {};
@@ -142,25 +124,6 @@ Future<void> main(List<String> arguments) async {
             ..write(jsonEncode({'error': 'Failed to load dashboard: $e'}))
             ..close();
         }
-      } else if (request.method == 'POST' && request.uri.path == '/api/bot/webhook') {
-        final body = await utf8.decoder.bind(request).join();
-        print('📩 Received Telegram Update');
-        if (globalTelegramService != null) {
-          try {
-            final update = jsonDecode(body) as Map<String, dynamic>;
-            globalTelegramService!.processWebhookUpdate(update);
-            print('✅ Webhook update forwarded to TelegramService');
-          } catch (e) {
-            print('❌ Error processing telegram update: $e');
-          }
-        } else {
-          print('⚠️ Telegram service not initialized, ignoring update');
-        }
-        request.response
-          ..statusCode = 200
-          ..write('OK')
-          ..close();
-        return;
       } else if (request.method == 'GET' && request.uri.path == '/api/listActions') {
         // Return list of available actions
         request.response
@@ -435,149 +398,6 @@ Future<void> main(List<String> arguments) async {
           ..headers.contentType = ContentType.json
           ..write(jsonEncode(batch))
           ..close();
-      } else if (request.method == 'POST' && request.uri.path == '/api/verify-code') {
-        // ─── MAGIC CODE LOGIN VERIFICATION ──────────────────────────────
-        var body = await utf8.decodeStream(request);
-        try {
-          final data = jsonDecode(body) as Map<String, dynamic>;
-          final code = (data['code'] as String?)?.trim() ?? '';
-
-          if (code.isEmpty || code.length != 6) {
-            request.response
-              ..statusCode = 400
-              ..headers.contentType = ContentType.json
-              ..write(jsonEncode({'success': false, 'error': 'Invalid code format'}))
-              ..close();
-            return;
-          }
-
-          // Look up code in login_codes table
-          final codeRow = await supabase
-              .from('login_codes')
-              .select('id, user_id, expires_at, used')
-              .eq('code', code)
-              .eq('used', false)
-              .maybeSingle();
-
-          if (codeRow == null) {
-            request.response
-              ..statusCode = 401
-              ..headers.contentType = ContentType.json
-              ..write(jsonEncode({'success': false, 'error': 'Invalid or expired code'}))
-              ..close();
-            return;
-          }
-
-          // Check expiry
-          final expiresAt = DateTime.parse(codeRow['expires_at'] as String);
-          if (DateTime.now().toUtc().isAfter(expiresAt)) {
-            // Delete expired code
-            await supabase.from('login_codes').delete().eq('id', codeRow['id']);
-            request.response
-              ..statusCode = 401
-              ..headers.contentType = ContentType.json
-              ..write(jsonEncode({'success': false, 'error': 'Code has expired. Send /login again in Telegram.'}))
-              ..close();
-            return;
-          }
-
-          final userId = codeRow['user_id'] as String;
-
-          // Mark code as used
-          await supabase.from('login_codes').update({'used': true}).eq('id', codeRow['id']);
-
-          // Get user info and shop
-          final userRow = await supabase
-              .from('users')
-              .select('id, full_name, telegram_id, email')
-              .eq('id', userId)
-              .single();
-
-          // Get shop info
-          final shopRow = await supabase
-              .from('shops')
-              .select('id, name, business_type, state')
-              .eq('owner_id', userId)
-              .eq('onboarding_completed', true)
-              .maybeSingle();
-
-          request.response
-            ..statusCode = 200
-            ..headers.contentType = ContentType.json
-            ..write(jsonEncode({
-              'success': true,
-              'user': {
-                'id': userRow['id'],
-                'full_name': userRow['full_name'],
-                'telegram_id': userRow['telegram_id'],
-                'email': userRow['email'],
-              },
-              'shop': shopRow != null ? {
-                'id': shopRow['id'],
-                'name': shopRow['name'],
-                'business_type': shopRow['business_type'],
-                'state': shopRow['state'],
-              } : null,
-            }))
-            ..close();
-        } catch (e) {
-          request.response
-            ..statusCode = 500
-            ..headers.contentType = ContentType.json
-            ..write(jsonEncode({'success': false, 'error': e.toString()}))
-            ..close();
-        }
-      } else if (request.method == 'GET' && request.uri.path == '/api/session') {
-        // ─── SESSION VALIDATION ─────────────────────────────────────────
-        try {
-          final userId = request.uri.queryParameters['userId'] ?? '';
-          if (userId.isEmpty) {
-            request.response
-              ..statusCode = 400
-              ..headers.contentType = ContentType.json
-              ..write(jsonEncode({'success': false, 'error': 'Missing userId'}))
-              ..close();
-            return;
-          }
-
-          final userRow = await supabase
-              .from('users')
-              .select('id, full_name, email')
-              .eq('id', userId)
-              .maybeSingle();
-
-          if (userRow == null) {
-            request.response
-              ..statusCode = 401
-              ..headers.contentType = ContentType.json
-              ..write(jsonEncode({'success': false, 'error': 'Invalid session'}))
-              ..close();
-            return;
-          }
-
-          final shopRow = await supabase
-              .from('shops')
-              .select('id, name, business_type, state')
-              .eq('owner_id', userId)
-              .eq('onboarding_completed', true)
-              .maybeSingle();
-
-          request.response
-            ..statusCode = 200
-            ..headers.contentType = ContentType.json
-            ..write(jsonEncode({
-              'success': true,
-              'user': userRow,
-              'shop': shopRow,
-            }))
-            ..close();
-        } catch (e) {
-          request.response
-            ..statusCode = 500
-            ..headers.contentType = ContentType.json
-            ..write(jsonEncode({'success': false, 'error': e.toString()}))
-            ..close();
-        }
       } else if (request.uri.path.startsWith('/api/admin/')) {
         // Handle admin API endpoints
         try {

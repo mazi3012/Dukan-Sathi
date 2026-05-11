@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'database.dart'; // Import supabase client
 
 class UserSession extends ChangeNotifier {
   static final UserSession _instance = UserSession._();
@@ -39,10 +40,11 @@ class UserSession extends ChangeNotifier {
       _shopId = prefs.getString(_shopIdKey);
       _shopName = prefs.getString(_shopNameKey);
 
-      // Validate session with backend if we have a userId
-      if (_userId != null) {
-        final valid = await _validateSession(_userId!);
-        if (!valid) {
+      // We still want to ensure we have a valid Supabase session
+      if (_userId != null && supabase.auth.currentSession == null) {
+        // If local state exists but Supabase session is gone, we might need to re-auth or clear
+        // For now, we trust the local state if Supabase has a user (which it usually does if logged in)
+        if (supabase.auth.currentUser == null) {
           await _clearLocal();
         }
       }
@@ -54,25 +56,35 @@ class UserSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Verify login code and establish session.
-  Future<Map<String, dynamic>> verifyCode(String code) async {
+  /// Login with Supabase Email & Password
+  Future<Map<String, dynamic>> loginWithEmail(String email, String password) async {
     try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/api/verify-code'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'code': code}),
+      final response = await supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
       );
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.user != null) {
+        final userId = response.user!.id;
+        
+        // Fetch additional info from our public tables
+        final userResult = await supabase
+            .from('users')
+            .select('full_name')
+            .eq('id', userId)
+            .maybeSingle();
+            
+        final shopResult = await supabase
+            .from('shops')
+            .select('id, name')
+            .eq('owner_id', userId)
+            .eq('onboarding_completed', true)
+            .maybeSingle();
 
-      if (response.statusCode == 200 && data['success'] == true) {
-        final user = data['user'] as Map<String, dynamic>;
-        final shop = data['shop'] as Map<String, dynamic>?;
-
-        _userId = user['id'] as String;
-        _userName = user['full_name'] as String?;
-        _shopId = shop?['id'] as String?;
-        _shopName = shop?['name'] as String?;
+        _userId = userId;
+        _userName = userResult?['full_name'] as String?;
+        _shopId = shopResult?['id'] as String?;
+        _shopName = shopResult?['name'] as String?;
 
         // Persist to local storage
         final prefs = await SharedPreferences.getInstance();
@@ -84,44 +96,20 @@ class UserSession extends ChangeNotifier {
         notifyListeners();
         return {'success': true};
       } else {
-        return {'success': false, 'error': data['error'] ?? 'Verification failed'};
+        return {'success': false, 'error': 'Login failed'};
       }
     } catch (e) {
-      return {'success': false, 'error': 'Connection error: $e'};
-    }
-  }
-
-  /// Validate an existing session with the backend.
-  Future<bool> _validateSession(String userId) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/session?userId=$userId'),
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        if (data['success'] == true) {
-          // Refresh shop info
-          final shop = data['shop'] as Map<String, dynamic>?;
-          if (shop != null) {
-            _shopId = shop['id'] as String?;
-            _shopName = shop['name'] as String?;
-          }
-          return true;
-        }
-      }
-      return false;
-    } catch (e) {
-      // If server is down, keep local session (offline-capable)
-      debugPrint('[Session] validate error (keeping local): $e');
-      return _userId != null;
+      return {'success': false, 'error': e.toString().replaceAll('Exception: ', '')};
     }
   }
 
   /// Logout and clear session.
   Future<void> logout() async {
+    await supabase.auth.signOut();
     await _clearLocal();
     notifyListeners();
   }
+
 
   Future<void> _clearLocal() async {
     _userId = null;
@@ -135,3 +123,4 @@ class UserSession extends ChangeNotifier {
     await prefs.remove(_shopNameKey);
   }
 }
+
