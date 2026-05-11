@@ -68,7 +68,7 @@ class EmptyState extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
-                    side: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                    side: BorderSide(color: AppColors.primary.withOpacity(0.2)),
                   ),
                 ),
               ).animate().fadeIn(delay: 400.ms).scale(),
