@@ -57,76 +57,147 @@ class UserSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Login with Supabase Email & Password
+  /// Login with Supabase Email & Password.
+  /// Uses raw HTTP to pre-check for errors the SDK doesn't handle gracefully.
   Future<Map<String, dynamic>> loginWithEmail(String email, String password) async {
     try {
-      final response = await supabase.auth.signInWithPassword(
-        email: email,
-        password: password,
+      // Pre-check with raw HTTP to catch errors that crash the SDK
+      final rawResponse = await http.post(
+        Uri.parse('$resolvedSupabaseUrl/auth/v1/token?grant_type=password'),
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': resolvedSupabaseAnonKey,
+        },
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+        }),
       );
 
-      final user = response.user;
-      if (user != null) {
-        final userId = user.id;
+      if (rawResponse.statusCode == 429) {
+        return {'success': false, 'error': 'Too many login attempts. Please wait a few minutes and try again.'};
+      }
+
+      if (rawResponse.statusCode == 400) {
+        final body = jsonDecode(rawResponse.body);
+        final errorCode = body['error_code'] ?? '';
+        final errorMsg = body['msg'] ?? body['error_description'] ?? 'Invalid credentials';
         
-        // Fetch additional info from our public tables
-        final userResult = await supabase
-            .from('users')
-            .select('full_name')
-            .eq('id', userId)
-            .maybeSingle();
-            
-        final shopResult = await supabase
-            .from('shops')
-            .select('id, name')
-            .eq('owner_id', userId)
-            .eq('onboarding_completed', true)
-            .maybeSingle();
+        if (errorCode == 'email_not_confirmed' || errorMsg.toString().contains('Email not confirmed')) {
+          return {'success': false, 'error': 'Please check your email and confirm your account before logging in.'};
+        }
+        return {'success': false, 'error': errorMsg};
+      }
 
-        _userId = userId;
-        _userName = userResult?['full_name'] as String?;
-        _shopId = shopResult?['id'] as String?;
-        _shopName = shopResult?['name'] as String?;
+      if (rawResponse.statusCode != 200) {
+        final body = jsonDecode(rawResponse.body);
+        return {'success': false, 'error': body['msg'] ?? 'Login failed (${rawResponse.statusCode})'};
+      }
 
-        // Persist to local storage
-        final prefs = await SharedPreferences.getInstance();
-        if (_userId != null) await prefs.setString(_userIdKey, _userId!);
-        if (_userName != null) await prefs.setString(_userNameKey, _userName!);
-        if (_shopId != null) await prefs.setString(_shopIdKey, _shopId!);
-        if (_shopName != null) await prefs.setString(_shopNameKey, _shopName!);
-
-        notifyListeners();
-        return {'success': true};
-      } else {
+      // Parse the successful login response
+      final body = jsonDecode(rawResponse.body) as Map<String, dynamic>;
+      final user = body['user'] as Map<String, dynamic>?;
+      
+      if (user == null) {
         return {'success': false, 'error': 'Login failed: No user returned'};
       }
+
+      final userId = user['id'] as String;
+      final accessToken = body['access_token'] as String;
+      final refreshToken = body['refresh_token'] as String;
+
+      // Set session in the Supabase client so subsequent queries work
+      await supabase.auth.setSession(refreshToken);
+
+      // Fetch additional info from our public tables
+      final userResult = await supabase
+          .from('users')
+          .select('full_name')
+          .eq('id', userId)
+          .maybeSingle();
+          
+      final shopResult = await supabase
+          .from('shops')
+          .select('id, name')
+          .eq('owner_id', userId)
+          .eq('onboarding_completed', true)
+          .maybeSingle();
+
+      _userId = userId;
+      _userName = userResult?['full_name'] as String?;
+      _shopId = shopResult?['id'] as String?;
+      _shopName = shopResult?['name'] as String?;
+
+      // Persist to local storage
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_userIdKey, userId);
+      if (_userName != null) await prefs.setString(_userNameKey, _userName!);
+      if (_shopId != null) await prefs.setString(_shopIdKey, _shopId!);
+      if (_shopName != null) await prefs.setString(_shopNameKey, _shopName!);
+
+      notifyListeners();
+      return {'success': true};
     } catch (e, stack) {
       debugPrint('[Session] login error: $e\n$stack');
-      String msg = e.toString().replaceAll('Exception: ', '');
-      if (msg.contains('Email not confirmed')) {
-        msg = 'Please check your email and confirm your account before logging in.';
+      String msg = e.toString();
+      if (msg.contains('Null check')) {
+        msg = 'Login service is temporarily unavailable. Please try again in a few minutes.';
+      } else {
+        msg = msg.replaceAll('Exception: ', '');
+        if (msg.contains('Email not confirmed')) {
+          msg = 'Please check your email and confirm your account before logging in.';
+        }
       }
       return {'success': false, 'error': msg};
     }
   }
 
-  /// Register a new user with Email & Password
+  /// Register a new user with Email & Password.
+  /// Uses raw HTTP as a fallback because the gotrue SDK crashes on non-200
+  /// responses (e.g. 429 rate limit) with "Null check operator used on a null value".
   Future<Map<String, dynamic>> register(String email, String password, String fullName) async {
     try {
-      final response = await supabase.auth.signUp(
-        email: email,
-        password: password,
-        data: {'full_name': fullName},
+      // First try raw HTTP to check for rate limits and other errors
+      // that the SDK doesn't handle gracefully.
+      final rawResponse = await http.post(
+        Uri.parse('$resolvedSupabaseUrl/auth/v1/signup'),
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': resolvedSupabaseAnonKey,
+        },
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          'data': {'full_name': fullName},
+        }),
       );
 
-      final user = response.user;
-      if (user != null) {
-        final userId = user.id;
-        if (response.session != null) {
+      if (rawResponse.statusCode == 429) {
+        return {'success': false, 'error': 'Too many signup attempts. Please wait a few minutes and try again.'};
+      }
+
+      if (rawResponse.statusCode == 422) {
+        return {'success': false, 'error': 'This email is already registered. Try signing in instead.'};
+      }
+
+      if (rawResponse.statusCode != 200) {
+        final body = jsonDecode(rawResponse.body);
+        final msg = body['msg'] ?? body['message'] ?? body['error_description'] ?? 'Registration failed (${rawResponse.statusCode})';
+        return {'success': false, 'error': msg};
+      }
+
+      // Parse the successful response
+      final body = jsonDecode(rawResponse.body) as Map<String, dynamic>;
+      final userId = body['id'] as String?;
+
+      if (userId != null) {
+        // Check if email confirmation is required (no access_token means confirmation needed)
+        final hasSession = body['access_token'] != null;
+        
+        if (hasSession) {
           _userId = userId;
           _userName = fullName;
           
-          // Persist registration session if immediate login is allowed
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(_userIdKey, userId);
           await prefs.setString(_userNameKey, fullName);
@@ -135,15 +206,21 @@ class UserSession extends ChangeNotifier {
         }
         
         return {
-          'success': true, 
-          'needsConfirmation': response.session == null,
+          'success': true,
+          'needsConfirmation': !hasSession,
         };
       } else {
         return {'success': false, 'error': 'Registration failed: No user returned'};
       }
     } catch (e, stack) {
       debugPrint('[Session] register error: $e\n$stack');
-      return {'success': false, 'error': 'Auth Error: ${e.toString().replaceAll('Exception: ', '')}'};
+      String msg = e.toString();
+      if (msg.contains('Null check')) {
+        msg = 'Registration service is temporarily unavailable. Please try again in a few minutes.';
+      } else {
+        msg = msg.replaceAll('Exception: ', '');
+      }
+      return {'success': false, 'error': msg};
     }
   }
 
