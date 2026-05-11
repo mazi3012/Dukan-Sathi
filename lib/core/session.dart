@@ -89,7 +89,7 @@ class UserSession extends ChangeNotifier {
 
         // Persist to local storage
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_userIdKey, _userId!);
+        if (_userId != null) await prefs.setString(_userIdKey, _userId!);
         if (_userName != null) await prefs.setString(_userNameKey, _userName!);
         if (_shopId != null) await prefs.setString(_shopIdKey, _shopId!);
         if (_shopName != null) await prefs.setString(_shopNameKey, _shopName!);
@@ -118,9 +118,16 @@ class UserSession extends ChangeNotifier {
       );
 
       if (response.user != null) {
+        final userId = response.user!.id;
         if (response.session != null) {
-          _userId = response.user!.id;
+          _userId = userId;
           _userName = fullName;
+          
+          // Persist registration session if immediate login is allowed
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_userIdKey, userId);
+          await prefs.setString(_userNameKey, fullName);
+          
           notifyListeners();
         }
         
@@ -149,16 +156,21 @@ class UserSession extends ChangeNotifier {
         'onboarding_completed': true,
       }).select().single();
 
-      _shopId = result['id'];
-      _shopName = result['name'];
+      _shopId = result['id'] as String?;
+      _shopName = result['name'] as String?;
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_shopIdKey, _shopId!);
-      await prefs.setString(_shopNameKey, _shopName!);
+      if (_shopId != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_shopIdKey, _shopId!);
+        if (_shopName != null) {
+          await prefs.setString(_shopNameKey, _shopName!);
+        }
+      }
 
       notifyListeners();
       return {'success': true};
     } catch (e) {
+      debugPrint('[Session] createShop error: $e');
       return {'success': false, 'error': e.toString().replaceAll('Exception: ', '')};
     }
   }
