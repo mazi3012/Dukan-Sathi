@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+// Use conditional imports: supabase_flutter for mobile, supabase for web
+import 'package:supabase_flutter/supabase_flutter.dart' if (dart.library.html) 'package:supabase/supabase.dart';
 
 /// Auth model
 class AdminUser {
