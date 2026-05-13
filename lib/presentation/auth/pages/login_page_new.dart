@@ -167,7 +167,11 @@ class _LoginPageState extends State<LoginPage> {
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.g_mobiledata, size: 24),
+                  Image.asset(
+                    'assets/google_logo.png',
+                    width: 20,
+                    height: 20,
+                  ),
                   const SizedBox(width: 12),
                   const Text(
                     'Sign in with Google',
@@ -295,4 +299,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-

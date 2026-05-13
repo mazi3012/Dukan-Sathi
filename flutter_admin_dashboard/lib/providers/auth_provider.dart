@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Auth model
 class AdminUser {
@@ -53,6 +55,10 @@ class AdminUser {
 
 /// Auth Provider - Manages authentication state
 class AuthProvider extends ChangeNotifier {
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+  );
+
   AdminUser? _currentUser;
   String? _sessionToken;
   bool _isLoading = false;
@@ -65,34 +71,70 @@ class AuthProvider extends ChangeNotifier {
   String? get error => _error;
   bool get isAuthenticated => _currentUser != null;
 
-  /// Simulate login (in real app, would call API)
-  Future<bool> login(String email, String password) async {
+  /// Login with Google
+  Future<bool> loginWithGoogle() async {
     try {
       _isLoading = true;
       _error = null;
       notifyListeners();
 
-      // TODO: Call actual login API endpoint
-      // For now, simulate with a super_admin user
-      await Future.delayed(Duration(seconds: 1));
+      // Sign out first to ensure fresh login
+      await _googleSignIn.signOut();
 
+      // Start Google Sign-In flow
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        _error = 'Google sign-in cancelled';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Get Google authentication details
+      final googleAuth = await googleUser.authentication;
+      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
+        _error = 'Failed to get Google authentication tokens';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Sign in with Supabase using Google provider
+      final supabase = Supabase.instance.client;
+      final response = await supabase.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: googleAuth.idToken!,
+      );
+
+      if (response.user == null) {
+        _error = 'Failed to authenticate with Supabase';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      final userId = response.user!.id;
+      final userEmail = response.user!.email ?? googleUser.email;
+      final userName = googleUser.displayName ?? googleUser.email;
+
+      // Create/update admin user record
       _currentUser = AdminUser(
-        id: 'admin-001',
-        email: email,
-        fullName: 'Admin User',
-        phone: '',
+        id: userId,
+        email: userEmail,
+        fullName: userName,
+        phone: googleUser.photoUrl,
         isActive: true,
-        roleId: 'super_admin',
+        roleId: 'admin',
         shopId: null,
         createdAt: DateTime.now(),
       );
 
-      _sessionToken = 'demo_token_${DateTime.now().millisecondsSinceEpoch}';
+      _sessionToken = 'admin_token_${DateTime.now().millisecondsSinceEpoch}';
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = e.toString().replaceAll('Exception: ', '');
       _isLoading = false;
       notifyListeners();
       return false;

@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'database.dart'; // Import supabase client
 
 class UserSession extends ChangeNotifier {
@@ -14,6 +16,14 @@ class UserSession extends ChangeNotifier {
   static const String _userNameKey = 'ds_user_name';
   static const String _shopIdKey = 'ds_shop_id';
   static const String _shopNameKey = 'ds_shop_name';
+
+  // Google Sign-In client
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: [
+      'email',
+      'profile',
+    ],
+  );
 
   String? _userId;
   String? _userName;
@@ -86,169 +96,74 @@ class UserSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Login with Supabase Email & Password.
-  /// Uses raw HTTP to pre-check for errors the SDK doesn't handle gracefully.
-  Future<Map<String, dynamic>> loginWithEmail(String email, String password) async {
+  /// Login with Google OAuth using Supabase integration.
+  /// This handles the complete OAuth flow with Supabase backend.
+  Future<Map<String, dynamic>> loginWithGoogle() async {
     try {
-      // Pre-check with raw HTTP to catch errors that crash the SDK
-      final rawResponse = await http.post(
-        Uri.parse('$resolvedSupabaseUrl/auth/v1/token?grant_type=password'),
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': resolvedSupabaseAnonKey,
-        },
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-        }),
+      // Sign out first to ensure fresh login
+      await _googleSignIn.signOut();
+      
+      // Start Google Sign-In flow
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        return {'success': false, 'error': 'Google sign-in cancelled'};
+      }
+
+      // Get Google authentication details
+      final googleAuth = await googleUser.authentication;
+      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
+        return {'success': false, 'error': 'Failed to get Google authentication tokens'};
+      }
+
+      // Sign in with Supabase using Google provider
+      final response = await supabase.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: googleAuth.idToken!,
       );
 
-      if (rawResponse.statusCode == 429) {
-        return {'success': false, 'error': 'Too many login attempts. Please wait a few minutes and try again.'};
+      if (response.user == null) {
+        return {'success': false, 'error': 'Failed to authenticate with Supabase'};
       }
 
-      if (rawResponse.statusCode == 400) {
-        final body = jsonDecode(rawResponse.body);
-        final errorCode = body['error_code'] ?? '';
-        final errorMsg = body['msg'] ?? body['error_description'] ?? 'Invalid credentials';
-        
-        // Note: Email confirmation is optional - users can proceed and verify later
-        // This check is kept for debugging but emails are not required to login
-        return {'success': false, 'error': errorMsg};
-      }
+      final userId = response.user!.id;
+      final userEmail = response.user!.email ?? googleUser.email;
+      final userName = googleUser.displayName ?? googleUser.email;
 
-      if (rawResponse.statusCode != 200) {
-        final body = jsonDecode(rawResponse.body);
-        return {'success': false, 'error': body['msg'] ?? 'Login failed (${rawResponse.statusCode})'};
-      }
+      // Upsert user record in public users table with full_name
+      await supabase.from('users').upsert({
+        'id': userId,
+        'email': userEmail,
+        'full_name': userName,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
 
-      // Parse the successful login response
-      final body = jsonDecode(rawResponse.body) as Map<String, dynamic>;
-      final user = body['user'] as Map<String, dynamic>?;
-      
-      if (user == null) {
-        return {'success': false, 'error': 'Login failed: No user returned'};
-      }
-
-      final userId = user['id'] as String;
-      final accessToken = body['access_token'] as String;
-      final refreshToken = body['refresh_token'] as String;
-
-      // Set session in the Supabase client so subsequent queries work
-      await supabase.auth.setSession(refreshToken);
-
-      // Fetch additional info from our public tables
-      final userResult = await supabase
-          .from('users')
-          .select('full_name')
-          .eq('id', userId)
-          .maybeSingle();
-          
-      // Accept ANY shop (not just completed ones) to support both Telegram and web onboarding
+      // Fetch user's shop if exists
       final shopResult = await supabase
           .from('shops')
           .select('id, name')
           .eq('owner_id', userId)
           .maybeSingle();
-      
-      // Check if email is verified (from Supabase user metadata)
-      _emailVerified = user['email_confirmed_at'] != null ?? true;
 
       _userId = userId;
-      _userName = userResult?['full_name'] as String?;
+      _userName = userName;
       _shopId = shopResult?['id'] as String?;
       _shopName = shopResult?['name'] as String?;
+      _emailVerified = response.user!.emailConfirmedAt != null || true; // Google users are pre-verified
 
       // Persist to local storage
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_userIdKey, userId);
-      if (_userName != null) await prefs.setString(_userNameKey, _userName!);
+      await prefs.setString(_userNameKey, userName);
       if (_shopId != null) await prefs.setString(_shopIdKey, _shopId!);
       if (_shopName != null) await prefs.setString(_shopNameKey, _shopName!);
 
       notifyListeners();
       return {'success': true};
     } catch (e, stack) {
-      debugPrint('[Session] login error: $e\n$stack');
+      debugPrint('[Session] Google login error: $e\n$stack');
       String msg = e.toString();
-      if (msg.contains('Null check')) {
-        msg = 'Login service is temporarily unavailable. Please try again in a few minutes.';
-      } else {
-        msg = msg.replaceAll('Exception: ', '');
-        if (msg.contains('Email not confirmed')) {
-          msg = 'Please check your email and confirm your account before logging in.';
-        }
-      }
-      return {'success': false, 'error': msg};
-    }
-  }
-
-  /// Register a new user with Email & Password.
-  /// Uses raw HTTP as a fallback because the gotrue SDK crashes on non-200
-  /// responses (e.g. 429 rate limit) with "Null check operator used on a null value".
-  Future<Map<String, dynamic>> register(String email, String password, String fullName) async {
-    try {
-      // First try raw HTTP to check for rate limits and other errors
-      // that the SDK doesn't handle gracefully.
-      final rawResponse = await http.post(
-        Uri.parse('$resolvedSupabaseUrl/auth/v1/signup'),
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': resolvedSupabaseAnonKey,
-        },
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-          'data': {'full_name': fullName},
-          'redirect_to': kIsWeb ? Uri.base.origin : null,
-        }),
-      );
-
-      if (rawResponse.statusCode == 429) {
-        return {'success': false, 'error': 'Too many signup attempts. Please wait a few minutes and try again.'};
-      }
-
-      if (rawResponse.statusCode == 422) {
-        return {'success': false, 'error': 'This email is already registered. Try signing in instead.'};
-      }
-
-      if (rawResponse.statusCode != 200) {
-        final body = jsonDecode(rawResponse.body);
-        final msg = body['msg'] ?? body['message'] ?? body['error_description'] ?? 'Registration failed (${rawResponse.statusCode})';
-        return {'success': false, 'error': msg};
-      }
-
-      // Parse the successful response
-      final body = jsonDecode(rawResponse.body) as Map<String, dynamic>;
-      final userId = body['id'] as String?;
-
-      if (userId != null) {
-        // Check if email confirmation is required (no access_token means confirmation needed)
-        final hasSession = body['access_token'] != null;
-        
-        if (hasSession) {
-          _userId = userId;
-          _userName = fullName;
-          
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(_userIdKey, userId);
-          await prefs.setString(_userNameKey, fullName);
-          
-          notifyListeners();
-        }
-        
-        return {
-          'success': true,
-          'needsConfirmation': !hasSession,
-        };
-      } else {
-        return {'success': false, 'error': 'Registration failed: No user returned'};
-      }
-    } catch (e, stack) {
-      debugPrint('[Session] register error: $e\n$stack');
-      String msg = e.toString();
-      if (msg.contains('Null check')) {
-        msg = 'Registration service is temporarily unavailable. Please try again in a few minutes.';
+      if (msg.contains('PlatformException')) {
+        msg = 'Failed to sign in with Google. Please try again.';
       } else {
         msg = msg.replaceAll('Exception: ', '');
       }
