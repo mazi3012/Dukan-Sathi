@@ -253,11 +253,11 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
           padding: EdgeInsets.only(
-            left: 20, 
-            right: 20, 
-            top: 15, 
-            bottom: MediaQuery.of(context).viewInsets.bottom > 0 
-                ? 15 
+            left: 20,
+            right: 20,
+            top: 15,
+            bottom: MediaQuery.of(context).viewInsets.bottom > 0
+                ? 15
                 : MediaQuery.of(context).padding.bottom + 15,
           ),
           decoration: BoxDecoration(
@@ -278,13 +278,18 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                     controller: _textController,
                     style: const TextStyle(color: Colors.white),
                     onSubmitted: (_) => _sendMessage(),
-                      decoration: InputDecoration(
-                        hintText: _isTranscribing ? "Transcribing..." : "Ask Dukan Sathi...",
-                        hintStyle: const TextStyle(color: Colors.white54),
-                        border: InputBorder.none,
-                        icon: const Icon(Iconsax.camera, color: Colors.white54),
-                        suffixIcon: _isTranscribing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : null,
-                      ),
+                    decoration: InputDecoration(
+                      hintText: _isTranscribing ? "Transcribing..." : "Ask Dukan Sathi...",
+                      hintStyle: const TextStyle(color: Colors.white54),
+                      border: InputBorder.none,
+                      icon: const Icon(Iconsax.camera, color: Colors.white54),
+                      suffixIcon: _isTranscribing
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : null,
                     ),
                   ),
                 ),
@@ -301,9 +306,15 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                     shape: BoxShape.circle,
                     color: _isRecording ? Colors.red.withOpacity(0.2) : AppColors.darkSurface,
                     border: Border.all(color: _isRecording ? Colors.red : AppColors.darkGlassBorder),
-                    boxShadow: _isRecording ? [
-                      BoxShadow(color: Colors.red.withOpacity(0.3), blurRadius: 10, spreadRadius: 2)
-                    ] : [],
+                    boxShadow: _isRecording
+                        ? [
+                            BoxShadow(
+                              color: Colors.red.withOpacity(0.3),
+                              blurRadius: 10,
+                              spreadRadius: 2,
+                            )
+                          ]
+                        : [],
                   ),
                   child: Icon(
                     _isRecording ? Iconsax.stop : Iconsax.microphone_2,
