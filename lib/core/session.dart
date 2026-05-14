@@ -107,17 +107,28 @@ class UserSession extends ChangeNotifier {
       // Start Google Sign-In flow
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
+        debugPrint('[Session] Google sign-in cancelled by user');
         return {'success': false, 'error': 'Google sign-in cancelled'};
       }
 
-      // Get Google authentication details
-      final googleAuth = await googleUser.authentication;
       debugPrint('[Session] googleUser: ${googleUser.email} id:${googleUser.id}');
+
+      // Get Google authentication details
+      // On web, this may require additional configuration
+      final googleAuth = await googleUser.authentication;
+      debugPrint('[Session] googleAuth object: $googleAuth');
       final idToken = googleAuth.idToken;
       final accessToken = googleAuth.accessToken;
-      debugPrint('[Session] googleAuth tokens: hasId=${idToken!=null} hasAccess=${accessToken!=null}');
-      if (accessToken == null || idToken == null || idToken.isEmpty) {
-        return {'success': false, 'error': 'Failed to get Google authentication tokens'};
+      debugPrint('[Session] googleAuth.idToken: ${idToken?.substring(0, 20)}...');
+      debugPrint('[Session] googleAuth.accessToken: ${accessToken?.substring(0, 20)}...');
+      debugPrint('[Session] googleAuth tokens: hasId=${idToken!=null && idToken.isNotEmpty} hasAccess=${accessToken!=null && accessToken.isNotEmpty}');
+      if (accessToken == null || accessToken.isEmpty) {
+        debugPrint('[Session] ERROR: accessToken is null or empty');
+        return {'success': false, 'error': 'Failed to get Google authentication tokens (no access token)'};
+      }
+      if (idToken == null || idToken.isEmpty) {
+        debugPrint('[Session] ERROR: idToken is null or empty');
+        return {'success': false, 'error': 'Failed to get Google authentication tokens (no ID token)'};
       }
 
       // Sign in with Supabase using Google provider

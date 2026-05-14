@@ -34,22 +34,36 @@ class GoogleAuthService {
       // Start Google Sign-In flow
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
+        debugPrint('[GoogleAuthService] Google sign-in cancelled by user');
         return {
           'success': false,
           'error': 'Google sign-in cancelled',
         };
       }
 
-      // Get Google authentication tokens
-      final googleAuth = await googleUser.authentication;
       debugPrint('[GoogleAuthService] googleUser: ${googleUser.email} id:${googleUser.id}');
+
+      // Get Google authentication tokens
+      // On web, this may require additional configuration
+      final googleAuth = await googleUser.authentication;
+      debugPrint('[GoogleAuthService] googleAuth object: $googleAuth');
       final idToken = googleAuth.idToken;
       final accessToken = googleAuth.accessToken;
-      debugPrint('[GoogleAuthService] googleAuth tokens: hasId=${idToken!=null} hasAccess=${accessToken!=null}');
-      if (accessToken == null || idToken == null || idToken.isEmpty) {
+      debugPrint('[GoogleAuthService] googleAuth.idToken: ${idToken?.substring(0, 20)}...');
+      debugPrint('[GoogleAuthService] googleAuth.accessToken: ${accessToken?.substring(0, 20)}...');
+      debugPrint('[GoogleAuthService] googleAuth tokens: hasId=${idToken!=null && idToken.isNotEmpty} hasAccess=${accessToken!=null && accessToken.isNotEmpty}'];
+      if (accessToken == null || accessToken.isEmpty) {
+        debugPrint('[GoogleAuthService] ERROR: accessToken is null or empty');
         return {
           'success': false,
-          'error': 'Failed to get Google authentication tokens',
+          'error': 'Failed to get Google authentication tokens (no access token)',
+        };
+      }
+      if (idToken == null || idToken.isEmpty) {
+        debugPrint('[GoogleAuthService] ERROR: idToken is null or empty');
+        return {
+          'success': false,
+          'error': 'Failed to get Google authentication tokens (no ID token)',
         };
       }
 
