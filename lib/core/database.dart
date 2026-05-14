@@ -1,6 +1,10 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase/supabase.dart';
+import 'supabase_provider_stub.dart'
+    if (dart.library.ui) 'supabase_provider_flutter.dart'
+    if (dart.library.io) 'supabase_provider_dart.dart'
+    if (dart.library.html) 'supabase_provider_flutter.dart';
 
-final SupabaseClient supabase = Supabase.instance.client;
+SupabaseClient get supabase => getSupabaseInstance();
 
 /// Helper to get the shop ID for a given user identifier.
 Future<String> getShopIdForUser(String? userIdentifier) async {
