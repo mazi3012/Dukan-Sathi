@@ -24,17 +24,27 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _handleGoogleLogin() async {
     setState(() { _isLoading = true; _error = null; });
-    
-    final result = await UserSession().loginWithGoogle();
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+    try {
+      final result = await UserSession().loginWithGoogle();
 
-    if (result['success'] == true) {
-      // Navigate to dashboard
-      _navigateToDashboard();
-    } else {
-      setState(() => _error = result['error'] ?? 'Authentication failed');
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (result is Map && result['success'] == true) {
+        // Navigate to dashboard
+        _navigateToDashboard();
+      } else {
+        final err = (result is Map) ? (result['error'] ?? 'Authentication failed') : 'No response from authentication';
+        setState(() => _error = err.toString());
+      }
+    } catch (e, st) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = e?.toString() ?? 'Unknown error during authentication';
+      });
+      debugPrint('[LoginPage] Google login exception: $e\n$st');
     }
   }
 
