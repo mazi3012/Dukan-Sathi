@@ -493,18 +493,16 @@ Future<void> main(List<String> arguments) async {
 
 const String _webSystemPrompt =
   "You are Dukan Sathi Pro, a premium AI retail shop assistant. CRITICAL RULES: "
-  "1. NEVER make up, guess, or hallucinate product names, prices, stock, or any data. ONLY use real data from tool responses. "
-  "2. If inventory/catalog is empty, say so plainly — never invent sample products. "
-  "3. No narration (never say 'I am checking' or 'Let me look up'). Use tools silently, output final result only. "
-  "4. If you create a draft invoice, ALWAYS include the Approval ID. "
-  "5. If you propose adding products, ALWAYS include the Batch ID in the response. "
-  "6. customerId, customerName, and customerState are OPTIONAL — do NOT ask for them; call the tool immediately. "
-  "7. For specific product lookups, use checkInventory. For full product lists, use browseCatalogTool. "
-  "8. For business analytics (revenue, orders, approval status), use businessInsightsTool. ALWAYS default to period='all_time' unless a specific timeframe is mentioned. "
-  "9. Present analytics in clear format, explicitly mentioning the timeframe: 'Total [Timeframe] Revenue: ₹X | Orders: Y | Approved: Z'. "
-  "10. For product additions, use proposeProducts. For product deletion, use requestProductDeletion. "
-  "11. For shop expenses, use logExpense to record and getExpenses to retrieve. "
-  "12. Always reply concisely in a friendly, professional manner.";
+  "1. NEVER hallucinate data; ONLY use tool responses. "
+  "2. For business analytics, use businessInsightsTool. DEFAULT to period='all_time'. "
+  "3. When reporting revenue, clearly state: 'Total Revenue (Tax Inclusive): ₹X'. "
+  "4. For shop expenses, use logExpense. If a category is missing (e.g. 'tea party'), use 'General'. "
+  "5. If a tool call fails, explain the error clearly to the user. "
+  "6. No narration (don't say 'I am checking'). Output results directly. "
+  "7. For customer dues or balances, use checkCustomerDue or listCustomersDue. "
+  "8. Always include Approval/Batch IDs in responses. "
+  "9. DEFAULT to period='all_time' for analytics unless a specific timeframe is mentioned. "
+  "10. Reply concisely, professionally, and authoritatively. Do NOT ask for IDs or Shop names; use the provided context.";
 
 DateTime _nowIst() => DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
 String _twoDigits(int v) => v.toString().padLeft(2, '0');
@@ -538,8 +536,8 @@ class WebChatSession {
   bool _isInventoryIntent(String n) => n.contains('stock') || n.contains('inventory') || n.contains('price') || n.contains('how many') || n.contains('quantity');
   bool _isBillingIntent(String n) => n.contains('bill') || n.contains('invoice') || n.contains('draft');
   bool _isAnalyticsIntent(String n) => n.contains('revenue') || n.contains('sales') || n.contains('analytics') || n.contains('insight') ||
-      n.contains('profit') || n.contains('earnings') || n.contains('orders') || n.contains('total sales');
-  bool _isExpenseIntent(String n) => n.contains('expense') || n.contains('spent') || n.contains('bill paid') || n.contains('cost');
+      n.contains('profit') || n.contains('earnings') || n.contains('orders') || n.contains('total sales') || n.contains('how much money');
+  bool _isExpenseIntent(String n) => n.contains('expense') || n.contains('spent') || n.contains('bill paid') || n.contains('cost') || n.contains('party') || n.contains('tea') || n.contains('rent') || n.contains('salary');
 
   String _extractInventoryQuery(String input) {
     var n = input.toLowerCase();
@@ -873,19 +871,20 @@ class WebChatSession {
 
     // Simple intent routing to avoid overloading Groq with unnecessary tools
     List<String> selectedTools = [];
-    if (n.contains('inventory') || n.contains('stock') || n.contains('price') || n.contains('atta') || n.contains('dal') || n.contains('oil')) {
+    if (n.contains('inventory') || n.contains('stock') || n.contains('price') || n.contains('atta') || n.contains('dal') || n.contains('oil') || n.contains('item')) {
       selectedTools = ['checkInventory', 'browseCatalogTool'];
-    } else if (n.contains('revenue') || n.contains('analytics') || n.contains('orders') || n.contains('sales')) {
+    } else if (n.contains('revenue') || n.contains('analytics') || n.contains('orders') || n.contains('sales') || n.contains('profit') || n.contains('earned') || n.contains('money')) {
       selectedTools = ['businessInsightsTool'];
-    } else if (n.contains('add product') || n.contains('import')) {
-      selectedTools = ['proposeProducts'];
-    } else if (n.contains('delete')) {
+    } else if (n.contains('add') || n.contains('new') || n.contains('create') || n.contains('import') || n.contains('upload')) {
+      // Add can be products or expenses
+      selectedTools = ['proposeProducts', 'logExpense'];
+    } else if (n.contains('delete') || n.contains('remove')) {
       selectedTools = ['requestProductDeletion'];
     } else if (n.contains('weather')) {
       selectedTools = ['getWeather'];
     } else if (n.contains('remind') || n.contains('reminder')) {
       selectedTools = ['setReminder'];
-    } else if (n.contains('expense') || n.contains('rent') || n.contains('bill')) {
+    } else if (n.contains('expense') || n.contains('rent') || n.contains('bill') || n.contains('pay') || n.contains('spent') || n.contains('party') || n.contains('tea')) {
       selectedTools = ['logExpense', 'getExpenses'];
     }
 

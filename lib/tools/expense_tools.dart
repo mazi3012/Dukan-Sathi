@@ -20,10 +20,11 @@ final logExpense = ai.defineTool<Map<String, dynamic>, String>(
         },
         'category': {
           'type': 'string',
-          'description': 'Category (e.g., Utility, Rent, Maintenance, Salary)',
+          'description': 'Category (e.g., Utility, Rent, Maintenance, Salary). Defaults to "General" if not specified.',
         },
       },
-      'required': ['description', 'amount', 'category'],
+      'required': ['description', 'amount'],
+      'additionalProperties': false,
     },
     parse: (json) => Map<String, dynamic>.from(json as Map),
   ),
@@ -38,7 +39,7 @@ final logExpense = ai.defineTool<Map<String, dynamic>, String>(
         'shop_id': shopId,
         'description': input['description'],
         'amount': input['amount'],
-        'category': input['category'],
+        'category': input['category'] ?? 'General',
         'timestamp': DateTime.now().toIso8601String(),
       });
 

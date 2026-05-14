@@ -313,7 +313,8 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
           .where((record) => record['approval_status'] == 'REJECTED')
           .fold<double>(0.0, (sum, record) => sum + _safeNum(record['proposed_total']));
       final totalRevenue = saleRecords.fold<double>(0.0, (sum, record) => sum + _safeNum(record['amount']));
-      
+      final netRevenue = saleRecords.fold<double>(0.0, (sum, record) => sum + _safeNum(record['subtotal_after_discount'] ?? record['amount']));
+      final taxCollected = totalRevenue - netRevenue;
       final customerRevenueMap = <String, double>{};
       final customerNameMap = <String, String>{};
       for (final record in saleRecords) {
@@ -342,6 +343,9 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
         'fromDate': from?.toIso8601String(),
         'toDate': to?.toIso8601String(),
         'total_revenue': totalRevenue,
+        'total_revenue_tax_inclusive': totalRevenue,
+        'net_revenue_tax_exclusive': netRevenue,
+        'total_tax_collected': taxCollected,
         'top_customer_name': topCustomerName,
         'top_customer_revenue': topCustomerRevenue,
         'total_orders': saleRecords.length,
