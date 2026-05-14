@@ -42,7 +42,9 @@ class GoogleAuthService {
 
       // Get Google authentication tokens
       final googleAuth = await googleUser.authentication;
-      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
+      if (accessToken == null || idToken == null || idToken.isEmpty) {
         return {
           'success': false,
           'error': 'Failed to get Google authentication tokens',
@@ -52,18 +54,20 @@ class GoogleAuthService {
       // Sign in with Supabase using Google provider
       final response = await _supabase.auth.signInWithIdToken(
         provider: OAuthProvider.google,
-        idToken: googleAuth.idToken!,
+        idToken: idToken,
       );
 
-      if (response.user == null) {
+      final respUser = response.user;
+      if (respUser == null) {
+        debugPrint('[GoogleAuthService] Supabase response.user is null');
         return {
           'success': false,
           'error': 'Failed to authenticate with Supabase',
         };
       }
 
-      final userId = response.user!.id;
-      final userEmail = response.user!.email ?? googleUser.email;
+      final userId = respUser.id;
+      final userEmail = respUser.email ?? googleUser.email;
       final userName = googleUser.displayName ?? googleUser.email;
 
       return {

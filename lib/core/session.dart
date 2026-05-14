@@ -112,22 +112,26 @@ class UserSession extends ChangeNotifier {
 
       // Get Google authentication details
       final googleAuth = await googleUser.authentication;
-      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
+      if (accessToken == null || idToken == null || idToken.isEmpty) {
         return {'success': false, 'error': 'Failed to get Google authentication tokens'};
       }
 
       // Sign in with Supabase using Google provider
       final response = await supabase.auth.signInWithIdToken(
         provider: OAuthProvider.google,
-        idToken: googleAuth.idToken!,
+        idToken: idToken,
       );
 
-      if (response.user == null) {
+      final respUser = response.user;
+      if (respUser == null) {
+        debugPrint('[Session] Supabase response.user is null');
         return {'success': false, 'error': 'Failed to authenticate with Supabase'};
       }
 
-      final userId = response.user!.id;
-      final userEmail = response.user!.email ?? googleUser.email;
+      final userId = respUser.id;
+      final userEmail = respUser.email ?? googleUser.email;
       final userName = googleUser.displayName ?? googleUser.email;
 
       // Upsert user record in public users table with full_name
@@ -149,7 +153,7 @@ class UserSession extends ChangeNotifier {
       _userName = userName;
       _shopId = shopResult?['id'] as String?;
       _shopName = shopResult?['name'] as String?;
-      _emailVerified = response.user!.emailConfirmedAt != null || true; // Google users are pre-verified
+      _emailVerified = respUser.emailConfirmedAt != null || true; // Google users are pre-verified
 
       // Persist to local storage
       final prefs = await SharedPreferences.getInstance();
