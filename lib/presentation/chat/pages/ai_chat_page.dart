@@ -1,5 +1,5 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:record/record.dart';
@@ -42,9 +42,20 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
         const config = RecordConfig();
         await _audioRecorder.start(config, path: ''); 
         setState(() => _isRecording = true);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Microphone permission denied')),
+          );
+        }
       }
     } catch (e) {
       debugPrint('Error starting recording: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not start recording: $e')),
+        );
+      }
     }
   }
 
@@ -296,6 +307,14 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
               ),
               const SizedBox(width: 8),
               GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  if (_isRecording) {
+                    _stopRecording();
+                  } else {
+                    _startRecording();
+                  }
+                },
                 onLongPress: _startRecording,
                 onLongPressUp: _stopRecording,
                 child: AnimatedContainer(
