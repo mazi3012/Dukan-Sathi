@@ -14,6 +14,9 @@ import 'package:dukansathi_new/tools/analytics_tools.dart';
 import 'package:dukansathi_new/tools/customer_tools.dart' as cust;
 import 'package:dukansathi_new/services/invoice_pdf_generator.dart';
 import 'package:genkit/genkit.dart';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'package:mime/mime.dart';
 
 Future<void> main(List<String> arguments) async {
   print('--- Genkit Server Initializing ---');
@@ -292,6 +295,88 @@ Future<void> main(List<String> arguments) async {
         } catch (e) {
           request.response..statusCode = 500..write(e.toString())..close();
         }
+      } else if (request.method == 'POST' && request.uri.path == '/api/update-draft') {
+        // ─── UPDATE DRAFT (GST, DISCOUNT, PAYMENT) ──────────────────────
+        var body = await utf8.decodeStream(request);
+        String currentType = 'unknown';
+        try {
+          final data = jsonDecode(body) as Map<String, dynamic>;
+        } catch (e) {
+          request.response..statusCode = 400..write('Invalid JSON')..close();
+        }
+      } else if (request.method == 'POST' && request.uri.path == '/api/transcribe') {
+        // ─── WHISPER TRANSCRIPTION ENDPOINT ───────────────────────────
+        try {
+          final bytes = await request.fold<List<int>>([], (p, e) => p..addAll(e));
+          if (bytes.isEmpty) {
+            request.response..statusCode = 400..write('No audio data received')..close();
+            return;
+          }
+
+          final groqKey = getEnv('GROQ_API_KEY');
+          if (groqKey == null || groqKey.isEmpty) {
+            request.response..statusCode = 500..write('GROQ_API_KEY not configured')..close();
+            return;
+          }
+
+          print('🎙️ Transcribing audio (${bytes.length} bytes)...');
+
+          final groqReq = http.MultipartRequest(
+            'POST', 
+            Uri.parse('https://api.groq.com/openai/v1/audio/transcriptions')
+          );
+          groqReq.headers['Authorization'] = 'Bearer $groqKey';
+          
+          // Determine mime type or default to m4a
+          final mimeType = lookupMimeType('audio.m4a', headerBytes: bytes.take(10).toList()) ?? 'audio/m4a';
+          final mediaType = MediaType.parse(mimeType);
+
+          groqReq.files.add(http.MultipartFile.fromBytes(
+            'file', 
+            bytes, 
+            filename: 'audio.${mediaType.subtype}',
+            contentType: mediaType,
+          ));
+          groqReq.fields['model'] = 'whisper-large-v3';
+
+          final streamedResponse = await groqReq.send();
+          final response = await http.Response.fromStream(streamedResponse);
+
+          if (response.statusCode == 200) {
+            final result = jsonDecode(response.body);
+            final text = result['text'] as String? ?? '';
+            print('✅ Transcribed: "$text"');
+            
+            request.response
+              ..statusCode = 200
+              ..headers.contentType = ContentType.json
+              ..write(jsonEncode({'text': text}))
+              ..close();
+          } else {
+            print('❌ Groq Transcription Error: ${response.body}');
+            request.response
+              ..statusCode = response.statusCode
+              ..headers.contentType = ContentType.json
+              ..write(jsonEncode({'error': 'Transcription failed', 'details': response.body}))
+              ..close();
+          }
+        } catch (e) {
+          print('❌ Server Error during transcription: $e');
+          request.response..statusCode = 500..write(e.toString())..close();
+        }
+      } else if (request.method == 'GET' && request.uri.path == '/api/get-draft') {
+        // ─── GET DRAFT DETAILS ──────────────────────────────────────────
+        final approvalId = request.uri.queryParameters['approvalId'];
+        if (approvalId == null) {
+          request.response..statusCode = 400..close();
+          return;
+        }
+        final draft = await getApprovalDetails(approvalId);
+        request.response
+          ..statusCode = draft != null ? 200 : 404
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode(draft ?? {'error': 'Draft not found'}))
+          ..close();
       } else if (request.method == 'POST' && request.uri.path == '/api/update-draft') {
         // ─── UPDATE DRAFT (GST, DISCOUNT, PAYMENT) ──────────────────────
         var body = await utf8.decodeStream(request);

@@ -2,6 +2,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:record/record.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../models/chat_message.dart';
@@ -20,6 +23,68 @@ class AiChatPage extends ConsumerStatefulWidget {
 class _AiChatPageState extends ConsumerState<AiChatPage> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  bool _isRecording = false;
+  bool _isTranscribing = false;
+
+  @override
+  void dispose() {
+    _audioRecorder.dispose();
+    _textController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startRecording() async {
+    try {
+      if (await _audioRecorder.hasPermission()) {
+        const config = RecordConfig();
+        await _audioRecorder.start(config, path: ''); 
+        setState(() => _isRecording = true);
+      }
+    } catch (e) {
+      debugPrint('Error starting recording: $e');
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    try {
+      final path = await _audioRecorder.stop();
+      setState(() => _isRecording = false);
+      if (path != null) {
+        _transcribeAudio(path);
+      }
+    } catch (e) {
+      debugPrint('Error stopping recording: $e');
+    }
+  }
+
+  Future<void> _transcribeAudio(String path) async {
+    setState(() => _isTranscribing = true);
+    try {
+      final response = await http.get(Uri.parse(path));
+      final bytes = response.bodyBytes;
+
+      final transResponse = await http.post(
+        Uri.parse('/api/transcribe'),
+        body: bytes,
+      );
+
+      if (transResponse.statusCode == 200) {
+        final data = jsonDecode(transResponse.body);
+        final text = data['text'] as String;
+        if (text.trim().isNotEmpty) {
+          _textController.text = text;
+          _sendMessage(); // Auto-send transcribed text
+        }
+      }
+    } catch (e) {
+      debugPrint('Transcription error: $e');
+    } finally {
+      setState(() => _isTranscribing = false);
+    }
+  }
 
   void _sendMessage() {
     final text = _textController.text;
@@ -213,12 +278,36 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                     controller: _textController,
                     style: const TextStyle(color: Colors.white),
                     onSubmitted: (_) => _sendMessage(),
-                    decoration: const InputDecoration(
-                      hintText: "Ask Dukan Sathi...",
-                      hintStyle: TextStyle(color: Colors.white54),
-                      border: InputBorder.none,
-                      icon: Icon(Iconsax.camera, color: Colors.white54),
+                      decoration: InputDecoration(
+                        hintText: _isTranscribing ? "Transcribing..." : "Ask Dukan Sathi...",
+                        hintStyle: const TextStyle(color: Colors.white54),
+                        border: InputBorder.none,
+                        icon: const Icon(Iconsax.camera, color: Colors.white54),
+                        suffixIcon: _isTranscribing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : null,
+                      ),
                     ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onLongPress: _startRecording,
+                onLongPressUp: _stopRecording,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  height: 50,
+                  width: 50,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _isRecording ? Colors.red.withOpacity(0.2) : AppColors.darkSurface,
+                    border: Border.all(color: _isRecording ? Colors.red : AppColors.darkGlassBorder),
+                    boxShadow: _isRecording ? [
+                      BoxShadow(color: Colors.red.withOpacity(0.3), blurRadius: 10, spreadRadius: 2)
+                    ] : [],
+                  ),
+                  child: Icon(
+                    _isRecording ? Iconsax.stop : Iconsax.microphone_2,
+                    color: _isRecording ? Colors.red : Colors.white54,
                   ),
                 ),
               ),

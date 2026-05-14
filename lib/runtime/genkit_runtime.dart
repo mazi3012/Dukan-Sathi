@@ -21,6 +21,8 @@ String? _envValue(String key) {
 	return null;
 }
 
+String? getEnv(String key) => _envValue(key);
+
 Genkit _createGenkit() {
 	if (File('.env').existsSync()) {
 		_env.load(['.env']);
