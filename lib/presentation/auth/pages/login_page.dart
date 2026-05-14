@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/session.dart';
 import '../../main/pages/main_layout.dart';
@@ -32,6 +33,9 @@ class _LoginPageState extends State<LoginPage> {
       setState(() => _isLoading = false);
 
       if (result is Map && result['success'] == true) {
+        if (result['note'] != null) {
+          setState(() => _error = result['note'].toString()); // Using _error variable to show info message
+        }
         // Navigate to dashboard
         // Note: We don't navigate manually here. UserSession.notifyListeners() will trigger
         // AuthGate (in main.dart) to rebuild and route to ShopSetupPage or MainLayout.
@@ -167,7 +171,7 @@ class _LoginPageState extends State<LoginPage> {
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.g_mobiledata, size: 24),
+                  const Icon(FontAwesomeIcons.google, size: 20, color: Color(0xFFDB4437)), // Google Red
                   const SizedBox(width: 12),
                   const Text(
                     'Sign in with Google',

@@ -18,12 +18,17 @@ class UserSession extends ChangeNotifier {
   static const String _shopNameKey = 'ds_shop_name';
 
   // Google Sign-In client
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: [
-      'email',
-      'profile',
-    ],
-  );
+  late GoogleSignIn _googleSignIn;
+
+  UserSession._internal() {
+    _googleSignIn = GoogleSignIn(
+      clientId: kIsWeb ? '648987320349-asplif3bmr9ai0k3lkp9ulth5gne9eru.apps.googleusercontent.com' : null,
+      scopes: [
+        'email',
+        'https://www.googleapis.com/auth/userinfo.profile',
+      ],
+    );
+  }
 
   String? _userId;
   String? _userName;
@@ -70,23 +75,34 @@ class UserSession extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // On web, wait a brief moment for Supabase to recover the session from the URL fragment/cookie
+      if (kIsWeb) {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      
       final prefs = await SharedPreferences.getInstance();
       _userId = prefs.getString(_userIdKey);
       _userName = prefs.getString(_userNameKey);
       _shopId = prefs.getString(_shopIdKey);
       _shopName = prefs.getString(_shopNameKey);
 
-      if (_userId != null) {
-        // Always try to refresh shop info if we have a user but no shop ID locally
-        // or just to ensure the session is still valid.
-        if (supabase.auth.currentUser == null) {
-          // If Supabase session is gone, we might need to re-auth or clear
-          // but we'll try to keep the userId if it's still valid in the eyes of the app
-          // Actually, if currentUser is null, we should probably clear.
-          await _clearLocal();
-        } else if (_shopId == null) {
+      final currentSupabaseUser = supabase.auth.currentUser;
+      
+      if (currentSupabaseUser != null) {
+        // We have a valid Supabase session (possibly just recovered from OAuth redirect)
+        _userId = currentSupabaseUser.id;
+        _userName = currentSupabaseUser.userMetadata?['full_name'] ?? currentSupabaseUser.email;
+        
+        // Ensure local storage is in sync
+        await prefs.setString(_userIdKey, _userId!);
+        if (_userName != null) await prefs.setString(_userNameKey, _userName!);
+        
+        if (_shopId == null) {
           await _fetchAndPersistShop(_userId!);
         }
+      } else if (_userId != null) {
+        // We have local data but no Supabase session - this is an invalid state
+        await _clearLocal();
       }
     } catch (e) {
       debugPrint('[Session] init error: $e');
@@ -101,41 +117,37 @@ class UserSession extends ChangeNotifier {
   /// On mobile: Uses google_sign_in package with ID tokens
   Future<Map<String, dynamic>> loginWithGoogle() async {
     try {
-      // Web platform: Not yet fully supported
+      debugPrint('[Session] Starting Google Sign-In flow (isWeb: $kIsWeb)');
+      
       if (kIsWeb) {
-        debugPrint('[Session] Web platform detected');
-        return {'success': false, 'error': 'Google sign-in on web requires additional setup. Please use the mobile app or contact support.'};
+        debugPrint('[Session] Web platform detected - using signInWithOAuth redirect');
+        
+        // Use the current origin for redirect back to ensure it works on localhost or production
+        final String redirectTo = Uri.base.origin;
+        debugPrint('[Session] Web redirect URL: $redirectTo');
+
+        await supabase.auth.signInWithOAuth(
+          provider: OAuthProvider.google,
+          redirectTo: redirectTo,
+        );
+        
+        // The page will redirect, so we return success.
+        return {'success': true, 'note': 'Redirecting to Google...'};
       }
-      
+
       // Mobile platform: Use google_sign_in package with tokens
-      debugPrint('[Session] Mobile platform detected - using google_sign_in with tokens');
-      // Sign out first to ensure fresh login
       await _googleSignIn.signOut();
-      
-      // Start Google Sign-In flow
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         debugPrint('[Session] Google sign-in cancelled by user');
         return {'success': false, 'error': 'Google sign-in cancelled'};
       }
 
-      debugPrint('[Session] googleUser: ${googleUser.email} id:${googleUser.id}');
-
-      // Get Google authentication details
       final googleAuth = await googleUser.authentication;
-      debugPrint('[Session] googleAuth object: $googleAuth');
       final idToken = googleAuth.idToken;
-      final accessToken = googleAuth.accessToken;
-      debugPrint('[Session] googleAuth.idToken: ${idToken?.substring(0, 20)}...');
-      debugPrint('[Session] googleAuth.accessToken: ${accessToken?.substring(0, 20)}...');
-      debugPrint('[Session] googleAuth tokens: hasId=${idToken!=null && idToken.isNotEmpty} hasAccess=${accessToken!=null && accessToken.isNotEmpty}');
-      if (accessToken == null || accessToken.isEmpty) {
-        debugPrint('[Session] ERROR: accessToken is null or empty');
-        return {'success': false, 'error': 'Failed to get Google authentication tokens (no access token)'};
-      }
+      
       if (idToken == null || idToken.isEmpty) {
-        debugPrint('[Session] ERROR: idToken is null or empty');
-        return {'success': false, 'error': 'Failed to get Google authentication tokens (no ID token)'};
+        return {'success': false, 'error': 'Failed to get Google authentication tokens'};
       }
 
       // Sign in with Supabase using Google provider (mobile only)

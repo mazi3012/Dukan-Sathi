@@ -7,8 +7,25 @@ import 'presentation/auth/pages/login_page.dart';
 import 'presentation/auth/pages/shop_setup_page.dart';
 import 'presentation/auth/pages/email_verification_page.dart';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Supabase correctly for Flutter (handles session persistence and OAuth redirects)
+  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+
+  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+    debugPrint('WARNING: SUPABASE_URL or SUPABASE_ANON_KEY is missing! Use --dart-define=SUPABASE_URL=... during run.');
+  }
+
+  await Supabase.initialize(
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
+    debug: true,
+  );
+
   // Initialize session (checks SharedPreferences + validates with backend)
   await UserSession().init();
   runApp(

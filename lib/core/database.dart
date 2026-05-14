@@ -1,36 +1,6 @@
-import 'package:supabase/supabase.dart';
-import 'env_stub.dart'
-    if (dart.library.io) 'env_io.dart'
-    if (dart.library.html) 'env_web.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-final _loader = getLoader()..load();
-
-final String _supabaseUrl = const String.fromEnvironment('SUPABASE_URL', defaultValue: '');
-final String _supabaseAnonKey = const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
-final String _supabaseServiceRoleKey = const String.fromEnvironment('SUPABASE_SERVICE_ROLE_KEY', defaultValue: '');
-
-String _getEnv(String key, String dartDefineValue) {
-  if (dartDefineValue.isNotEmpty) return dartDefineValue;
-  return _loader.get(key) ?? '';
-}
-
-final String resolvedSupabaseUrl = _getEnv('SUPABASE_URL', _supabaseUrl);
-final String resolvedSupabaseAnonKey = _getEnv('SUPABASE_ANON_KEY', _supabaseAnonKey);
-final String resolvedSupabaseServiceRoleKey = _getEnv('SUPABASE_SERVICE_ROLE_KEY', _supabaseServiceRoleKey);
-
-void _validateSupabaseEnv() {
-  if (resolvedSupabaseUrl.isEmpty || resolvedSupabaseAnonKey.isEmpty) {
-    throw StateError(
-      'SUPABASE_URL and SUPABASE_ANON_KEY must be set in environment variables.',
-    );
-  }
-}
-
-final SupabaseClient supabase = (() {
-  _validateSupabaseEnv();
-  final key = resolvedSupabaseServiceRoleKey.isNotEmpty ? resolvedSupabaseServiceRoleKey : resolvedSupabaseAnonKey;
-  return SupabaseClient(resolvedSupabaseUrl, key);
-})();
+final SupabaseClient supabase = Supabase.instance.client;
 
 /// Helper to get the shop ID for a given user identifier.
 Future<String> getShopIdForUser(String? userIdentifier) async {
