@@ -98,7 +98,9 @@ final checkInventoryTool = ai.defineTool<Map<String, dynamic>, List<Product>>(
   inputSchema: checkInventoryInputSchema,
   fn: (input, context) async {
     final query = (input['productName'] as String?) ?? '';
-    final shopId = await getShopIdForUser(context.context?['userIdentifier'] as String?);
+    final shopId = (input['shopId'] as String?) ?? 
+                   (context.context?['shopId'] as String?) ?? 
+                   await getShopIdForUser(context.context?['userIdentifier'] as String?);
     return findInventoryProducts(query, shopId);
   },
 );
@@ -125,7 +127,9 @@ final browseCatalogTool =
   inputSchema: browseCatalogInputSchema,
   fn: (input, context) async {
     final category = (input['category'] as String?)?.trim();
-    final shopId = await getShopIdForUser(context.context?['userIdentifier'] as String?);
+    final shopId = (input['shopId'] as String?) ?? 
+                   (context.context?['shopId'] as String?) ?? 
+                   await getShopIdForUser(context.context?['userIdentifier'] as String?);
     
     var query = supabase
         .from('products')
@@ -198,7 +202,9 @@ final proposeProductsTool =
         .map((p) => Map<String, dynamic>.from(p as Map))
         .toList();
 
-    final shopId = await getShopIdForUser(context.context?['userIdentifier'] as String?);
+    final shopId = (input['shopId'] as String?) ?? 
+                   (context.context?['shopId'] as String?) ?? 
+                   await getShopIdForUser(context.context?['userIdentifier'] as String?);
 
     final response = await supabase.from('draft_product_batches').insert({
       'shop_id': shopId,
@@ -220,6 +226,7 @@ final proposeProducts = proposeProductsTool;
 Future<Map<String, dynamic>> createProductBatchRequest({
   required String userIdentifier,
   required List<Map<String, dynamic>> products,
+  String? shopId,
 }) async {
   if (products.isEmpty) {
     return {
@@ -228,9 +235,9 @@ Future<Map<String, dynamic>> createProductBatchRequest({
     };
   }
 
-  final shopId = await getShopIdForUser(userIdentifier);
+  final effectiveShopId = shopId ?? await getShopIdForUser(userIdentifier);
   final response = await supabase.from('draft_product_batches').insert({
-    'shop_id': shopId,
+    'shop_id': effectiveShopId,
     'proposed_products': products,
     'status': 'PENDING',
   }).select('id').single();
@@ -247,9 +254,10 @@ Future<Map<String, dynamic>> createProductDeletionRequest({
   required String userIdentifier,
   required String rawQuery,
   String? reason,
+  String? shopId,
 }) async {
   final normalizedQuery = rawQuery.toLowerCase().trim();
-  final shopId = await getShopIdForUser(userIdentifier);
+  final effectiveShopId = shopId ?? await getShopIdForUser(userIdentifier);
 
   final listQuery = normalizedQuery.contains('last item') ||
           normalizedQuery.contains('last one') ||
@@ -259,12 +267,12 @@ Future<Map<String, dynamic>> createProductDeletionRequest({
       ? await supabase
           .from('products')
           .select('id, shop_id, name, price, stock_quantity, category, cost_price')
-          .eq('shop_id', shopId)
+          .eq('shop_id', effectiveShopId)
           .limit(50)
       : null;
 
   final matches = listQuery == null
-      ? await findInventoryProducts(rawQuery, shopId)
+      ? await findInventoryProducts(rawQuery, effectiveShopId)
       : (listQuery as List<dynamic>).map((row) => _productFromRow(row as Map)).toList();
 
   if (matches.isEmpty) {
@@ -299,7 +307,7 @@ Future<Map<String, dynamic>> createProductDeletionRequest({
 
   await supabase.from('draft_product_deletions').insert({
     'id': requestId,
-    'shop_id': shopId,
+    'shop_id': effectiveShopId,
     'requested_by': userIdentifier,
     'products': payload,
     'reason': reason,

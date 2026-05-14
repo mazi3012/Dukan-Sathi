@@ -784,6 +784,7 @@ class WebChatSession {
           final result = await createProductBatchRequest(
             userIdentifier: userIdentifier,
             products: products,
+            shopId: _currentShopId,
           );
           final text = 'Product draft created! Batch ID: ${result['batchId']}';
           _addToHistory(input, text);
@@ -834,6 +835,7 @@ class WebChatSession {
             input: {
               'requestedItems': requestedItems,
               if (customerName != null) 'customerName': customerName,
+              'shopId': _currentShopId,
             },
             userIdentifier: userIdentifier,
           );
@@ -885,7 +887,10 @@ class WebChatSession {
           ..._history,
         ],
         toolNames: selectedTools.isNotEmpty ? selectedTools : null,
-        context: {'userIdentifier': userIdentifier},
+        context: {
+          'userIdentifier': userIdentifier,
+          'shopId': _currentShopId,
+        },
       );
       final reply = response.text.trim();
       _history.add(Message(role: Role.model, content: [TextPart(text: reply)]));

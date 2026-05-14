@@ -221,6 +221,7 @@ final createDraftInvoiceTool = ai.defineTool<Map<String, dynamic>, Map<String, d
     return createDraftInvoiceRequest(
       input: input,
       userIdentifier: context.context?['userIdentifier'] as String?,
+      shopId: context.context?['shopId'] as String?,
     );
   },
 );
@@ -228,8 +229,11 @@ final createDraftInvoiceTool = ai.defineTool<Map<String, dynamic>, Map<String, d
 Future<Map<String, dynamic>> createDraftInvoiceRequest({
   required Map<String, dynamic> input,
   required String? userIdentifier,
+  String? shopId,
 }) async {
-  final shopId = (input['shopId'] as String?) ?? await getShopIdForUser(userIdentifier);
+  final effectiveShopId = (input['shopId'] as String?) ?? 
+                 shopId ?? 
+                 await getShopIdForUser(userIdentifier);
   final customerId = input['customerId'] as String?;
   final customerNameInput = _normalizeCustomerName(input['customerName']);
   final userPrompt = input['userPrompt'] as String?;
@@ -261,7 +265,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
     final customerRows = await supabase
         .from('customers')
         .select('id, name')
-        .eq('shop_id', shopId)
+        .eq('shop_id', effectiveShopId)
         .ilike('name', resolvedCustomerName)
         .maybeSingle();
     if (customerRows != null) {
@@ -275,7 +279,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
     final customerRows = await supabase
         .from('customers')
         .select('name')
-        .eq('shop_id', shopId)
+        .eq('shop_id', effectiveShopId)
         .eq('id', resolvedCustomerId)
         .maybeSingle();
     if (customerRows != null) {
@@ -286,7 +290,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
     final allShopProductsRows = await supabase
         .from('products')
         .select('id, price, name, shop_id, gst_rate, hsn_sac_code')
-        .eq('shop_id', shopId);
+        .eq('shop_id', effectiveShopId);
     final allShopProducts = (allShopProductsRows as List<dynamic>)
         .map((row) => Map<String, dynamic>.from(row as Map))
         .toList();
@@ -295,7 +299,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
     final shopRows = await supabase
         .from('shops')
         .select('id, state, gst_registration_number, gst_mode, business_type, created_at')
-        .eq('id', shopId)
+        .eq('id', effectiveShopId)
         .single();
 
     final shopData = Map<String, dynamic>.from(shopRows as Map);
@@ -308,7 +312,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
     );
 
     final shopConfig = ShopConfig(
-      shopId: shopId,
+      shopId: effectiveShopId,
       state: shopData['state'] as String,
       gstRegistrationNumber: shopData['gst_registration_number'] as String?,
       gstMode: gstMode,
@@ -404,7 +408,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
 
     final draftApprovalPayload = {
       'approval_id': approvalId,
-      'shop_id': shopId,
+      'shop_id': effectiveShopId,
       'customer_id': resolvedCustomerId,
       'customer_name': resolvedCustomerName,
       'customer_state': customerState,
@@ -448,9 +452,9 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
 
       final legacyPayload = {
         'approval_id': approvalId,
-        'shop_id': shopId,
-        'customer_id': resolvedCustomerId,
-        'created_at': DateTime.now().toIso8601String(),
+      'shop_id': effectiveShopId,
+      'customer_id': resolvedCustomerId,
+      'created_at': DateTime.now().toIso8601String(),
         'proposed_items': adjustedItems.map((item) => item.toJson()).toList(),
         'proposed_tax_breakdown': {
           'subtotal': taxBreakdown.subtotal,
@@ -474,7 +478,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
     // Return response showing approval pending + tax breakdown
     return {
       'approvalId': approvalId,
-      'shopId': shopId,
+      'shopId': effectiveShopId,
       'customerId': resolvedCustomerId,
       'customerName': resolvedCustomerName,
       'customerState': customerState,
