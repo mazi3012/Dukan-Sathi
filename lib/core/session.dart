@@ -112,8 +112,10 @@ class UserSession extends ChangeNotifier {
 
       // Get Google authentication details
       final googleAuth = await googleUser.authentication;
+      debugPrint('[Session] googleUser: ${googleUser.email} id:${googleUser.id}');
       final idToken = googleAuth.idToken;
       final accessToken = googleAuth.accessToken;
+      debugPrint('[Session] googleAuth tokens: hasId=${idToken!=null} hasAccess=${accessToken!=null}');
       if (accessToken == null || idToken == null || idToken.isEmpty) {
         return {'success': false, 'error': 'Failed to get Google authentication tokens'};
       }
@@ -125,6 +127,7 @@ class UserSession extends ChangeNotifier {
       );
 
       final respUser = response.user;
+      debugPrint('[Session] supabase response.user: ${respUser?.id}');
       if (respUser == null) {
         debugPrint('[Session] Supabase response.user is null');
         return {'success': false, 'error': 'Failed to authenticate with Supabase'};

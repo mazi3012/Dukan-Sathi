@@ -42,8 +42,10 @@ class GoogleAuthService {
 
       // Get Google authentication tokens
       final googleAuth = await googleUser.authentication;
+      debugPrint('[GoogleAuthService] googleUser: ${googleUser.email} id:${googleUser.id}');
       final idToken = googleAuth.idToken;
       final accessToken = googleAuth.accessToken;
+      debugPrint('[GoogleAuthService] googleAuth tokens: hasId=${idToken!=null} hasAccess=${accessToken!=null}');
       if (accessToken == null || idToken == null || idToken.isEmpty) {
         return {
           'success': false,
@@ -58,6 +60,7 @@ class GoogleAuthService {
       );
 
       final respUser = response.user;
+      debugPrint('[GoogleAuthService] supabase response.user: ${respUser?.id}');
       if (respUser == null) {
         debugPrint('[GoogleAuthService] Supabase response.user is null');
         return {
