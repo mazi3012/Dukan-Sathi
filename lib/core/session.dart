@@ -127,7 +127,7 @@ class UserSession extends ChangeNotifier {
         debugPrint('[Session] Web redirect URL: $redirectTo');
 
         await supabase.auth.signInWithOAuth(
-          provider: OAuthProvider.google,
+          OAuthProvider.google,
           redirectTo: redirectTo,
         );
         
