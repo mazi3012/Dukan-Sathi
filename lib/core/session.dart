@@ -3,8 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-// Use conditional imports: supabase_flutter for mobile, supabase for web
-import 'package:supabase_flutter/supabase_flutter.dart' if (dart.library.html) 'package:supabase/supabase.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'database.dart'; // Import supabase client
 
 class UserSession extends ChangeNotifier {
@@ -98,9 +97,18 @@ class UserSession extends ChangeNotifier {
   }
 
   /// Login with Google OAuth using Supabase integration.
-  /// This handles the complete OAuth flow with Supabase backend.
+  /// On web: Not yet fully supported - returning error message
+  /// On mobile: Uses google_sign_in package with ID tokens
   Future<Map<String, dynamic>> loginWithGoogle() async {
     try {
+      // Web platform: Not yet fully supported
+      if (kIsWeb) {
+        debugPrint('[Session] Web platform detected');
+        return {'success': false, 'error': 'Google sign-in on web requires additional setup. Please use the mobile app or contact support.'};
+      }
+      
+      // Mobile platform: Use google_sign_in package with tokens
+      debugPrint('[Session] Mobile platform detected - using google_sign_in with tokens');
       // Sign out first to ensure fresh login
       await _googleSignIn.signOut();
       
@@ -114,7 +122,6 @@ class UserSession extends ChangeNotifier {
       debugPrint('[Session] googleUser: ${googleUser.email} id:${googleUser.id}');
 
       // Get Google authentication details
-      // On web, this may require additional configuration
       final googleAuth = await googleUser.authentication;
       debugPrint('[Session] googleAuth object: $googleAuth');
       final idToken = googleAuth.idToken;
@@ -131,7 +138,7 @@ class UserSession extends ChangeNotifier {
         return {'success': false, 'error': 'Failed to get Google authentication tokens (no ID token)'};
       }
 
-      // Sign in with Supabase using Google provider
+      // Sign in with Supabase using Google provider (mobile only)
       final response = await supabase.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: idToken,
