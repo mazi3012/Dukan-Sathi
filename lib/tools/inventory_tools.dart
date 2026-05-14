@@ -206,18 +206,25 @@ final proposeProductsTool =
                    (context.context?['shopId'] as String?) ?? 
                    await getShopIdForUser(context.context?['userIdentifier'] as String?);
 
-    final response = await supabase.from('draft_product_batches').insert({
-      'shop_id': shopId,
-      'proposed_products': products,
-      'status': 'PENDING',
-    }).select('id').single();
+    try {
+      final response = await supabase.from('draft_product_batches').insert({
+        'shop_id': shopId,
+        'proposed_products': products,
+        'status': 'PENDING',
+      }).select('id').single();
 
-    return {
-      'message':
-          'Product draft created. Human approval is required to finalize.',
-      'batchId': response['id'],
-      'itemCount': products.length,
-    };
+      return {
+        'message':
+            'Product draft created. Human approval is required to finalize.',
+        'batchId': response['id'],
+        'itemCount': products.length,
+      };
+    } catch (e) {
+      return {
+        'status': 'error',
+        'message': 'Failed to create product draft: $e',
+      };
+    }
   },
 );
 
@@ -235,19 +242,26 @@ Future<Map<String, dynamic>> createProductBatchRequest({
     };
   }
 
-  final effectiveShopId = shopId ?? await getShopIdForUser(userIdentifier);
-  final response = await supabase.from('draft_product_batches').insert({
-    'shop_id': effectiveShopId,
-    'proposed_products': products,
-    'status': 'PENDING',
-  }).select('id').single();
+  try {
+    final effectiveShopId = shopId ?? await getShopIdForUser(userIdentifier);
+    final response = await supabase.from('draft_product_batches').insert({
+      'shop_id': effectiveShopId,
+      'proposed_products': products,
+      'status': 'PENDING',
+    }).select('id').single();
 
-  return {
-    'success': true,
-    'batchId': response['id'],
-    'itemCount': products.length,
-    'products': products,
-  };
+    return {
+      'success': true,
+      'batchId': response['id'],
+      'itemCount': products.length,
+      'products': products,
+    };
+  } catch (e) {
+    return {
+      'success': false,
+      'message': 'Failed to create product batch: $e',
+    };
+  }
 }
 
 Future<Map<String, dynamic>> createProductDeletionRequest({

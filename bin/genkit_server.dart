@@ -792,12 +792,18 @@ class WebChatSession {
             products: products,
             shopId: _currentShopId,
           );
-          final text = 'Product draft created! Batch ID: ${result['batchId']}';
-          _addToHistory(input, text);
-          return {
-            'text': text,
-            'card': {'type': 'batch', ...result},
-          };
+          if (result['success'] == true) {
+            final text = 'Product draft created! Batch ID: ${result['batchId']}';
+            _addToHistory(input, text);
+            return {
+              'text': text,
+              'card': {'type': 'batch', ...result},
+            };
+          } else {
+            final text = '⚠️ Failed to create product draft: ${result['message']}';
+            _addToHistory(input, text);
+            return {'text': text};
+          }
         } catch (e) {
           final text = '⚠️ Error creating product draft: $e';
           _addToHistory(input, text);
