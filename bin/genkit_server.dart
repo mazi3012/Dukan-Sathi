@@ -502,7 +502,8 @@ const String _webSystemPrompt =
   "7. For customer dues or balances, use checkCustomerDue or listCustomersDue. "
   "8. Always include Approval/Batch IDs in responses. "
   "9. DEFAULT to period='all_time' for analytics unless a specific timeframe is mentioned. "
-  "10. Reply concisely, professionally, and authoritatively. Do NOT ask for IDs or Shop names; use the provided context.";
+  "10. Reply concisely, professionally, and authoritatively. Do NOT ask for IDs or Shop names; use the provided context. "
+  "11. NEVER hallucinate or make up financial numbers. If you cannot find data using a tool, explain that you don't have access to that information.";
 
 DateTime _nowIst() => DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
 String _twoDigits(int v) => v.toString().padLeft(2, '0');
@@ -535,7 +536,7 @@ class WebChatSession {
       n.contains('add these') || n.contains('bulk add') || n.contains('upload');
   bool _isInventoryIntent(String n) => n.contains('stock') || n.contains('inventory') || n.contains('price') || n.contains('how many') || n.contains('quantity');
   bool _isBillingIntent(String n) => n.contains('bill') || n.contains('invoice') || n.contains('draft');
-  bool _isAnalyticsIntent(String n) => n.contains('revenue') || n.contains('sales') || n.contains('analytics') || n.contains('insight') ||
+  bool _isAnalyticsIntent(String n) => n.contains('revenue') || n.contains('sales') || n.contains('sale') || n.contains('analytics') || n.contains('insight') ||
       n.contains('profit') || n.contains('earnings') || n.contains('orders') || n.contains('total sales') || n.contains('how much money');
   bool _isExpenseIntent(String n) => n.contains('expense') || n.contains('spent') || n.contains('bill paid') || n.contains('cost') || n.contains('party') || n.contains('tea') || n.contains('rent') || n.contains('salary');
 
@@ -669,7 +670,7 @@ class WebChatSession {
     }
 
     // Analytics intent
-    if (n.contains('revenue') || n.contains('sales') || n.contains('profit') || n.contains('analytics') || n.contains('report')) {
+    if (n.contains('revenue') || n.contains('sales') || n.contains('sale') || n.contains('profit') || n.contains('analytics') || n.contains('report')) {
       try {
         final isToday = n.contains('today');
         final period = isToday ? 'today' : 'all_time';
@@ -873,7 +874,7 @@ class WebChatSession {
     List<String> selectedTools = [];
     if (n.contains('inventory') || n.contains('stock') || n.contains('price') || n.contains('atta') || n.contains('dal') || n.contains('oil') || n.contains('item')) {
       selectedTools = ['checkInventory', 'browseCatalogTool'];
-    } else if (n.contains('revenue') || n.contains('analytics') || n.contains('orders') || n.contains('sales') || n.contains('profit') || n.contains('earned') || n.contains('money')) {
+    } else if (n.contains('revenue') || n.contains('analytics') || n.contains('orders') || n.contains('sales') || n.contains('sale') || n.contains('profit') || n.contains('earned') || n.contains('money')) {
       selectedTools = ['businessInsightsTool'];
     } else if (n.contains('add') || n.contains('new') || n.contains('create') || n.contains('import') || n.contains('upload')) {
       // Add can be products or expenses
