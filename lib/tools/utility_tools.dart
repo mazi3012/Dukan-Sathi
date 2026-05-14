@@ -119,7 +119,7 @@ final setReminder = ai.defineTool<Map<String, dynamic>, String>(
       final userIdentifier = context.context?['userIdentifier'] as String?;
       if (userIdentifier == null) return 'Error: User context missing.';
       
-      final shopId = await getShopIdForUser(userIdentifier);
+      final shopId = (context.context?['shopId'] as String?) ?? await getShopIdForUser(userIdentifier);
       final chatId = int.parse(userIdentifier);
       
       var scheduledAt = DateTime.parse(input['scheduledAt'] as String);

@@ -32,7 +32,7 @@ final logExpense = ai.defineTool<Map<String, dynamic>, String>(
       final userIdentifier = context.context?['userIdentifier'] as String?;
       if (userIdentifier == null) return 'Error: User context missing.';
       
-      final shopId = await getShopIdForUser(userIdentifier);
+      final shopId = (context.context?['shopId'] as String?) ?? await getShopIdForUser(userIdentifier);
       
       await supabase.from('expenses').insert({
         'shop_id': shopId,
@@ -69,7 +69,7 @@ final getExpenses = ai.defineTool<Map<String, dynamic>, String>(
       final userIdentifier = context.context?['userIdentifier'] as String?;
       if (userIdentifier == null) return 'Error: User context missing.';
       
-      final shopId = await getShopIdForUser(userIdentifier);
+      final shopId = (context.context?['shopId'] as String?) ?? await getShopIdForUser(userIdentifier);
       final category = input['category'] as String?;
       
       var queryBuilder = supabase.from('expenses').select().eq('shop_id', shopId);

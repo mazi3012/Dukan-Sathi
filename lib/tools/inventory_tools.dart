@@ -358,6 +358,7 @@ final requestProductDeletionTool =
       userIdentifier: context.context?['userIdentifier']?.toString() ?? '',
       rawQuery: rawName,
       reason: reason,
+      shopId: context.context?['shopId'] as String?,
     );
 
     if (result['success'] != true) {

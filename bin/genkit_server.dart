@@ -531,7 +531,8 @@ class WebChatSession {
       n.contains('items do we have') || n.contains('items do you have') || n.contains('our product') || n.contains('our inventory') ||
       n.contains('show inventory') || n.contains('view product') || n.contains('what do you sell') || n.contains('what do we sell') ||
       n.contains('browse');
-  bool _isAddProductIntent(String n) => n.contains('add product') || n.contains('add a product') || n.contains('add item') || n.contains('new product') ||
+  bool _isAddProductIntent(String n) => n.contains('add product') || n.contains('add a product') || n.contains('add a new product') || 
+      n.contains('add item') || n.contains('add a new item') || n.contains('new product') ||
       n.contains('new item') || n.contains('create product') || n.contains('add service') ||
       n.contains('add these') || n.contains('bulk add') || n.contains('upload');
   bool _isInventoryIntent(String n) => n.contains('stock') || n.contains('inventory') || n.contains('price') || n.contains('how many') || n.contains('quantity');
@@ -590,7 +591,12 @@ class WebChatSession {
     final lines = text.split(RegExp(r'\n|(?=\-)'));
     
     for (var line in lines) {
-      line = line.replaceAll(RegExp(r'^\s*[\-\*•]\s*|^(add a product|add product|add item|new product|new item)\s*[:\-]?\s*', caseSensitive: false), '').trim();
+      String oldLine;
+      do {
+        oldLine = line;
+        line = line.replaceAll(RegExp(r'^\s*[\-\*•]\s*|^(add|create|new)\s+(a\s+)?(new\s+)?(product|item|service|stock|inventory)\s*[:\-]?\s*|^(or product|or item|or)\s*', caseSensitive: false), '').trim();
+      } while (line != oldLine);
+      
       if (line.isEmpty) continue;
       
       // Try to parse key-value pairs or delimited format
@@ -673,7 +679,7 @@ class WebChatSession {
         
         final result = await businessInsightsTool.fn!(
           {'shopId': _currentShopId, 'period': period},
-          (context: {'userIdentifier': _currentUserId}, init: null, inputStream: null, sendChunk: (dynamic chunk) {}, streamingRequested: false)
+          (context: {'userIdentifier': _currentUserId, 'shopId': _currentShopId}, init: null, inputStream: null, sendChunk: (dynamic chunk) {}, streamingRequested: false)
         );
         final rev = result['total_revenue'] ?? 0.0;
         final orders = result['total_orders'] ?? 0;
@@ -691,7 +697,7 @@ class WebChatSession {
       try {
         final result = await businessInsightsTool.fn!(
           {'shopId': _currentShopId, 'period': 'all_time'},
-          (context: {'userIdentifier': _currentUserId}, init: null, inputStream: null, sendChunk: (dynamic chunk) {}, streamingRequested: false)
+          (context: {'userIdentifier': _currentUserId, 'shopId': _currentShopId}, init: null, inputStream: null, sendChunk: (dynamic chunk) {}, streamingRequested: false)
         );
         final name = result['top_customer_name'];
         final rev = result['top_customer_revenue'];
@@ -730,7 +736,7 @@ class WebChatSession {
         if (targetName != null) {
           final text = await cust.checkCustomerDue.fn!(
             {'customerName': targetName},
-            (context: {'userIdentifier': _currentUserId}, init: null, inputStream: null, sendChunk: (dynamic chunk) {}, streamingRequested: false)
+            (context: {'userIdentifier': _currentUserId, 'shopId': _currentShopId}, init: null, inputStream: null, sendChunk: (dynamic chunk) {}, streamingRequested: false)
           );
           _addToHistory(input, text);
           return {'text': text};
@@ -738,7 +744,7 @@ class WebChatSession {
           // List all dues
           final text = await cust.listCustomersDue.fn!(
             {},
-            (context: {'userIdentifier': _currentUserId}, init: null, inputStream: null, sendChunk: (dynamic chunk) {}, streamingRequested: false)
+            (context: {'userIdentifier': _currentUserId, 'shopId': _currentShopId}, init: null, inputStream: null, sendChunk: (dynamic chunk) {}, streamingRequested: false)
           );
           _addToHistory(input, text);
           return {'text': text};
