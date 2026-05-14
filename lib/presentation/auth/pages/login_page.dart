@@ -33,7 +33,8 @@ class _LoginPageState extends State<LoginPage> {
 
       if (result is Map && result['success'] == true) {
         // Navigate to dashboard
-        _navigateToDashboard();
+        // Note: We don't navigate manually here. UserSession.notifyListeners() will trigger
+        // AuthGate (in main.dart) to rebuild and route to ShopSetupPage or MainLayout.
       } else {
         final err = (result is Map) ? (result['error'] ?? 'Authentication failed') : 'No response from authentication';
         setState(() => _error = err.toString());
@@ -46,17 +47,6 @@ class _LoginPageState extends State<LoginPage> {
       });
       debugPrint('[LoginPage] Google login exception: $e\n$st');
     }
-  }
-
-  void _navigateToDashboard() {
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (_, a, __) => const MainLayout(),
-        transitionsBuilder: (_, anim, __, child) =>
-            FadeTransition(opacity: anim, child: child),
-        transitionDuration: 600.ms,
-      ),
-    );
   }
 
   @override
