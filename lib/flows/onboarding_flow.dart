@@ -137,7 +137,7 @@ Future<void> _upsertDraft(OnboardingSession s) async {
 // ─── STATE CODE HELPERS ───────────────────────────────────────────────────────
 const Set<String> _validStateCodes = {
   'AP','AR','AS','BR','CG','GA','GJ','HR','HP','JK','JH','KA',
-  'KL','MP','MH','MN','ML','MZ','OD','PB','RJ','SK','TN','TS',
+  'KL','MP','MH','MN','ML','MZ','NL','OD','PB','RJ','SK','TN','TS',
   'TR','UP','UK','WB','AN','CH','DL','DD','DH','JL','LA','LD','PY',
 };
 
@@ -147,7 +147,7 @@ const Map<String, String> _stateNameToCode = {
   'haryana': 'HR', 'himachal pradesh': 'HP', 'jammu and kashmir': 'JK',
   'jharkhand': 'JH', 'karnataka': 'KA', 'kerala': 'KL',
   'madhya pradesh': 'MP', 'maharashtra': 'MH', 'manipur': 'MN',
-  'meghalaya': 'ML', 'mizoram': 'MZ', 'odisha': 'OD', 'orissa': 'OD',
+  'meghalaya': 'ML', 'mizoram': 'MZ', 'nagaland': 'NL', 'odisha': 'OD', 'orissa': 'OD',
   'punjab': 'PB', 'rajasthan': 'RJ', 'sikkim': 'SK', 'tamil nadu': 'TN',
   'telangana': 'TS', 'tripura': 'TR', 'uttar pradesh': 'UP',
   'uttarakhand': 'UK', 'west bengal': 'WB',

@@ -22,22 +22,37 @@ class _ShopSetupPageState extends State<ShopSetupPage> {
   String _gstMode = 'UNREGISTERED';
   bool _isLoading = false;
 
-  final List<String> _indianStates = [
-    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
-    'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
-    'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
-    'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
-    'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'
-  ];
+  final Map<String, String> _stateCodes = {
+    'Andhra Pradesh': 'AP', 'Arunachal Pradesh': 'AR', 'Assam': 'AS', 'Bihar': 'BR',
+    'Chhattisgarh': 'CG', 'Goa': 'GA', 'Gujarat': 'GJ', 'Haryana': 'HR',
+    'Himachal Pradesh': 'HP', 'Jammu & Kashmir': 'JK', 'Jharkhand': 'JH',
+    'Karnataka': 'KA', 'Kerala': 'KL', 'Madhya Pradesh': 'MP', 'Maharashtra': 'MH',
+    'Manipur': 'MN', 'Meghalaya': 'ML', 'Mizoram': 'MZ', 'Nagaland': 'NL',
+    'Odisha': 'OD', 'Punjab': 'PB', 'Rajasthan': 'RJ', 'Sikkim': 'SK',
+    'Tamil Nadu': 'TN', 'Telangana': 'TS', 'Tripura': 'TR', 'Uttar Pradesh': 'UP',
+    'Uttarakhand': 'UK', 'West Bengal': 'WB', 'Andaman & Nicobar': 'AN',
+    'Chandigarh': 'CH', 'Delhi': 'DL', 'Dadra & Nagar Haveli': 'DH',
+    'Daman & Diu': 'DD', 'Ladakh': 'LA', 'Lakshadweep': 'LD', 'Puducherry': 'PY'
+  };
+
+  late List<String> _indianStates;
+
+  @override
+  void initState() {
+    super.initState();
+    _indianStates = _stateCodes.keys.toList()..sort();
+  }
 
   Future<void> _handleSetup() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
+    final stateCode = _stateCodes[_selectedState] ?? 'WB';
+
     final result = await UserSession().createShop(
       name: _nameController.text,
-      state: _selectedState,
+      state: stateCode,
       businessType: _businessTypeController.text,
       gstNumber: _gstController.text.isNotEmpty ? _gstController.text : null,
       gstMode: _gstMode,
