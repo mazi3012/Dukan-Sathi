@@ -21,22 +21,24 @@ class AppColors {
   static const Color cyanGlow = Color(0xFF00F0FF); // The "Pulse" of the system
 
   // --- Brand Colors ---
-  static const Color primary = Color(0xFF6C63FF);
-  static const Color primaryGlow = Color(0x806C63FF);
-  static const Color accent = Color(0xFFFF63B8);
-  static const Color success = Color(0xFF4CAF50);
-  static const Color error = Color(0xFFE53935);
-  static const Color warning = Color(0xFFFFB300);
+  static const Color primary = Color(0xFF059669); // Emerald Green as Primary
+  static const Color primaryGlow = Color(0x33059669); 
+  static const Color accent = Color(0xFF10B981); // Emerald 500
+  static const Color cyberPurple = Color(0xFF6C63FF); // Kept for legacy if needed
+  
+  static const Color success = Color(0xFF10B981);
+  static const Color error = Color(0xFFEF4444);
+  static const Color warning = Color(0xFFF59E0B);
 
   // --- Gradients ---
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [Color(0xFF6C63FF), Color(0xFF4B43E0)],
+    colors: [Color(0xFF059669), Color(0xFF10B981)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient accentGradient = LinearGradient(
-    colors: [Color(0xFFFF63B8), Color(0xFFE043A0)],
+    colors: [Color(0xFF10B981), Color(0xFF34D399)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );

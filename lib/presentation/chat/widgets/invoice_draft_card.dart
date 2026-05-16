@@ -286,24 +286,26 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                     const SizedBox(width: 8),
                     Text(
                       isApproved ? "Approved Invoice" : "Draft Invoice",
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             color: isApproved ? AppColors.success : Theme.of(context).primaryColor,
                             fontWeight: FontWeight.bold,
                           ),
                     ),
                   ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkGlass : AppColors.lightGlass,
-                    borderRadius: BorderRadius.circular(8),
+                if (!isApproved)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.2)),
+                    ),
+                    child: Text(
+                      "EDITING",
+                      style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
+                    ),
                   ),
-                  child: Text(
-                    customerName,
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
-                ),
               ],
             ),
             const Divider(color: AppColors.darkGlassBorder, height: 24),
@@ -462,47 +464,54 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
             ),
             
             if (!isApproved) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 24),
               // Advanced Toggle
-              GestureDetector(
-                onTap: () => setState(() => _showAdvanced = !_showAdvanced),
-                child: Row(
-                  children: [
-                    Text(
-                      _showAdvanced ? "Hide Controls" : "Edit Draft (GST, Discount, Payment)",
-                      style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                    Icon(_showAdvanced ? Iconsax.arrow_up_1 : Iconsax.arrow_down_1, size: 14, color: Theme.of(context).primaryColor),
-                  ],
-                ),
-              ),
-              if (_showAdvanced)
-                _buildAdvancedControls(gstType, paymentStatus).animate().fadeIn().slideY(begin: -0.1),
+              _buildSectionLabel("Adjustments & Payment"),
+              const SizedBox(height: 12),
+              _buildAdvancedControls(gstType, paymentStatus).animate().fadeIn().slideY(begin: 0.05),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             
             // Grand Total
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "Total Amount",
-                  style: TextStyle(fontSize: 16),
-                ),
-                Text(
-                  "₹${totalAmount.toStringAsFixed(2)}",
-                  style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                    fontSize: 28,
-                    color: isApproved ? AppColors.success : AppColors.success,
-                    shadows: [
-                      BoxShadow(
-                        color: AppColors.success.withOpacity(0.5),
-                        blurRadius: 10,
-                      )
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.1)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Total Amount",
+                        style: TextStyle(
+                          fontSize: 14, 
+                          color: Theme.of(context).textTheme.bodySmall?.color,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isApproved ? "Invoice Finalized" : "Draft Calculation",
+                        style: TextStyle(fontSize: 10, color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.5)),
+                      ),
                     ],
                   ),
-                ).animate().scale(delay: 400.ms, curve: Curves.easeOutBack),
-              ],
+                  Text(
+                    "₹${totalAmount.toStringAsFixed(2)}",
+                    style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                      fontSize: 32,
+                      color: Theme.of(context).primaryColor,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -1,
+                    ),
+                  ).animate().scale(delay: 400.ms, curve: Curves.easeOutBack),
+                ],
+              ),
             ),
 
             // Payment Summary (Paid / Due)
@@ -539,7 +548,14 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                     child: Container(
                       height: 50,
                       decoration: BoxDecoration(
-                        gradient: AppColors.primaryGradient,
+                        gradient: LinearGradient(
+                          colors: [
+                            Theme.of(context).primaryColor,
+                            Theme.of(context).primaryColor.withOpacity(0.8),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
@@ -622,41 +638,52 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       child: Column(
         children: [
           // GST Switcher
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("GST Type:", style: TextStyle(color: Colors.white70, fontSize: 12)),
-              const Spacer(),
-              _buildSmallToggle(
-                "Intra-state (CGST+SGST)",
-                currentGst == 'CGST_SGST',
-                () => _updateDraft('gst', {'gstType': 'CGST_SGST'}),
-              ),
-              const SizedBox(width: 8),
-              _buildSmallToggle(
-                "Inter-state (IGST)",
-                currentGst == 'IGST',
-                () => _updateDraft('gst', {'gstType': 'IGST'}),
+              Text("GST Type:", style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color, fontSize: 12)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildSmallToggle(
+                    "Intra-state (CGST+SGST)",
+                    currentGst == 'CGST_SGST',
+                    () => _updateDraft('gst', {'gstType': 'CGST_SGST'}),
+                  ),
+                  _buildSmallToggle(
+                    "Inter-state (IGST)",
+                    currentGst == 'IGST',
+                    () => _updateDraft('gst', {'gstType': 'IGST'}),
+                  ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 12),
           // Payment Status
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Payment:", style: TextStyle(color: Colors.white70, fontSize: 12)),
-              const Spacer(),
-              _buildSmallToggle("Unpaid", paymentStatus == 'UNPAID', () => _updateDraft('payment', {'paymentStatus': 'UNPAID'})),
-              const SizedBox(width: 4),
-              _buildSmallToggle("Partial", paymentStatus == 'PARTIAL', () => _updateDraft('payment', {'paymentStatus': 'PARTIAL'})),
-              const SizedBox(width: 4),
-              _buildSmallToggle("Paid", paymentStatus == 'PAID', () => _updateDraft('payment', {'paymentStatus': 'PAID'})),
+              Text("Payment Status:", style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color, fontSize: 12)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildSmallToggle("Unpaid", paymentStatus == 'UNPAID', () => _updateDraft('payment', {'paymentStatus': 'UNPAID'})),
+                  _buildSmallToggle("Partial", paymentStatus == 'PARTIAL', () => _updateDraft('payment', {'paymentStatus': 'PARTIAL'})),
+                  _buildSmallToggle("Paid", paymentStatus == 'PAID', () => _updateDraft('payment', {'paymentStatus': 'PAID'})),
+                ],
+              ),
             ],
           ),
           if (paymentStatus == 'PARTIAL') ...[
             const SizedBox(height: 8),
             Row(
               children: [
-                const Text("Amount Paid:", style: TextStyle(color: Colors.white54, fontSize: 11)),
+                Text("Amount Paid:", style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color, fontSize: 11)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextField(
@@ -664,7 +691,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                     focusNode: _paidAmountFocusNode,
                     keyboardType: TextInputType.number,
                     autofocus: true,
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color, fontSize: 12),
                     decoration: _inputDecoration("₹ 0.00"),
                     onSubmitted: (val) => _updateDraft('payment', {
                       'paymentStatus': 'PARTIAL',
@@ -709,13 +736,13 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
           // Discount
           Row(
             children: [
-              const Text("Discount:", style: TextStyle(color: Colors.white70, fontSize: 12)),
+              Text("Discount:", style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color, fontSize: 12)),
               const SizedBox(width: 12),
               Expanded(
                 child: TextField(
                   controller: _discountController,
                   keyboardType: TextInputType.number,
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                  style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color, fontSize: 12),
                   decoration: _inputDecoration("e.g. 10% or 50"),
                   onSubmitted: (val) {
                     final isPercent = val.contains('%');
@@ -766,17 +793,19 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
     );
   }
   InputDecoration _inputDecoration(String hint) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: Colors.white24, fontSize: 12),
+      hintStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.5), fontSize: 12),
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       filled: true,
-      fillColor: Colors.black26,
+      fillColor: isDark ? Colors.black26 : Colors.black.withOpacity(0.05),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
     );
   }
   Widget _buildSmallToggle(String label, bool active, VoidCallback onTap) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: active ? null : onTap,
       behavior: HitTestBehavior.opaque,
@@ -787,12 +816,12 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
           decoration: BoxDecoration(
             color: active ? Theme.of(context).primaryColor.withOpacity(0.2) : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: active ? Theme.of(context).primaryColor : Colors.white10),
+            border: Border.all(color: active ? Theme.of(context).primaryColor : (isDark ? Colors.white10 : Colors.black12)),
           ),
           child: Text(
             label,
             style: TextStyle(
-              color: active ? Theme.of(context).primaryColor : Colors.white54,
+              color: active ? Theme.of(context).primaryColor : (isDark ? Colors.white54 : Colors.black54),
               fontSize: 10,
               fontWeight: active ? FontWeight.bold : FontWeight.normal,
             ),
@@ -802,6 +831,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
     );
   }
   Widget _buildLineItem(String name, String qtyPrice, String total, {VoidCallback? onEdit}) {
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: Row(
@@ -811,37 +841,51 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-                Text(qtyPrice, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                Text(name, style: TextStyle(color: textColor, fontWeight: FontWeight.w500)),
+                Text(qtyPrice, style: TextStyle(color: textColor.withOpacity(0.6), fontSize: 12)),
               ],
             ),
           ),
           if (onEdit != null) ...[
-            Text(total, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            Text(total, style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
             const SizedBox(width: 8),
             GestureDetector(
               onTap: onEdit,
               child: Icon(Iconsax.edit, size: 16, color: Theme.of(context).primaryColor),
             ),
           ] else
-            Text(total, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            Text(total, style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
-  Widget _buildTaxLine(String label, String amount, {Color color = Colors.white70}) {
+  Widget _buildTaxLine(String label, String amount, {Color? color}) {
+    final defaultColor = Theme.of(context).textTheme.bodySmall?.color ?? Colors.black54;
     return Padding(
       padding: const EdgeInsets.only(bottom: 4.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 13)),
-          Text(amount, style: TextStyle(color: color, fontSize: 13)),
+          Text(label, style: TextStyle(color: defaultColor, fontSize: 13)),
+          Text(amount, style: TextStyle(color: color ?? Theme.of(context).textTheme.bodyLarge?.color, fontSize: 13)),
         ],
       ),
     );
   }
 }
+  Widget _buildSectionLabel(String label) {
+    return Text(
+      label.toUpperCase(),
+      style: TextStyle(
+        color: Theme.of(context).primaryColor.withOpacity(0.6),
+        fontSize: 10,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.2,
+      ),
+    );
+  }
+}
+
 class _StaticPlaceholder extends StatelessWidget {
   const _StaticPlaceholder();
   @override

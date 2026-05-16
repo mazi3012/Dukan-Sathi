@@ -39,11 +39,11 @@ class AppTheme {
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    primaryColor: AppColors.lightPrimary,
+    primaryColor: AppColors.primary,
     scaffoldBackgroundColor: AppColors.lightBackground,
     colorScheme: const ColorScheme.light(
-      primary: AppColors.lightPrimary,
-      secondary: AppColors.primary,
+      primary: AppColors.primary,
+      secondary: AppColors.accent,
       surface: AppColors.lightSurface,
       error: AppColors.error,
       onSurface: AppColors.lightOnSurface,
