@@ -130,8 +130,8 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
             PageRouteBuilder(
-              pageBuilder: (_, a, __) => const LoginPage(),
-              transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
+              pageBuilder: (_, a, _) => const LoginPage(),
+              transitionsBuilder: (_, anim, _, child) => FadeTransition(opacity: anim, child: child),
               transitionDuration: const Duration(milliseconds: 500),
             ),
             (route) => false,

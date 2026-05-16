@@ -220,7 +220,7 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
               ),
             ),
           );
-        }).toList(),
+        }),
         
         if (_batchId != null && !_isApproved)
           Padding(

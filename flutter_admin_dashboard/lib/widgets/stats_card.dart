@@ -7,7 +7,7 @@ class StatsCard extends StatelessWidget {
   final Color color;
   final VoidCallback? onTap;
 
-  const StatsCard({
+  const StatsCard({super.key, 
     required this.title,
     required this.value,
     required this.icon,
@@ -45,7 +45,7 @@ class StatsCard extends StatelessWidget {
                         size: 24,
                       ),
                     ),
-                    Icon(
+                    const Icon(
                       Icons.trending_up,
                       color: Colors.green,
                       size: 16,

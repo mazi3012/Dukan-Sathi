@@ -1,5 +1,6 @@
 /// GST Tax Slab Database for all Indian states and UTs
 /// Reference: GST Council official rates as of 2026
+library;
 
 class StateTaxSlabs {
   static const Map<String, String> stateNames = {

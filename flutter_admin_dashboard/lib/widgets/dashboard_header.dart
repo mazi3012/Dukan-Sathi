@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 
 class DashboardHeader extends StatelessWidget {
-  const DashboardHeader({Key? key}) : super(key: key);
+  const DashboardHeader({super.key});
 
   @override
   Widget build(BuildContext context) {

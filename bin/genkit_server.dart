@@ -6,7 +6,6 @@ import 'package:dukansathi_new/runtime/genkit_runtime.dart';
 import 'package:dukansathi_new/flows/retail_assistant.dart';
 import 'package:dukansathi_new/services/admin_service.dart';
 import 'package:dukansathi_new/core/database.dart';
-import 'package:dukansathi_new/models/product.dart';
 import 'package:dukansathi_new/tools/inventory_tools.dart';
 import 'package:dukansathi_new/tools/approval_tools.dart';
 import 'package:dukansathi_new/tools/billing_tools.dart';
@@ -761,7 +760,7 @@ class WebChatSession {
         final period = isToday ? 'today' : 'all_time';
         final periodName = isToday ? "Today's" : "All-time";
         
-        final result = await businessInsightsTool.fn!(
+        final result = await businessInsightsTool.fn(
           {'shopId': _currentShopId, 'period': period},
           (context: {'userIdentifier': _currentUserId, 'shopId': _currentShopId}, init: null, inputStream: null, sendChunk: (dynamic chunk) {}, streamingRequested: false)
         );
@@ -779,7 +778,7 @@ class WebChatSession {
     // Best Customer intent
     if (n.contains('best customer') || n.contains('top customer')) {
       try {
-        final result = await businessInsightsTool.fn!(
+        final result = await businessInsightsTool.fn(
           {'shopId': _currentShopId, 'period': 'all_time'},
           (context: {'userIdentifier': _currentUserId, 'shopId': _currentShopId}, init: null, inputStream: null, sendChunk: (dynamic chunk) {}, streamingRequested: false)
         );
@@ -818,7 +817,7 @@ class WebChatSession {
         if (targetName == null && n.contains('rahul')) targetName = 'rahul';
 
         if (targetName != null) {
-          final text = await cust.checkCustomerDue.fn!(
+          final text = await cust.checkCustomerDue.fn(
             {'customerName': targetName},
             (context: {'userIdentifier': _currentUserId, 'shopId': _currentShopId}, init: null, inputStream: null, sendChunk: (dynamic chunk) {}, streamingRequested: false)
           );
@@ -826,7 +825,7 @@ class WebChatSession {
           return {'text': text};
         } else {
           // List all dues
-          final text = await cust.listCustomersDue.fn!(
+          final text = await cust.listCustomersDue.fn(
             {},
             (context: {'userIdentifier': _currentUserId, 'shopId': _currentShopId}, init: null, inputStream: null, sendChunk: (dynamic chunk) {}, streamingRequested: false)
           );
@@ -930,7 +929,7 @@ class WebChatSession {
           final result = await createDraftInvoiceRequest(
             input: {
               'requestedItems': requestedItems,
-              if (customerName != null) 'customerName': customerName,
+              'customerName': ?customerName,
               'shopId': _currentShopId,
             },
             userIdentifier: userIdentifier,

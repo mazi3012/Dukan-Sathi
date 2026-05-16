@@ -68,7 +68,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   }
 
   void _showSettleDialog() {
-    final TextEditingController _amountController = TextEditingController(text: _currentBalance.toStringAsFixed(0));
+    final TextEditingController amountController = TextEditingController(text: _currentBalance.toStringAsFixed(0));
     
     showModalBottomSheet(
       context: context,
@@ -93,7 +93,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
               const SizedBox(height: 25),
               GlassBox(
                 child: TextField(
-                  controller: _amountController,
+                  controller: amountController,
                   keyboardType: TextInputType.number,
                   style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
                   decoration: const InputDecoration(
@@ -109,7 +109,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () async {
-                    final amount = double.tryParse(_amountController.text) ?? 0;
+                    final amount = double.tryParse(amountController.text) ?? 0;
                     if (amount > 0) {
                       Navigator.pop(context);
                       await _processPayment(amount);

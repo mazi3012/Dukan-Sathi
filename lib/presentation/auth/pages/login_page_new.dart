@@ -41,8 +41,8 @@ class _LoginPageState extends State<LoginPage> {
   void _navigateToDashboard() {
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (_, a, __) => const MainLayout(),
-        transitionsBuilder: (_, anim, __, child) =>
+        pageBuilder: (_, a, _) => const MainLayout(),
+        transitionsBuilder: (_, anim, _, child) =>
             FadeTransition(opacity: anim, child: child),
         transitionDuration: 600.ms,
       ),

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/session.dart';

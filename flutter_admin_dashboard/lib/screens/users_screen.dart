@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/data_provider.dart';
 
 class UsersScreen extends StatefulWidget {
-  const UsersScreen({Key? key}) : super(key: key);
+  const UsersScreen({super.key});
 
   @override
   State<UsersScreen> createState() => _UsersScreenState();
@@ -184,7 +184,7 @@ class _UsersScreenState extends State<UsersScreen> {
 }
 
 class CreateUserDialog extends StatefulWidget {
-  const CreateUserDialog({Key? key}) : super(key: key);
+  const CreateUserDialog({super.key});
 
   @override
   State<CreateUserDialog> createState() => _CreateUserDialogState();
@@ -265,7 +265,7 @@ class _CreateUserDialogState extends State<CreateUserDialog> {
                   builder: (context, dataProvider, _) {
                     return DropdownButtonFormField<String>(
                       decoration: const InputDecoration(labelText: 'Role'),
-                      value: _selectedRoleId,
+                      initialValue: _selectedRoleId,
                       items: dataProvider.roles.map<DropdownMenuItem<String>>((role) {
                         return DropdownMenuItem<String>(
                           value: role['id'].toString(),

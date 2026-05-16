@@ -2,6 +2,7 @@
 /// Reference: CBIC GST Council official rates (common items for retail/kirana shops)
 ///
 /// Valid Indian GST slabs: 0, 0.1, 0.25, 1.5, 3, 5, 6, 12, 18, 28
+library;
 
 class HsnGstLookup {
   /// Valid GST rate slabs in India

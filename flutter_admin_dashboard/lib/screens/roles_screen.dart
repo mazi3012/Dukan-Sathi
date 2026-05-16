@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/data_provider.dart';
 
 class RolesScreen extends StatefulWidget {
-  const RolesScreen({Key? key}) : super(key: key);
+  const RolesScreen({super.key});
 
   @override
   State<RolesScreen> createState() => _RolesScreenState();
@@ -45,7 +45,7 @@ class _RolesScreenState extends State<RolesScreen> {
 }
 
 class RolesTab extends StatelessWidget {
-  const RolesTab({Key? key}) : super(key: key);
+  const RolesTab({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -89,7 +89,7 @@ class RolesTab extends StatelessWidget {
 }
 
 class PermissionsTab extends StatelessWidget {
-  const PermissionsTab({Key? key}) : super(key: key);
+  const PermissionsTab({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -167,7 +167,7 @@ class PermissionsTab extends StatelessWidget {
 class RoleCard extends StatelessWidget {
   final Map<String, dynamic> role;
 
-  const RoleCard({required this.role});
+  const RoleCard({super.key, required this.role});
 
   @override
   Widget build(BuildContext context) {
@@ -187,7 +187,7 @@ class RoleCard extends StatelessWidget {
                     color: Colors.blue.shade100,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Center(
+                  child: const Center(
                     child: Icon(
                       Icons.security_outlined,
                       color: Colors.blue,

@@ -355,7 +355,7 @@ Future<Map<String, dynamic>> updateDraftItem({
     final amountPaid = paymentStatus == 'PAID'
         ? taxBreakdown.totalAmount
         : paymentStatus == 'PARTIAL'
-            ? ((_roundToTwoDecimals((approvalData['amount_paid'] as num?)?.toDouble() ?? 0.0)).clamp(0.0, taxBreakdown.totalAmount) as double)
+            ? (_roundToTwoDecimals((approvalData['amount_paid'] as num?)?.toDouble() ?? 0.0)).clamp(0.0, taxBreakdown.totalAmount)
             : 0.0;
     final dueAmount = _roundToTwoDecimals(taxBreakdown.totalAmount - amountPaid);
 
@@ -478,7 +478,7 @@ Future<Map<String, dynamic>> updateDraftDiscount({
     final amountPaid = paymentStatus == 'PAID'
         ? taxBreakdown.totalAmount
         : paymentStatus == 'PARTIAL'
-            ? ((_roundToTwoDecimals((approvalData['amount_paid'] as num?)?.toDouble() ?? 0.0)).clamp(0.0, taxBreakdown.totalAmount) as double)
+            ? (_roundToTwoDecimals((approvalData['amount_paid'] as num?)?.toDouble() ?? 0.0)).clamp(0.0, taxBreakdown.totalAmount)
             : 0.0;
     final dueAmount = _roundToTwoDecimals(taxBreakdown.totalAmount - amountPaid);
 

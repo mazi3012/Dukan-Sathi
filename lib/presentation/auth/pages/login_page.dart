@@ -5,7 +5,6 @@ import 'package:iconsax/iconsax.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/session.dart';
-import '../../main/pages/main_layout.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -32,7 +31,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      if (result is Map && result['success'] == true) {
+      if (result['success'] == true) {
         if (result['note'] != null) {
           setState(() => _error = result['note'].toString()); // Using _error variable to show info message
         }
@@ -47,7 +46,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _error = e?.toString() ?? 'Unknown error during authentication';
+        _error = e.toString() ?? 'Unknown error during authentication';
       });
       debugPrint('[LoginPage] Google login exception: $e\n$st');
     }

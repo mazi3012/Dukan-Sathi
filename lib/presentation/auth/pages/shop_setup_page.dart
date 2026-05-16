@@ -222,7 +222,7 @@ class _ShopSetupPageState extends State<ShopSetupPage> {
   Widget _buildDropdown() {
     return GlassBox(
       child: DropdownButtonFormField<String>(
-        value: _selectedState,
+        initialValue: _selectedState,
         dropdownColor: AppColors.darkBackground,
         style: const TextStyle(color: Colors.white),
         decoration: const InputDecoration(

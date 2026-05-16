@@ -12,13 +12,13 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      colorScheme: ColorScheme.light(
+      colorScheme: const ColorScheme.light(
         primary: primaryColor,
         secondary: secondaryColor,
         error: errorColor,
         surface: surfaceColor,
       ),
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -35,7 +35,7 @@ class AppTheme {
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
         ),
-        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         filled: true,
         fillColor: Colors.grey[50],
       ),
@@ -43,7 +43,7 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
-          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
           ),
@@ -56,7 +56,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      colorScheme: ColorScheme.dark(
+      colorScheme: const ColorScheme.dark(
         primary: primaryColor,
         secondary: secondaryColor,
         error: errorColor,

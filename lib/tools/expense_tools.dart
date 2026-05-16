@@ -1,7 +1,6 @@
 import 'package:schemantic/schemantic.dart';
 import '../core/database.dart';
 import '../runtime/genkit_runtime.dart';
-import 'analytics_tools.dart';
 
 final logExpense = ai.defineTool<Map<String, dynamic>, String>(
   name: 'logExpense',
@@ -83,7 +82,7 @@ final getExpenses = ai.defineTool<Map<String, dynamic>, String>(
       final expenses = response as List<dynamic>;
 
       if (expenses.isEmpty) {
-        return 'No expenses found' + (category != null ? ' for category "$category".' : '.');
+        return 'No expenses found${category != null ? ' for category "$category".' : '.'}';
       }
 
       double total = 0;

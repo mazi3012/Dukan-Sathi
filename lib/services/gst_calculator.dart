@@ -1,5 +1,4 @@
 import 'package:uuid/uuid.dart';
-import '../data/state_tax_slabs.dart';
 import '../models/cart_item.dart';
 import '../models/shop_config.dart';
 import '../models/tax_breakdown.dart';

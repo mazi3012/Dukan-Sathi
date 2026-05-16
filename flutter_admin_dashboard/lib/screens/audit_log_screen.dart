@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/data_provider.dart';
 
 class AuditLogScreen extends StatefulWidget {
-  const AuditLogScreen({Key? key}) : super(key: key);
+  const AuditLogScreen({super.key});
 
   @override
   State<AuditLogScreen> createState() => _AuditLogScreenState();

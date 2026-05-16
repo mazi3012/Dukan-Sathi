@@ -203,8 +203,9 @@ class _BillingPageState extends State<BillingPage> {
         final paymentStatus = sale['payment_status'] ?? 'PAID';
 
         Color statusColor;
-        if (paymentStatus == 'PAID') statusColor = AppColors.success;
-        else if (paymentStatus == 'PARTIAL') statusColor = Colors.orange;
+        if (paymentStatus == 'PAID') {
+          statusColor = AppColors.success;
+        } else if (paymentStatus == 'PARTIAL') statusColor = Colors.orange;
         else statusColor = AppColors.error;
 
         return Container(

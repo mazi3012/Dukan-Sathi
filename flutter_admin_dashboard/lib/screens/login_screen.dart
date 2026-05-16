@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -134,12 +134,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                             AlwaysStoppedAnimation(Colors.black87),
                                       ),
                                     )
-                                  : Row(
+                                  : const Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
-                                        const Icon(Icons.g_mobiledata, size: 20),
-                                        const SizedBox(width: 12),
-                                        const Text(
+                                        Icon(Icons.g_mobiledata, size: 20),
+                                        SizedBox(width: 12),
+                                        Text(
                                           'Sign in with Google',
                                           style: TextStyle(fontSize: 16),
                                         ),

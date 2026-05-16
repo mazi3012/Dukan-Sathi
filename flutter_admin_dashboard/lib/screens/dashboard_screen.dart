@@ -8,7 +8,7 @@ import '../widgets/dashboard_header.dart';
 import '../widgets/stats_card.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({Key? key}) : super(key: key);
+  const DashboardScreen({super.key});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -392,7 +392,7 @@ class QuickAccessButton extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;
 
-  const QuickAccessButton({
+  const QuickAccessButton({super.key, 
     required this.icon,
     required this.label,
     required this.onPressed,

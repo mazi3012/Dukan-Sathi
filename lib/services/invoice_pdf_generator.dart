@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -68,7 +67,7 @@ class InvoicePdfGenerator {
     final approvalData = await _fetchApprovalData(approvalId);
     final template = resolveTemplate(approval.proposedTaxBreakdown);
     final shop = await _fetchShop(approval.shopId);
-    final customerName = approvalData?['customer_name'] as String?;
+    final customerName = approvalData['customer_name'] as String?;
     final customer = approval.customerId == null
         ? null
         : await _fetchCustomer(approval.customerId!);

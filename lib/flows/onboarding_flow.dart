@@ -121,7 +121,7 @@ Future<void> _upsertDraft(OnboardingSession s) async {
           .insert(data)
           .select('id')
           .single();
-      s.draftId = (row as Map<String, dynamic>)['id'] as String;
+      s.draftId = (row)['id'] as String;
     } else {
       await supabase
           .from('onboarding_drafts')

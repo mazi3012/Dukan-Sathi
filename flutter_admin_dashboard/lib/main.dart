@@ -18,7 +18,7 @@ void main() {
 }
 
 class AdminDashboardApp extends StatelessWidget {
-  const AdminDashboardApp({Key? key}) : super(key: key);
+  const AdminDashboardApp({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -3,7 +3,6 @@ import 'package:http/http.dart' as http;
 import 'package:schemantic/schemantic.dart';
 import '../core/database.dart';
 import '../runtime/genkit_runtime.dart';
-import 'analytics_tools.dart';
 
 final getWeather = ai.defineTool<Map<String, dynamic>, String>(
   name: 'getWeather',
@@ -74,14 +73,14 @@ final getWeather = ai.defineTool<Map<String, dynamic>, String>(
 
       return '''📍 Weather for $locationName ($district, $state):
 
-🌡 Temperature outside: ${currentTemp}°C (Feels like ${currentApparent}°C)
-💨 Wind Speed: ${currentWind} km/h
+🌡 Temperature outside: $currentTemp°C (Feels like $currentApparent°C)
+💨 Wind Speed: $currentWind km/h
 
 📅 Today's Forecast:
-High: ${todayMax}°C | Low: ${todayMin}°C
+High: $todayMax°C | Low: $todayMin°C
 
 📅 Tomorrow's Forecast:
-High: ${tomorrowMax}°C | Low: ${tomorrowMin}°C
+High: $tomorrowMax°C | Low: $tomorrowMin°C
 Expect ${tomorrowCode > 50 ? 'rain/showers' : 'clear skies'}.''';
 
     } catch (e) {

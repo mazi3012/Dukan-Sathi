@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:dukansathi_new/services/admin_service.dart';
-import 'package:supabase/supabase.dart';
 
 /// Admin API Handler - All admin endpoints for the dashboard
 class AdminApiHandler {
