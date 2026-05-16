@@ -173,7 +173,9 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
         duration: 300.ms,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withOpacity(0.15) : Colors.transparent,
+          color: isSelected 
+              ? (isDark ? AppColors.primary.withOpacity(0.15) : AppColors.cyanGlow.withOpacity(0.2)) 
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(15),
         ),
         child: Row(
@@ -181,16 +183,16 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
             Icon(
               icon,
               color: isSelected 
-                  ? AppColors.primary 
-                  : (isDark ? Colors.white54 : Colors.black38),
+                  ? (isDark ? AppColors.primary : AppColors.lightOnSurface) 
+                  : (isDark ? Colors.white54 : AppColors.lightOnSurface.withOpacity(0.4)),
               size: 24,
             ),
             if (isSelected) ...[
               const SizedBox(width: 8),
               Text(
                 label,
-                style: const TextStyle(
-                  color: AppColors.primary,
+                style: TextStyle(
+                  color: isDark ? AppColors.primary : AppColors.lightOnSurface,
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
                 ),

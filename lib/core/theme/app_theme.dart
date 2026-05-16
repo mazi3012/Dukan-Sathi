@@ -40,41 +40,59 @@ class AppTheme {
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    primaryColor: AppColors.trustBlue,
+    primaryColor: AppColors.cyanGlow,
     scaffoldBackgroundColor: AppColors.lightBackground,
     colorScheme: const ColorScheme.light(
-      primary: AppColors.trustBlue,
+      primary: AppColors.cyanGlow,
       secondary: AppColors.primary,
       surface: AppColors.lightSurface,
       background: AppColors.lightBackground,
       error: AppColors.error,
+      onSurface: AppColors.lightOnSurface,
     ),
-    textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme).copyWith(
-      displayLarge: GoogleFonts.outfit(
+    textTheme: GoogleFonts.plusJakartaSansTextTheme(ThemeData.light().textTheme).copyWith(
+      displayLarge: GoogleFonts.plusJakartaSans(
         fontSize: 32,
         fontWeight: FontWeight.bold,
-        color: const Color(0xFF1A1D26),
+        color: AppColors.lightOnSurface,
+        letterSpacing: -0.02,
       ),
-      titleLarge: GoogleFonts.outfit(
+      titleLarge: GoogleFonts.plusJakartaSans(
         fontSize: 20,
-        fontWeight: FontWeight.w600,
-        color: const Color(0xFF1A1D26),
+        fontWeight: FontWeight.w700,
+        color: AppColors.lightOnSurface,
+      ),
+      bodyLarge: GoogleFonts.plusJakartaSans(
+        color: AppColors.lightOnSurface,
       ),
     ),
     cardTheme: CardThemeData(
-      color: AppColors.lightSurface,
-      elevation: 8,
-      shadowColor: AppColors.trustBlue.withOpacity(0.1),
+      color: AppColors.lightSurface.withOpacity(0.7),
+      elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: Colors.black.withOpacity(0.04)),
+        side: const BorderSide(color: AppColors.lightGlassBorder),
       ),
     ),
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      iconTheme: IconThemeData(color: Color(0xFF1A1D26)),
-      titleTextStyle: TextStyle(color: Color(0xFF1A1D26), fontSize: 20, fontWeight: FontWeight.bold),
+      centerTitle: true,
+      iconTheme: IconThemeData(color: AppColors.lightOnSurface),
+      titleTextStyle: TextStyle(
+        color: AppColors.lightOnSurface, 
+        fontSize: 20, 
+        fontWeight: FontWeight.bold,
+        fontFamily: 'Plus Jakarta Sans',
+      ),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.cyanGlow,
+        foregroundColor: AppColors.lightOnSurface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+      ),
     ),
   );
 }
