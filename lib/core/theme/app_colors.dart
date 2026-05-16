@@ -7,15 +7,17 @@ class AppColors {
   static const Color darkGlass = Color(0x1AFFFFFF); // 10% white
   static const Color darkGlassBorder = Color(0x33FFFFFF); // 20% white
 
-  // --- Light Mode Palette (Luminous Clarity) ---
-  static const Color lightBackground = Color(0xFFF4F7FB); // Sleek cool off-white
+  // --- Light Mode Palette (Organic Green) ---
+  static const Color lightBackground = Color(0xFFF4F9F6); // Subtle green-tinted off-white
   static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightSurfaceContainer = Color(0xFFE2E8F0);
-  static const Color lightSurfaceHighest = Color(0xFFCBD5E1);
-  static const Color lightOnSurface = Color(0xFF0F172A); // Crisp slate text
-  static const Color lightOutline = Color(0xFF94A3B8);
-  static const Color lightGlass = Color(0xB3FFFFFF); // 70% white for frosted look
-  static const Color lightGlassBorder = Color(0x1A000000); // 10% black for subtle edge
+  static const Color lightSurfaceContainer = Color(0xFFD1FAE5);
+  static const Color lightSurfaceHighest = Color(0xFFA7F3D0);
+  static const Color lightOnSurface = Color(0xFF064E3B); // Very dark green text
+  static const Color lightOutline = Color(0xFF6EE7B7);
+  static const Color lightGlass = Color(0xD9FFFFFF); // 85% white for clean frosted look
+  static const Color lightGlassBorder = Color(0x33059669); // Subtle emerald green edge
+  static const Color lightPrimary = Color(0xFF059669); // Main emerald green
+  static const Color lightPrimarySoft = Color(0xFFD1FAE5); // Soft green for icon boxes
   static const Color cyanGlow = Color(0xFF00F0FF); // The "Pulse" of the system
 
   // --- Brand Colors ---

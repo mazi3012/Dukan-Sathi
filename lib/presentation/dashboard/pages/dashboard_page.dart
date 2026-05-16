@@ -115,6 +115,35 @@ class _DashboardPageState extends State<DashboardPage> {
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
+          // Background blobs for glassmorphism effect
+          Positioned(
+            top: -100,
+            right: -50,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [AppColors.lightPrimary.withOpacity(0.15), Colors.transparent],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 100,
+            left: -100,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [AppColors.lightOutline.withOpacity(0.1), Colors.transparent],
+                ),
+              ),
+            ),
+          ),
           // Content
           SafeArea(
             child: CustomScrollView(
@@ -125,7 +154,9 @@ class _DashboardPageState extends State<DashboardPage> {
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
                       _buildWelcomeSection(context),
-                      const SizedBox(height: 30),
+                      const SizedBox(height: 24),
+                      if (!_isLoading) _buildOverviewCard(),
+                      if (!_isLoading) const SizedBox(height: 20),
                       _isLoading 
                         ? _buildStatsSkeleton()
                         : _buildStatsGrid(),
@@ -197,6 +228,91 @@ class _DashboardPageState extends State<DashboardPage> {
     ).animate().fadeIn(duration: 600.ms).slideX(begin: -0.1);
   }
 
+  Widget _buildOverviewCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF047857), Color(0xFF064E3B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF047857).withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Subtle background decoration
+          Positioned(
+            right: -20,
+            top: -20,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.05),
+              ),
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Total Sales", style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  const SizedBox(height: 4),
+                  Text("₹${_totalSales.toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.arrow_upward, color: Colors.greenAccent, size: 14),
+                      const SizedBox(width: 4),
+                      Text("12.5% vs last month", style: TextStyle(color: Colors.greenAccent.shade100, fontSize: 11)),
+                    ],
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                ),
+                child: const Icon(Iconsax.trend_up, color: Colors.white, size: 28),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Total Revenue", style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  const SizedBox(height: 4),
+                  Text("₹${(_totalSales * 1.15).toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.arrow_upward, color: Colors.greenAccent, size: 14),
+                      const SizedBox(width: 4),
+                      Text("8.3% vs last month", style: TextStyle(color: Colors.greenAccent.shade100, fontSize: 11)),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.1);
+  }
+
   Widget _buildStatsGrid() {
     return GridView.count(
       shrinkWrap: true,
@@ -204,25 +320,39 @@ class _DashboardPageState extends State<DashboardPage> {
       crossAxisCount: 2,
       crossAxisSpacing: 15,
       mainAxisSpacing: 15,
-      childAspectRatio: 1.5,
+      childAspectRatio: 1.4,
       children: [
-        _buildStatCard("Sales", "₹${_totalSales.toStringAsFixed(0)}", Iconsax.money_send, AppColors.primary),
-        _buildStatCard("Invoices", _invoiceCount.toString(), Iconsax.document_text, AppColors.accent),
-        _buildStatCard("Expenses", "₹${_totalExpenses.toStringAsFixed(0)}", Iconsax.money_remove, AppColors.error),
-        _buildStatCard("Products", _productCount.toString(), Iconsax.box, AppColors.success),
+        _buildStatCard("Sales", "₹${_totalSales.toStringAsFixed(0)}", Iconsax.wallet_money),
+        _buildStatCard("Invoices", _invoiceCount.toString(), Iconsax.document_text),
+        _buildStatCard("Expenses", "₹${_totalExpenses.toStringAsFixed(0)}", Iconsax.card_send),
+        _buildStatCard("Products", _productCount.toString(), Iconsax.box),
       ],
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(String title, String value, IconData icon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final iconBgColor = isDark ? Colors.white.withOpacity(0.1) : AppColors.lightPrimarySoft;
+    final iconColor = isDark ? Colors.white : AppColors.lightPrimary;
+    final borderColor = isDark ? Colors.white.withOpacity(0.1) : AppColors.lightGlassBorder;
+
     return GlassBox(
+      borderRadius: 16,
       child: Padding(
-        padding: const EdgeInsets.all(15),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(icon, color: color, size: 20),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: iconBgColor,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: borderColor),
+              ),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -230,11 +360,14 @@ class _DashboardPageState extends State<DashboardPage> {
                   value,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
+                    fontSize: 22,
                   ),
                 ),
                 Text(
                   title,
-                  style: Theme.of(context).textTheme.bodySmall,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+                  ),
                 ),
               ],
             ),
@@ -291,11 +424,29 @@ class _DashboardPageState extends State<DashboardPage> {
       margin: const EdgeInsets.only(bottom: 15),
       child: GlassBox(
         child: ListTile(
-          leading: const CircleAvatar(
-            backgroundColor: AppColors.darkGlass,
-            child: Icon(Iconsax.receipt, color: AppColors.primary, size: 18),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          leading: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).brightness == Brightness.dark 
+                  ? Colors.white.withOpacity(0.1) 
+                  : AppColors.lightPrimarySoft,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Theme.of(context).brightness == Brightness.dark 
+                    ? Colors.white.withOpacity(0.1) 
+                    : AppColors.lightGlassBorder,
+              ),
+            ),
+            child: Icon(
+              Iconsax.receipt, 
+              color: Theme.of(context).brightness == Brightness.dark 
+                  ? Colors.white 
+                  : AppColors.lightPrimary, 
+              size: 20
+            ),
           ),
-          title: Text("Invoice #$invNum", style: Theme.of(context).textTheme.bodyLarge),
+          title: Text("Invoice #$invNum", style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
           subtitle: Text("Customer: $customer", style: Theme.of(context).textTheme.bodySmall),
           trailing: Text("₹${amount.toStringAsFixed(0)}", style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold)),
         ),

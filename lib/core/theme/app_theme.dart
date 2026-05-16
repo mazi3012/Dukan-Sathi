@@ -39,10 +39,10 @@ class AppTheme {
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    primaryColor: AppColors.cyanGlow,
+    primaryColor: AppColors.lightPrimary,
     scaffoldBackgroundColor: AppColors.lightBackground,
     colorScheme: const ColorScheme.light(
-      primary: AppColors.cyanGlow,
+      primary: AppColors.lightPrimary,
       secondary: AppColors.primary,
       surface: AppColors.lightSurface,
       error: AppColors.error,
@@ -65,11 +65,12 @@ class AppTheme {
       ),
     ),
     cardTheme: CardThemeData(
-      color: AppColors.lightSurface.withOpacity(0.7),
-      elevation: 0,
+      color: AppColors.lightSurface,
+      elevation: 4,
+      shadowColor: AppColors.lightPrimary.withOpacity(0.15),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: AppColors.lightGlassBorder),
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.lightGlassBorder, width: 1.5),
       ),
     ),
     appBarTheme: const AppBarTheme(
@@ -86,9 +87,9 @@ class AppTheme {
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.cyanGlow,
-        foregroundColor: AppColors.lightOnSurface,
-        elevation: 0,
+        backgroundColor: AppColors.lightPrimary,
+        foregroundColor: Colors.white,
+        elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     ),

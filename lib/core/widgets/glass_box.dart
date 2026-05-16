@@ -24,24 +24,39 @@ class GlassBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-        child: Container(
-          decoration: BoxDecoration(
-            color: color ?? 
-              (isDark 
-                ? Colors.white.withOpacity(opacity) 
-                : AppColors.lightGlass),
-            borderRadius: BorderRadius.circular(borderRadius),
-            border: border ?? Border.all(
-              color: isDark 
-                ? AppColors.darkGlassBorder 
-                : AppColors.lightGlassBorder,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(borderRadius),
+        boxShadow: [
+          if (Theme.of(context).brightness == Brightness.light)
+            BoxShadow(
+              color: AppColors.lightPrimary.withOpacity(0.04),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+              spreadRadius: 0,
             ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+          child: Container(
+            decoration: BoxDecoration(
+              color: color ?? 
+                (isDark 
+                  ? Colors.white.withOpacity(opacity) 
+                  : AppColors.lightSurface.withOpacity(0.85)),
+              borderRadius: BorderRadius.circular(borderRadius),
+              border: border ?? Border.all(
+                color: isDark 
+                  ? AppColors.darkGlassBorder 
+                  : AppColors.lightGlassBorder,
+                width: isDark ? 1.0 : 1.5,
+              ),
+            ),
+            child: child,
           ),
-          child: child,
         ),
       ),
     );
