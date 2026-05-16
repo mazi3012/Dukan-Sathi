@@ -86,8 +86,7 @@ class _ShopSetupPageState extends State<ShopSetupPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 40),
-                  const Icon(Iconsax.shop, size: 48, color: AppColors.primary)
+                  Icon(Iconsax.shop, size: 48, color: Theme.of(context).primaryColor)
                       .animate()
                       .fadeIn(duration: 600.ms)
                       .scale(),

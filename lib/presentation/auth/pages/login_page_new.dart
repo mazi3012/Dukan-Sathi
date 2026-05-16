@@ -121,16 +121,16 @@ class _LoginPageState extends State<LoginPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.15),
+          color: Theme.of(context).primaryColor.withOpacity(0.15),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.primary.withOpacity(0.4)),
+          border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.4)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Iconsax.login, color: AppColors.primary, size: 18),
+            Icon(Iconsax.login, color: Theme.of(context).primaryColor, size: 18),
             const SizedBox(width: 8),
-            Text('Welcome Back', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
+            Text('Welcome Back', style: TextStyle(color: Theme.of(context).primaryColor, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -158,7 +158,7 @@ class _LoginPageState extends State<LoginPage> {
       child: ElevatedButton(
         onPressed: _isLoading ? null : _handleGoogleLogin,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.primary,
+          backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Theme.of(context).primaryColor,
           foregroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black87 : Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 2,
@@ -244,7 +244,7 @@ class _LoginPageState extends State<LoginPage> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: RadialGradient(
-                colors: [AppColors.primary.withOpacity(0.15), Colors.transparent],
+                colors: [Theme.of(context).primaryColor.withOpacity(0.15), Colors.transparent],
               ),
             ),
           ),
@@ -277,7 +277,7 @@ class _LoginPageState extends State<LoginPage> {
             borderRadius: BorderRadius.circular(20),
             gradient: AppColors.primaryGradient,
             boxShadow: [
-              BoxShadow(color: AppColors.primary.withOpacity(0.5), blurRadius: 30, offset: const Offset(0, 10)),
+              BoxShadow(color: Theme.of(context).primaryColor.withOpacity(0.5), blurRadius: 30, offset: const Offset(0, 10)),
             ],
           ),
           child: const Icon(Iconsax.shop, size: 42, color: Colors.white),

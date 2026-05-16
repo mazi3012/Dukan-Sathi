@@ -155,10 +155,10 @@ class _CustomersPageState extends State<CustomersPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.2),
+                  color: Theme.of(context).brightness == Brightness.dark ? AppColors.primary.withOpacity(0.2) : AppColors.lightPrimarySoft,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Iconsax.wallet_3, color: AppColors.primary, size: 28),
+                child: Icon(Iconsax.wallet_3, color: Theme.of(context).brightness == Brightness.dark ? AppColors.primary : AppColors.lightPrimary, size: 28),
               ),
               const SizedBox(width: 20),
               Column(
@@ -221,17 +221,17 @@ class _CustomersPageState extends State<CustomersPage> {
                 if (selected) setState(() => _filter = filter);
               },
               backgroundColor: Theme.of(context).cardColor.withOpacity(0.5),
-              selectedColor: AppColors.primary.withOpacity(0.3),
+              selectedColor: Theme.of(context).brightness == Brightness.dark ? AppColors.primary.withOpacity(0.3) : AppColors.lightPrimary.withOpacity(0.2),
               labelStyle: TextStyle(
                 color: isSelected 
-                    ? AppColors.primary 
+                    ? (Theme.of(context).brightness == Brightness.dark ? AppColors.primary : AppColors.lightPrimary) 
                     : Theme.of(context).textTheme.bodyMedium?.color,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
                 side: BorderSide(
-                  color: isSelected ? AppColors.primary : Colors.transparent,
+                  color: isSelected ? (Theme.of(context).brightness == Brightness.dark ? AppColors.primary : AppColors.lightPrimary) : Colors.transparent,
                 ),
               ),
             ),

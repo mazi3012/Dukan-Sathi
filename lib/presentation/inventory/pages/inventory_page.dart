@@ -162,10 +162,10 @@ class _InventoryPageState extends State<InventoryPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.2),
+                  color: Theme.of(context).brightness == Brightness.dark ? AppColors.primary.withOpacity(0.2) : AppColors.lightPrimarySoft,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Iconsax.chart_2, color: AppColors.primary),
+                child: Icon(Iconsax.chart_2, color: Theme.of(context).brightness == Brightness.dark ? AppColors.primary : AppColors.lightPrimary),
               ),
             ],
           ),
@@ -194,7 +194,7 @@ class _InventoryPageState extends State<InventoryPage> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
                 color: isSelected 
-                    ? (isLowStock ? AppColors.error : AppColors.primary)
+                    ? (isLowStock ? AppColors.error : (Theme.of(context).brightness == Brightness.dark ? AppColors.primary : AppColors.lightPrimary))
                     : Theme.of(context).cardColor.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
@@ -270,7 +270,7 @@ class _InventoryPageState extends State<InventoryPage> {
               padding: const EdgeInsets.only(right: 20),
               alignment: Alignment.centerRight,
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.3),
+                color: Theme.of(context).brightness == Brightness.dark ? AppColors.primary.withOpacity(0.3) : AppColors.lightPrimary.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Row(
@@ -300,10 +300,12 @@ class _InventoryPageState extends State<InventoryPage> {
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
-                      color: isLowStock ? AppColors.error.withOpacity(0.1) : AppColors.primary.withOpacity(0.1),
+                      color: isLowStock 
+                          ? AppColors.error.withOpacity(0.1) 
+                          : (Theme.of(context).brightness == Brightness.dark ? AppColors.primary.withOpacity(0.1) : AppColors.lightPrimarySoft),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(Iconsax.box, color: isLowStock ? AppColors.error : AppColors.primary),
+                    child: Icon(Iconsax.box, color: isLowStock ? AppColors.error : (Theme.of(context).brightness == Brightness.dark ? AppColors.primary : AppColors.lightPrimary)),
                   ),
                   title: Text(
                     name,

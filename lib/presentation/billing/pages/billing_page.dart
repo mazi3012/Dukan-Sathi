@@ -99,7 +99,7 @@ class _BillingPageState extends State<BillingPage> {
             const SnackBar(content: Text('Opening AI Invoice Generator...')),
           );
         },
-        backgroundColor: AppColors.primary,
+        backgroundColor: Theme.of(context).primaryColor,
         icon: const Icon(Iconsax.add, color: Colors.white),
         label: const Text("New Bill", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ).animate().scale(delay: 500.ms),
@@ -163,7 +163,7 @@ class _BillingPageState extends State<BillingPage> {
                   Text(
                     "₹${_todayRevenue.toStringAsFixed(0)}",
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: AppColors.primary,
+                      color: Theme.of(context).primaryColor,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -172,10 +172,10 @@ class _BillingPageState extends State<BillingPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.2),
+                  color: Theme.of(context).brightness == Brightness.dark ? AppColors.primary.withOpacity(0.2) : AppColors.lightPrimarySoft,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Iconsax.wallet_3, color: AppColors.primary),
+                child: Icon(Iconsax.wallet_3, color: Theme.of(context).brightness == Brightness.dark ? AppColors.primary : AppColors.lightPrimary),
               ),
             ],
           ),

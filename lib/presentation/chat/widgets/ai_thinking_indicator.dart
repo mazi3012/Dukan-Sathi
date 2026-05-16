@@ -47,7 +47,7 @@ class _AiThinkingIndicatorState extends State<AiThinkingIndicator> {
           width: 16,
           height: 16,
           child: const CircularProgressIndicator(
-            color: AppColors.primary,
+            color: Theme.of(context).primaryColor,
             strokeWidth: 2,
           ),
         ),

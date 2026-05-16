@@ -144,7 +144,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                   labelText: 'Quantity',
                   labelStyle: TextStyle(color: Colors.white54),
                   enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.darkGlassBorder)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Theme.of(context).primaryColor)),
                 ),
               ),
               const SizedBox(height: 12),
@@ -156,7 +156,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                   labelText: 'Unit Price',
                   labelStyle: TextStyle(color: Colors.white54),
                   enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.darkGlassBorder)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Theme.of(context).primaryColor)),
                 ),
               ),
             ],
@@ -179,7 +179,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                   });
                 }
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).primaryColor),
               child: const Text("Save"),
             ),
           ],
@@ -264,7 +264,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       blur: 25,
       opacity: 0.15,
       border: Border.all(
-        color: isApproved ? AppColors.success.withOpacity(0.4) : AppColors.primary.withOpacity(0.3),
+        color: isApproved ? AppColors.success.withOpacity(0.4) : Theme.of(context).primaryColor.withOpacity(0.3),
         width: 1,
       ),
       child: Padding(
@@ -280,14 +280,14 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                   children: [
                     Icon(
                       isApproved ? Iconsax.tick_circle : Iconsax.edit,
-                      color: isApproved ? AppColors.success : AppColors.primary,
+                      color: isApproved ? AppColors.success : Theme.of(context).primaryColor,
                       size: 16,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       isApproved ? "Approved Invoice" : "Draft Invoice",
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: isApproved ? AppColors.success : AppColors.primary,
+                            color: isApproved ? AppColors.success : Theme.of(context).primaryColor,
                             fontWeight: FontWeight.bold,
                           ),
                     ),
@@ -338,10 +338,10 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                           width: 22, height: 22,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.15),
+                            color: Theme.of(context).primaryColor.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Text('$idx', style: const TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold)),
+                          child: Text('$idx', style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 10, fontWeight: FontWeight.bold)),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -350,7 +350,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                         if (!isApproved)
                           GestureDetector(
                             onTap: () => _showEditItemDialog(Map<String, dynamic>.from(item)),
-                            child: const Icon(Iconsax.edit, size: 14, color: AppColors.primary),
+                            child: Icon(Iconsax.edit, size: 14, color: Theme.of(context).primaryColor),
                           ),
                       ],
                     ),
@@ -367,10 +367,10 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
+                            color: Theme.of(context).primaryColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: Text('GST $gstRateStr', style: const TextStyle(color: AppColors.primary, fontSize: 9, fontWeight: FontWeight.bold)),
+                          child: Text('GST $gstRateStr', style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 9, fontWeight: FontWeight.bold)),
                         ),
                         const SizedBox(width: 6),
                         Text(
@@ -470,9 +470,9 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                   children: [
                     Text(
                       _showAdvanced ? "Hide Controls" : "Edit Draft (GST, Discount, Payment)",
-                      style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 12, fontWeight: FontWeight.bold),
                     ),
-                    Icon(_showAdvanced ? Iconsax.arrow_up_1 : Iconsax.arrow_down_1, size: 14, color: AppColors.primary),
+                    Icon(_showAdvanced ? Iconsax.arrow_up_1 : Iconsax.arrow_down_1, size: 14, color: Theme.of(context).primaryColor),
                   ],
                 ),
               ),
@@ -543,7 +543,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary.withOpacity(0.4),
+                            color: Theme.of(context).primaryColor.withOpacity(0.4),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -695,11 +695,11 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.2),
+                      color: Theme.of(context).primaryColor.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.primary),
+                      border: Border.all(color: Theme.of(context).primaryColor),
                     ),
-                    child: const Text("Save", style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
+                    child: Text("Save", style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 11, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -752,11 +752,11 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.2),
+                    color: Theme.of(context).primaryColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.primary),
+                    border: Border.all(color: Theme.of(context).primaryColor),
                   ),
-                  child: const Text("Apply", style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
+                  child: Text("Apply", style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 11, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -785,14 +785,14 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: active ? AppColors.primary.withOpacity(0.2) : Colors.transparent,
+            color: active ? Theme.of(context).primaryColor.withOpacity(0.2) : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: active ? AppColors.primary : Colors.white10),
+            border: Border.all(color: active ? Theme.of(context).primaryColor : Colors.white10),
           ),
           child: Text(
             label,
             style: TextStyle(
-              color: active ? AppColors.primary : Colors.white54,
+              color: active ? Theme.of(context).primaryColor : Colors.white54,
               fontSize: 10,
               fontWeight: active ? FontWeight.bold : FontWeight.normal,
             ),
@@ -821,7 +821,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
             const SizedBox(width: 8),
             GestureDetector(
               onTap: onEdit,
-              child: const Icon(Iconsax.edit, size: 16, color: AppColors.primary),
+              child: Icon(Iconsax.edit, size: 16, color: Theme.of(context).primaryColor),
             ),
           ] else
             Text(total, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),

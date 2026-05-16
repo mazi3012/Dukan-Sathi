@@ -174,7 +174,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected 
-              ? (isDark ? AppColors.primary.withOpacity(0.15) : AppColors.cyanGlow.withOpacity(0.2)) 
+              ? (isDark ? AppColors.primary.withOpacity(0.15) : AppColors.lightPrimarySoft) 
               : Colors.transparent,
           borderRadius: BorderRadius.circular(15),
         ),
@@ -183,7 +183,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
             Icon(
               icon,
               color: isSelected 
-                  ? (isDark ? AppColors.primary : AppColors.lightOnSurface) 
+                  ? (isDark ? AppColors.primary : AppColors.lightPrimary) 
                   : (isDark ? Colors.white54 : AppColors.lightOnSurface.withOpacity(0.4)),
               size: 24,
             ),
@@ -192,7 +192,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
               Text(
                 label,
                 style: TextStyle(
-                  color: isDark ? AppColors.primary : AppColors.lightOnSurface,
+                  color: isDark ? AppColors.primary : AppColors.lightPrimary,
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
                 ),

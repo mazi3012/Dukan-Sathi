@@ -98,7 +98,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
                   decoration: InputDecoration(
                     prefixText: "₹ ",
-                    prefixStyle: Theme.of(context).textTheme.headlineMedium?.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                    prefixStyle: Theme.of(context).textTheme.headlineMedium?.copyWith(color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                   ),
@@ -116,7 +116,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: Theme.of(context).primaryColor,
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),

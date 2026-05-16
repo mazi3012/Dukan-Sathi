@@ -100,17 +100,17 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                     width: 100,
                     height: 100,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: Theme.of(context).primaryColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(30),
                       border: Border.all(
-                        color: AppColors.primary.withOpacity(0.3),
+                        color: Theme.of(context).primaryColor.withOpacity(0.3),
                         width: 2,
                       ),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Iconsax.sms_notification,
                       size: 50,
-                      color: AppColors.primary,
+                      color: Theme.of(context).primaryColor,
                     ),
                   )
                       .animate()
@@ -145,16 +145,16 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: Theme.of(context).primaryColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: AppColors.primary.withOpacity(0.2),
+                        color: Theme.of(context).primaryColor.withOpacity(0.2),
                       ),
                     ),
                     child: Text(
                       widget.email,
-                      style: const TextStyle(
-                        color: AppColors.primary,
+                      style: TextStyle(
+                        color: Theme.of(context).primaryColor,
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                       ),
@@ -232,9 +232,9 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                             : 'Resend in $_secondsRemaining seconds',
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: Theme.of(context).primaryColor,
                         disabledBackgroundColor:
-                            AppColors.primary.withOpacity(0.3),
+                            Theme.of(context).primaryColor.withOpacity(0.3),
                         disabledForegroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white54 : Colors.black54,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),

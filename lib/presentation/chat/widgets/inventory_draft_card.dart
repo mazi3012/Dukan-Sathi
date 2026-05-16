@@ -117,7 +117,7 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
               children: [
                 Icon(
                   _isApproved ? Iconsax.tick_circle : Iconsax.add_circle,
-                  color: _isApproved ? AppColors.success : AppColors.primary,
+                  color: _isApproved ? AppColors.success : Theme.of(context).primaryColor,
                   size: 16,
                 ),
                 const SizedBox(width: 8),
@@ -152,12 +152,12 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
                       width: 50,
                       height: 50,
                       decoration: BoxDecoration(
-                        color: (_isApproved ? AppColors.success : AppColors.primary).withOpacity(0.1),
+                        color: (_isApproved ? AppColors.success : Theme.of(context).primaryColor).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         Iconsax.box, 
-                        color: _isApproved ? AppColors.success : AppColors.primary,
+                        color: _isApproved ? AppColors.success : Theme.of(context).primaryColor,
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -182,7 +182,7 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
                         Text(
                           "₹$price",
                           style: TextStyle(
-                            color: _isApproved ? AppColors.success : AppColors.primary,
+                            color: _isApproved ? AppColors.success : Theme.of(context).primaryColor,
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
                           ),
@@ -222,7 +222,7 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withOpacity(0.4),
+                    color: Theme.of(context).primaryColor.withOpacity(0.4),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),

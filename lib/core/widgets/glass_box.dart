@@ -30,10 +30,10 @@ class GlassBox extends StatelessWidget {
         boxShadow: [
           if (Theme.of(context).brightness == Brightness.light)
             BoxShadow(
-              color: AppColors.lightPrimary.withOpacity(0.04),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-              spreadRadius: 0,
+              color: AppColors.lightPrimary.withOpacity(0.12),
+              blurRadius: 32,
+              offset: const Offset(0, 12),
+              spreadRadius: 2,
             ),
         ],
       ),

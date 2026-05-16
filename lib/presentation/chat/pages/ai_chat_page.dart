@@ -143,8 +143,8 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
           children: [
             Container(
               padding: const EdgeInsets.all(6),
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor,
                 shape: BoxShape.circle,
               ),
               child: const Icon(Iconsax.magic_star, size: 16, color: Colors.white),
@@ -364,7 +364,7 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                   gradient: AppColors.primaryGradient,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.4),
+                      color: Theme.of(context).primaryColor.withOpacity(0.4),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
