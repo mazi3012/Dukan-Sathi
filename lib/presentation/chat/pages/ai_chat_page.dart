@@ -135,7 +135,7 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Iconsax.arrow_left_2, color: Colors.white),
+          icon: Icon(Iconsax.arrow_left_2, color: Theme.of(context).iconTheme.color),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(
@@ -150,10 +150,10 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
               child: const Icon(Iconsax.magic_star, size: 16, color: Colors.white),
             ),
             const SizedBox(width: 8),
-            const Flexible(
+            Flexible(
               child: Text(
                 "Dukan Sathi",
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                style: Theme.of(context).appBarTheme.titleTextStyle,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -163,16 +163,8 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
       ),
       body: Stack(
         children: [
-          // Background
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF0F111A), Color(0xFF1E1936)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
+          // Background handled by Scaffold
+          const SizedBox.expand(),
           
           // Chat List
           SafeArea(
@@ -223,12 +215,12 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
       child: Container(
         margin: const EdgeInsets.only(left: 40),
         padding: const EdgeInsets.all(16),
-        decoration: const BoxDecoration(
-          gradient: AppColors.primaryGradient,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-            bottomLeft: Radius.circular(20),
+        decoration: BoxDecoration(
+          color: Theme.of(context).primaryColor,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(12),
+            topRight: Radius.circular(12),
+            bottomLeft: Radius.circular(12),
             bottomRight: Radius.circular(4),
           ),
         ),
@@ -245,13 +237,17 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
         child: GlassBox(
           opacity: 0.1,
           blur: 10,
-          borderRadius: 20,
-          border: Border.all(color: AppColors.darkGlassBorder),
+          borderRadius: 12,
+          border: Border.all(
+            color: Theme.of(context).brightness == Brightness.dark 
+                ? AppColors.darkGlassBorder 
+                : AppColors.lightGlassBorder,
+          ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: isTyping
                 ? const AiThinkingIndicator()
-                : Text(text, style: const TextStyle(color: Colors.white, fontSize: 15)),
+                : Text(text, style: Theme.of(context).textTheme.bodyLarge),
           ),
         ),
       ),
@@ -272,8 +268,14 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                 : MediaQuery.of(context).padding.bottom + 15,
           ),
           decoration: BoxDecoration(
-            color: AppColors.darkBackground.withOpacity(0.8),
-            border: const Border(top: BorderSide(color: AppColors.darkGlassBorder)),
+            color: Theme.of(context).scaffoldBackgroundColor.withOpacity(0.8),
+            border: Border(
+              top: BorderSide(
+                color: Theme.of(context).brightness == Brightness.dark 
+                    ? AppColors.darkGlassBorder 
+                    : AppColors.lightGlassBorder,
+              ),
+            ),
           ),
           child: Row(
             children: [
@@ -281,19 +283,23 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   decoration: BoxDecoration(
-                    color: AppColors.darkSurface,
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: AppColors.darkGlassBorder),
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Theme.of(context).brightness == Brightness.dark 
+                          ? AppColors.darkGlassBorder 
+                          : AppColors.lightGlassBorder,
+                    ),
                   ),
                   child: TextField(
                     controller: _textController,
-                    style: const TextStyle(color: Colors.white),
+                    style: Theme.of(context).textTheme.bodyLarge,
                     onSubmitted: (_) => _sendMessage(),
                     decoration: InputDecoration(
                       hintText: _isTranscribing ? "Transcribing..." : "Ask Dukan Sathi...",
-                      hintStyle: const TextStyle(color: Colors.white54),
+                      hintStyle: Theme.of(context).textTheme.bodySmall,
                       border: InputBorder.none,
-                      icon: const Icon(Iconsax.camera, color: Colors.white54),
+                      icon: Icon(Iconsax.camera, color: Theme.of(context).iconTheme.color?.withOpacity(0.5)),
                       suffixIcon: _isTranscribing
                           ? const SizedBox(
                               width: 20,
@@ -323,8 +329,16 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                   width: 50,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: _isRecording ? Colors.red.withOpacity(0.2) : AppColors.darkSurface,
-                    border: Border.all(color: _isRecording ? Colors.red : AppColors.darkGlassBorder),
+                    color: _isRecording 
+                        ? Colors.red.withOpacity(0.2) 
+                        : Theme.of(context).cardColor,
+                    border: Border.all(
+                      color: _isRecording 
+                          ? Colors.red 
+                          : (Theme.of(context).brightness == Brightness.dark 
+                              ? AppColors.darkGlassBorder 
+                              : AppColors.lightGlassBorder),
+                    ),
                     boxShadow: _isRecording
                         ? [
                             BoxShadow(
@@ -337,7 +351,7 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                   ),
                   child: Icon(
                     _isRecording ? Iconsax.stop : Iconsax.microphone_2,
-                    color: _isRecording ? Colors.red : Colors.white54,
+                    color: _isRecording ? Colors.red : Theme.of(context).iconTheme.color,
                   ),
                 ),
               ),

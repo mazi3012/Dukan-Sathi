@@ -84,22 +84,10 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.darkBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Stack(
           children: [
-            // Background gradient
-            Container(
-              width: double.infinity,
-              height: double.infinity,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppColors.darkBackground, Color(0xFF1A1D2E)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-            ),
             // Content
             SingleChildScrollView(
               padding: const EdgeInsets.all(24),
@@ -134,7 +122,6 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                     'Verify Your Email',
                     style: Theme.of(context).textTheme.displaySmall?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
                         ),
                   )
                       .animate()
@@ -145,7 +132,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                   Text(
                     'We\'ve sent a verification link to:',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Colors.white54,
+                          color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6),
                         ),
                   )
                       .animate()
@@ -202,7 +189,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodyMedium
-                                    ?.copyWith(color: Colors.blue[200]),
+                                    ?.copyWith(color: Theme.of(context).brightness == Brightness.dark ? Colors.blue[200] : Colors.blue[800]),
                               ),
                             ),
                           ],
@@ -221,7 +208,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                               style: Theme.of(context)
                                   .textTheme
                                   .bodyMedium
-                                  ?.copyWith(color: Colors.blue[200]),
+                                  ?.copyWith(color: Theme.of(context).brightness == Brightness.dark ? Colors.blue[200] : Colors.blue[800]),
                             ),
                           ],
                         ),
@@ -248,7 +235,8 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                         backgroundColor: AppColors.primary,
                         disabledBackgroundColor:
                             AppColors.primary.withOpacity(0.3),
-                        disabledForegroundColor: Colors.white54,
+                        disabledForegroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white54 : Colors.black54,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                   )
@@ -273,7 +261,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                       child: const Text(
                         'Continue to Setup',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Theme.of(context).textTheme.bodyMedium?.color,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -285,10 +273,10 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                   // Logout button
                   TextButton.icon(
                     onPressed: _handleLogout,
-                    icon: const Icon(Iconsax.logout, color: Colors.white54),
-                    label: const Text(
+                    icon: Icon(Iconsax.logout, color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6)),
+                    label: Text(
                       'Logout',
-                      style: TextStyle(color: Colors.white54),
+                      style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6)),
                     ),
                   )
                       .animate()

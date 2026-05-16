@@ -102,7 +102,7 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
       return const GlassBox(
         child: Padding(
           padding: EdgeInsets.all(16.0),
-          child: Text("No products found.", style: TextStyle(color: Colors.white54)),
+          child: Text("No products found.", style: Theme.of(context).textTheme.bodySmall),
         ),
       );
     }
@@ -123,11 +123,7 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
                 const SizedBox(width: 8),
                 Text(
                   _isApproved ? "Added to Inventory" : "New Product Proposal",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -146,7 +142,7 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
               border: Border.all(
                 color: _isApproved 
                     ? AppColors.success.withOpacity(0.3) 
-                    : Colors.white.withOpacity(0.1),
+                    : Theme.of(context).dividerColor.withOpacity(0.1),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -171,18 +167,11 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
                         children: [
                           Text(
                             name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           Text(
                             category,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.5),
-                              fontSize: 12,
-                            ),
+                            style: Theme.of(context).textTheme.labelSmall,
                           ),
                         ],
                       ),
@@ -230,7 +219,7 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
               height: 50,
               decoration: BoxDecoration(
                 gradient: AppColors.primaryGradient,
-                borderRadius: BorderRadius.circular(15),
+                borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
                     color: AppColors.primary.withOpacity(0.4),
@@ -244,7 +233,7 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: _isApproving
                     ? const SizedBox(
@@ -259,7 +248,7 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
                           SizedBox(width: 10),
                           Text(
                             "Approve & Add to Inventory", 
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),

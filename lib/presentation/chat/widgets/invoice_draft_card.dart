@@ -296,12 +296,12 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.darkGlass,
-                    borderRadius: BorderRadius.circular(12),
+                    color: Theme.of(context).brightness == Brightness.dark ? AppColors.darkGlass : AppColors.lightGlass,
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     customerName,
-                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                    style: Theme.of(context).textTheme.labelSmall,
                   ),
                 ),
               ],
@@ -324,9 +324,9 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white10),
+                  color: Theme.of(context).cardColor.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.1)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -345,7 +345,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                          child: Text(name, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                         ),
                         if (!isApproved)
                           GestureDetector(
@@ -361,7 +361,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                         Expanded(
                           child: Text(
                             '$qty × ₹${unitPrice.toStringAsFixed(2)} = ₹${taxableValue.toStringAsFixed(2)}',
-                            style: const TextStyle(color: Colors.white54, fontSize: 11),
+                            style: Theme.of(context).textTheme.labelSmall,
                           ),
                         ),
                         Container(
@@ -384,10 +384,10 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        const Text('Total: ', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                        const Text('Total: ', style: TextStyle(fontSize: 11)),
                         Text(
                           '₹${totalWithTax.toStringAsFixed(2)}',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
@@ -402,7 +402,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.2),
+                color: Theme.of(context).cardColor.withOpacity(0.8),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Stack(
@@ -487,7 +487,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
               children: [
                 const Text(
                   "Total Amount",
-                  style: TextStyle(color: Colors.white70, fontSize: 16),
+                  style: TextStyle(fontSize: 16),
                 ),
                 Text(
                   "₹${totalAmount.toStringAsFixed(2)}",
@@ -540,7 +540,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                       height: 50,
                       decoration: BoxDecoration(
                         gradient: AppColors.primaryGradient,
-                        borderRadius: BorderRadius.circular(15),
+                        borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
                             color: AppColors.primary.withOpacity(0.4),
@@ -554,7 +554,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
                           shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         child: _isApproving
                             ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
@@ -574,9 +574,9 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                     height: 50,
                     width: 50,
                     decoration: BoxDecoration(
-                      color: AppColors.darkSurface,
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: AppColors.darkGlassBorder),
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.1)),
                     ),
                     child: IconButton(
                       onPressed: () {},
@@ -596,7 +596,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                   height: 50,
                   decoration: BoxDecoration(
                     color: AppColors.success.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppColors.success.withOpacity(0.3)),
                   ),
                   child: const Center(

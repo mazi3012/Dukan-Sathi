@@ -77,30 +77,30 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
       builder: (context) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Container(
-          decoration: const BoxDecoration(
-            color: AppColors.darkBackground,
-            borderRadius: BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)),
-            border: Border(top: BorderSide(color: Colors.white10)),
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+            border: Border(top: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.1))),
           ),
           padding: const EdgeInsets.all(30),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Receive Payment", style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+              Text("Receive Payment", style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 5),
-              Text("Current Due: ₹${_currentBalance.toStringAsFixed(2)}", style: const TextStyle(color: Colors.white54)),
+              Text("Current Due: ₹${_currentBalance.toStringAsFixed(2)}", style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: 25),
               GlassBox(
                 child: TextField(
                   controller: amountController,
                   keyboardType: TextInputType.number,
-                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                  decoration: const InputDecoration(
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
                     prefixText: "₹ ",
-                    prefixStyle: TextStyle(color: AppColors.primary, fontSize: 24, fontWeight: FontWeight.bold),
+                    prefixStyle: Theme.of(context).textTheme.headlineMedium?.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                   ),
                 ),
               ),
@@ -118,7 +118,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: const Text("Confirm Payment", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
@@ -189,15 +189,8 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppColors.darkBackground, Color(0xFF1A1D2E)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-          ),
+          // Background handled by Scaffold
+          const SizedBox.expand(),
           SafeArea(
             child: Column(
               children: [
@@ -207,11 +200,11 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                 const SizedBox(height: 20),
                 Expanded(
                   child: Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.black26,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(30),
-                        topRight: Radius.circular(30),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor.withOpacity(0.3),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        topRight: Radius.circular(12),
                       ),
                     ),
                     child: _isLoading
@@ -237,12 +230,12 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
         children: [
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Iconsax.arrow_left_2, color: Colors.white),
+            icon: Icon(Iconsax.arrow_left_2, color: Theme.of(context).iconTheme.color),
           ),
           const SizedBox(width: 10),
           Text(
             "Customer Profile",
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white),
+            style: Theme.of(context).appBarTheme.titleTextStyle,
           ),
         ],
       ),
@@ -267,11 +260,11 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
           const SizedBox(height: 15),
           Text(
             name,
-            style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
           ).animate().fadeIn(delay: 100.ms),
           Text(
             phone,
-            style: const TextStyle(color: Colors.white54, fontSize: 16),
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).textTheme.bodySmall?.color),
           ).animate().fadeIn(delay: 200.ms),
           const SizedBox(height: 20),
           GlassBox(
@@ -290,7 +283,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                     children: [
                       Text(
                         hasDues ? "Pending Dues" : "All Clear",
-                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        style: Theme.of(context).textTheme.labelSmall,
                       ),
                       Text(
                         "₹${balance.toStringAsFixed(2)}",
@@ -349,7 +342,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
     return const Center(
       child: Text(
         "No transaction history found.",
-        style: TextStyle(color: Colors.white54, fontSize: 16),
+        style: Theme.of(context).textTheme.bodySmall,
       ),
     );
   }
@@ -393,14 +386,14 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                   decoration: BoxDecoration(
                     color: statusColor,
                     shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.darkBackground, width: 3),
+                    border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 3),
                   ),
                 ),
                 if (index != _transactions.length - 1)
                   Container(
                     width: 2,
                     height: 60,
-                    color: Colors.white10,
+                    color: Theme.of(context).dividerColor.withOpacity(0.1),
                   ),
               ],
             ),
@@ -411,9 +404,9 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                 margin: const EdgeInsets.only(bottom: 20),
                 padding: const EdgeInsets.all(15),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: Colors.white10),
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.1)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -423,12 +416,12 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                       children: [
                         Text(
                           isPayment ? "Payment Received" : "Bill: ${tx['invoice_number'] ?? 'N/A'}",
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 5),
                         Text(
                           date != null ? DateFormat('MMM dd, yyyy - hh:mm a').format(date) : "Unknown Date",
-                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                          style: Theme.of(context).textTheme.labelSmall,
                         ),
                       ],
                     ),
@@ -437,10 +430,9 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                       children: [
                         Text(
                           isPayment ? "+ ₹${amountPaid.toStringAsFixed(0)}" : "₹${amount.toStringAsFixed(0)}",
-                          style: TextStyle(
-                            color: isPayment ? AppColors.success : Colors.white, 
-                            fontWeight: FontWeight.bold, 
-                            fontSize: 16
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: isPayment ? AppColors.success : Theme.of(context).textTheme.bodyLarge?.color, 
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 5),
@@ -469,9 +461,9 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   Widget _buildBottomSettleBar(double balance) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-      decoration: const BoxDecoration(
-        color: Color(0xFF1A1D2E),
-        border: Border(top: BorderSide(color: Colors.white10)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        border: Border(top: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.1))),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -480,8 +472,8 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("To Collect", style: TextStyle(color: Colors.white54, fontSize: 12)),
-              Text("₹${balance.toStringAsFixed(0)}", style: const TextStyle(color: AppColors.error, fontSize: 24, fontWeight: FontWeight.bold)),
+              Text("To Collect", style: Theme.of(context).textTheme.bodySmall),
+              Text("₹${balance.toStringAsFixed(0)}", style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: AppColors.error, fontWeight: FontWeight.bold)),
             ],
           ),
           ElevatedButton(
@@ -489,7 +481,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: const Text("Receive Payment", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
           ),

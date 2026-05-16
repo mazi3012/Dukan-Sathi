@@ -8,14 +8,14 @@ class AppColors {
   static const Color darkGlassBorder = Color(0x33FFFFFF); // 20% white
 
   // --- Light Mode Palette (Luminous Clarity) ---
-  static const Color lightBackground = Color(0xFFE7FAFF);
+  static const Color lightBackground = Color(0xFFF4F7FB); // Sleek cool off-white
   static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightSurfaceContainer = Color(0xFFBAF1FF);
-  static const Color lightSurfaceHighest = Color(0xFF9AE9FC);
-  static const Color lightOnSurface = Color(0xFF00343D);
-  static const Color lightOutline = Color(0xFF80B6C3);
-  static const Color lightGlass = Color(0x99FFFFFF); // 60% white for frosted look
-  static const Color lightGlassBorder = Color(0x2680B6C3); // 15% light outline
+  static const Color lightSurfaceContainer = Color(0xFFE2E8F0);
+  static const Color lightSurfaceHighest = Color(0xFFCBD5E1);
+  static const Color lightOnSurface = Color(0xFF0F172A); // Crisp slate text
+  static const Color lightOutline = Color(0xFF94A3B8);
+  static const Color lightGlass = Color(0xB3FFFFFF); // 70% white for frosted look
+  static const Color lightGlassBorder = Color(0x1A000000); // 10% black for subtle edge
   static const Color cyanGlow = Color(0xFF00F0FF); // The "Pulse" of the system
 
   // --- Brand Colors ---

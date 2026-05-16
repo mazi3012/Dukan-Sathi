@@ -55,7 +55,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.darkBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
           _buildBackgroundBlobs(),
@@ -81,15 +81,17 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _buildCard() {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(24),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
           padding: const EdgeInsets.all(32),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: Colors.white.withOpacity(0.12)),
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.05) : AppColors.lightGlass,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.12) : AppColors.lightGlassBorder,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -144,7 +146,7 @@ class _LoginPageState extends State<LoginPage> {
         'Sign in securely with your Google account to access your Dukan Sathi Pro dashboard.',
         textAlign: TextAlign.center,
         style: TextStyle(
-          color: Colors.white.withOpacity(0.7),
+          color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
           fontSize: 14,
           height: 1.5,
         ),
@@ -159,9 +161,9 @@ class _LoginPageState extends State<LoginPage> {
       child: ElevatedButton(
         onPressed: _isLoading ? null : _handleGoogleLogin,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.primary,
+          foregroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black87 : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 2,
           disabledBackgroundColor: Colors.grey.shade300,
         ),
@@ -191,7 +193,7 @@ class _LoginPageState extends State<LoginPage> {
         'We use Google\'s secure authentication to protect your account.',
         textAlign: TextAlign.center,
         style: TextStyle(
-          color: Colors.white.withOpacity(0.5),
+          color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.5),
           fontSize: 12,
         ),
       ),
@@ -241,7 +243,7 @@ class _LoginPageState extends State<LoginPage> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: RadialGradient(
-                colors: [AppColors.primary.withOpacity(0.3), Colors.transparent],
+                colors: [AppColors.primary.withOpacity(0.15), Colors.transparent],
               ),
             ),
           ),
@@ -255,7 +257,7 @@ class _LoginPageState extends State<LoginPage> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: RadialGradient(
-                colors: [AppColors.accent.withOpacity(0.2), Colors.transparent],
+                colors: [AppColors.accent.withOpacity(0.15), Colors.transparent],
               ),
             ),
           ),
@@ -271,7 +273,7 @@ class _LoginPageState extends State<LoginPage> {
           width: 80,
           height: 80,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
             gradient: AppColors.primaryGradient,
             boxShadow: [
               BoxShadow(color: AppColors.primary.withOpacity(0.5), blurRadius: 30, offset: const Offset(0, 10)),
@@ -283,7 +285,7 @@ class _LoginPageState extends State<LoginPage> {
         const Text(
           'Dukan Sathi Pro',
           style: TextStyle(
-            color: Colors.white,
+            color: Theme.of(context).textTheme.displayLarge?.color,
             fontSize: 28,
             fontWeight: FontWeight.bold,
             letterSpacing: -0.5,
@@ -292,7 +294,10 @@ class _LoginPageState extends State<LoginPage> {
         const SizedBox(height: 8),
         const Text(
           'Your AI-Powered Shop Assistant',
-          style: TextStyle(color: Colors.white54, fontSize: 15),
+          style: TextStyle(
+            color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6), 
+            fontSize: 15
+          ),
         ).animate().fadeIn(delay: 300.ms),
       ],
     );

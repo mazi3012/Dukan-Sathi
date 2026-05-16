@@ -74,16 +74,10 @@ class _ShopSetupPageState extends State<ShopSetupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [AppColors.darkBackground, Color(0xFF1A1D2E)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
@@ -105,7 +99,7 @@ class _ShopSetupPageState extends State<ShopSetupPage> {
                   const SizedBox(height: 8),
                   Text(
                     "Just a few details to get your digital dukan ready.",
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white54),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6)),
                   ).animate().fadeIn(delay: 300.ms),
                   const SizedBox(height: 48),
                   
@@ -166,7 +160,7 @@ class _ShopSetupPageState extends State<ShopSetupPage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       child: _isLoading
@@ -195,7 +189,7 @@ class _ShopSetupPageState extends State<ShopSetupPage> {
       padding: const EdgeInsets.only(bottom: 8, left: 4),
       child: Text(
         text,
-        style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w500),
+        style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7), fontWeight: FontWeight.w500),
       ),
     );
   }
@@ -210,7 +204,7 @@ class _ShopSetupPageState extends State<ShopSetupPage> {
       child: TextFormField(
         controller: controller,
         validator: validator,
-        style: const TextStyle(color: Colors.white),
+        style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color),
         decoration: InputDecoration(
           hintText: hint,
           prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
@@ -223,8 +217,8 @@ class _ShopSetupPageState extends State<ShopSetupPage> {
     return GlassBox(
       child: DropdownButtonFormField<String>(
         initialValue: _selectedState,
-        dropdownColor: AppColors.darkBackground,
-        style: const TextStyle(color: Colors.white),
+        dropdownColor: Theme.of(context).cardColor,
+        style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color),
         decoration: const InputDecoration(
           prefixIcon: Icon(Iconsax.location, color: AppColors.primary, size: 20),
           border: InputBorder.none,
@@ -256,17 +250,17 @@ class _ShopSetupPageState extends State<ShopSetupPage> {
               margin: const EdgeInsets.symmetric(horizontal: 4),
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary.withOpacity(0.2) : Colors.white.withOpacity(0.05),
+                color: isSelected ? AppColors.primary.withOpacity(0.2) : (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.05) : AppColors.lightGlass),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isSelected ? AppColors.primary : Colors.white10,
+                  color: isSelected ? AppColors.primary : (Theme.of(context).brightness == Brightness.dark ? Colors.white10 : AppColors.lightGlassBorder),
                 ),
               ),
               child: Center(
                 child: Text(
                   mode.split('_')[0],
                   style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.white54,
+                    color: isSelected ? Theme.of(context).textTheme.bodyMedium?.color : Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.5),
                     fontSize: 12,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   ),

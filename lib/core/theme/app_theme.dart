@@ -68,7 +68,7 @@ class AppTheme {
       color: AppColors.lightSurface.withOpacity(0.7),
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(12),
         side: const BorderSide(color: AppColors.lightGlassBorder),
       ),
     ),
@@ -89,7 +89,7 @@ class AppTheme {
         backgroundColor: AppColors.cyanGlow,
         foregroundColor: AppColors.lightOnSurface,
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     ),
   );

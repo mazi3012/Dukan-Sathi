@@ -15,7 +15,7 @@ class GlassBox extends StatelessWidget {
     required this.child,
     this.blur = 15.0,
     this.opacity = 0.1,
-    this.borderRadius = 20.0,
+    this.borderRadius = 12.0,
     this.color,
     this.border,
   });
