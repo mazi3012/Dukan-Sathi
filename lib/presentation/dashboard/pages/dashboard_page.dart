@@ -155,8 +155,10 @@ class _DashboardPageState extends State<DashboardPage> {
                     delegate: SliverChildListDelegate([
                       _buildWelcomeSection(context),
                       const SizedBox(height: 24),
-                      if (!_isLoading) _buildOverviewCard(),
-                      if (!_isLoading) const SizedBox(height: 20),
+                      _isLoading 
+                        ? _buildOverviewSkeleton()
+                        : _buildOverviewCard(),
+                      const SizedBox(height: 20),
                       _isLoading 
                         ? _buildStatsSkeleton()
                         : _buildStatsGrid(),
@@ -395,6 +397,10 @@ class _DashboardPageState extends State<DashboardPage> {
     return Column(
       children: _recentActivity.map((activity) => _buildActivityItem(activity)).toList(),
     );
+  }
+
+  Widget _buildOverviewSkeleton() {
+    return const SkeletonSummaryCard();
   }
 
   Widget _buildStatsSkeleton() {

@@ -84,7 +84,7 @@ class _CustomersPageState extends State<CustomersPage> {
             child: Column(
               children: [
                 _buildAppBar(),
-                _buildSummaryCard(),
+                _isLoading ? const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: SkeletonSummaryCard()) : _buildSummaryCard(),
                 _buildSearchBar(),
                 _buildFilterChips(),
                 Expanded(

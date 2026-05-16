@@ -80,7 +80,7 @@ class _InventoryPageState extends State<InventoryPage> {
             child: Column(
               children: [
                 _buildAppBar(),
-                if (!_isLoading) _buildValuationCard(),
+                _isLoading ? const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: SkeletonSummaryCard()) : _buildValuationCard(),
                 if (!_isLoading && _products.isNotEmpty) _buildCategoryFilters(),
                 const SizedBox(height: 10),
                 Expanded(

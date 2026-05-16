@@ -78,7 +78,7 @@ class _BillingPageState extends State<BillingPage> {
             child: Column(
               children: [
                 _buildAppBar(),
-                if (!_isLoading) _buildSalesSummary(),
+                _isLoading ? const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: SkeletonSummaryCard()) : _buildSalesSummary(),
                 const SizedBox(height: 10),
                 Expanded(
                   child: _isLoading
