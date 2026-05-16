@@ -46,7 +46,7 @@ class _AiThinkingIndicatorState extends State<AiThinkingIndicator> {
         SizedBox(
           width: 16,
           height: 16,
-          child: const CircularProgressIndicator(
+          child: CircularProgressIndicator(
             color: Theme.of(context).primaryColor,
             strokeWidth: 2,
           ),

@@ -140,10 +140,10 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                 controller: qtyCtrl,
                 keyboardType: TextInputType.number,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Quantity',
-                  labelStyle: TextStyle(color: Colors.white54),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.darkGlassBorder)),
+                  labelStyle: const TextStyle(color: Colors.white54),
+                  enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: AppColors.darkGlassBorder)),
                   focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Theme.of(context).primaryColor)),
                 ),
               ),
@@ -152,10 +152,10 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                 controller: priceCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Unit Price',
-                  labelStyle: TextStyle(color: Colors.white54),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.darkGlassBorder)),
+                  labelStyle: const TextStyle(color: Colors.white54),
+                  enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: AppColors.darkGlassBorder)),
                   focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Theme.of(context).primaryColor)),
                 ),
               ),
@@ -872,7 +872,6 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       ),
     );
   }
-}
   Widget _buildSectionLabel(String label) {
     return Text(
       label.toUpperCase(),
