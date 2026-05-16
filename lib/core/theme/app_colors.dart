@@ -8,10 +8,11 @@ class AppColors {
   static const Color darkGlassBorder = Color(0x33FFFFFF); // 20% white
 
   // --- Light Mode Palette ---
-  static const Color lightBackground = Color(0xFFF4F7FF);
+  static const Color lightBackground = Color(0xFFF8FAFF);
   static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightGlass = Color(0x1A000000); // 10% black
+  static const Color lightGlass = Color(0x0D000000); // 5% black
   static const Color lightGlassBorder = Color(0x1A000000); // 10% black
+  static const Color trustBlue = Color(0xFF0052CC); // Professional Trust Blue
 
   // --- Brand Colors ---
   static const Color primary = Color(0xFF6C63FF);

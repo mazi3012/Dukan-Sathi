@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/session.dart';
 import '../../dashboard/pages/dashboard_page.dart';
@@ -11,14 +13,14 @@ import '../../customers/pages/customers_page.dart';
 import '../../chat/pages/ai_chat_page.dart';
 import '../../auth/pages/login_page.dart';
 
-class MainLayout extends StatefulWidget {
+class MainLayout extends ConsumerStatefulWidget {
   const MainLayout({super.key});
 
   @override
-  State<MainLayout> createState() => _MainLayoutState();
+  ConsumerState<MainLayout> createState() => _MainLayoutState();
 }
 
-class _MainLayoutState extends State<MainLayout> {
+class _MainLayoutState extends ConsumerState<MainLayout> {
   int _currentIndex = 0;
 
   final List<Widget> _pages = [
@@ -40,31 +42,42 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
   Widget _buildDrawer() {
+    final themeMode = ref.watch(themeProvider);
+    final isDark = themeMode == ThemeMode.dark || 
+                  (themeMode == ThemeMode.system && Theme.of(context).brightness == Brightness.dark);
+
     return Drawer(
-      backgroundColor: AppColors.darkBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       child: Column(
         children: [
-          _buildDrawerHeader(),
+          _buildDrawerHeader(isDark),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 15),
               children: [
                 _buildDrawerItem(Iconsax.user, "Profile"),
+                _buildDrawerItem(
+                  isDark ? Iconsax.sun_1 : Iconsax.moon, 
+                  isDark ? "Light Mode" : "Dark Mode",
+                  onTap: () {
+                    ref.read(themeProvider.notifier).toggleTheme();
+                  },
+                ),
                 _buildDrawerItem(Iconsax.setting_2, "Settings"),
                 _buildDrawerItem(Iconsax.info_circle, "Help & Support"),
                 _buildDrawerItem(Iconsax.star, "Rate Us"),
               ],
             ),
           ),
-          const Divider(color: Colors.white10),
-          _buildLogoutItem(),
+          Divider(color: isDark ? Colors.white10 : Colors.black12),
+          _buildLogoutItem(isDark),
           const SizedBox(height: 30),
         ],
       ),
     );
   }
 
-  Widget _buildDrawerHeader() {
+  Widget _buildDrawerHeader(bool isDark) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 60, 20, 30),
       child: Column(
@@ -78,11 +91,18 @@ class _MainLayoutState extends State<MainLayout> {
           const SizedBox(height: 15),
           Text(
             UserSession().userName ?? "Shop Owner",
-            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: isDark ? Colors.white : Colors.black87, 
+              fontSize: 20, 
+              fontWeight: FontWeight.bold
+            ),
           ),
           Text(
             UserSession().shopName ?? "Dukan Sathi Shop",
-            style: const TextStyle(color: Colors.white54, fontSize: 14),
+            style: TextStyle(
+              color: isDark ? Colors.white54 : Colors.black54, 
+              fontSize: 14
+            ),
           ),
         ],
       ),
@@ -90,15 +110,16 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
   Widget _buildDrawerItem(IconData icon, String label, {VoidCallback? onTap}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
-      leading: Icon(icon, color: Colors.white70),
-      title: Text(label, style: const TextStyle(color: Colors.white)),
+      leading: Icon(icon, color: isDark ? Colors.white70 : Colors.black54),
+      title: Text(label, style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
       onTap: onTap ?? () => Navigator.pop(context),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     );
   }
 
-  Widget _buildLogoutItem() {
+  Widget _buildLogoutItem(bool isDark) {
     return ListTile(
       leading: const Icon(Iconsax.logout, color: AppColors.error),
       title: const Text('Logout', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
@@ -143,6 +164,8 @@ class _MainLayoutState extends State<MainLayout> {
 
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _currentIndex == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),
       behavior: HitTestBehavior.opaque,
@@ -157,7 +180,9 @@ class _MainLayoutState extends State<MainLayout> {
           children: [
             Icon(
               icon,
-              color: isSelected ? AppColors.primary : Colors.white54,
+              color: isSelected 
+                  ? AppColors.primary 
+                  : (isDark ? Colors.white54 : Colors.black38),
               size: 24,
             ),
             if (isSelected) ...[

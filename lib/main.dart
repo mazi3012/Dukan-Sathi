@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_provider.dart';
 import 'core/session.dart';
 import 'presentation/main/pages/main_layout.dart';
 import 'presentation/auth/pages/login_page.dart';
@@ -35,17 +36,19 @@ void main() async {
   );
 }
 
-class DukanSathiApp extends StatelessWidget {
+class DukanSathiApp extends ConsumerWidget {
   const DukanSathiApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeProvider);
+    
     return MaterialApp(
       title: 'Dukan Sathi Pro',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.dark,
+      themeMode: themeMode,
       home: const AuthGate(),
       onGenerateRoute: _handleDeepLink,
     );

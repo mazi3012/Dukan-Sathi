@@ -40,11 +40,11 @@ class AppTheme {
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    primaryColor: AppColors.primary,
+    primaryColor: AppColors.trustBlue,
     scaffoldBackgroundColor: AppColors.lightBackground,
     colorScheme: const ColorScheme.light(
-      primary: AppColors.primary,
-      secondary: AppColors.accent,
+      primary: AppColors.trustBlue,
+      secondary: AppColors.primary,
       surface: AppColors.lightSurface,
       background: AppColors.lightBackground,
       error: AppColors.error,
@@ -53,22 +53,28 @@ class AppTheme {
       displayLarge: GoogleFonts.outfit(
         fontSize: 32,
         fontWeight: FontWeight.bold,
-        color: Colors.black87,
+        color: const Color(0xFF1A1D26),
       ),
       titleLarge: GoogleFonts.outfit(
         fontSize: 20,
         fontWeight: FontWeight.w600,
-        color: Colors.black87,
+        color: const Color(0xFF1A1D26),
       ),
     ),
     cardTheme: CardThemeData(
       color: AppColors.lightSurface,
-      elevation: 4,
-      shadowColor: Colors.black12,
+      elevation: 8,
+      shadowColor: AppColors.trustBlue.withOpacity(0.1),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: Colors.black.withOpacity(0.05)),
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: Colors.black.withOpacity(0.04)),
       ),
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      iconTheme: IconThemeData(color: Color(0xFF1A1D26)),
+      titleTextStyle: TextStyle(color: Color(0xFF1A1D26), fontSize: 20, fontWeight: FontWeight.bold),
     ),
   );
 }
