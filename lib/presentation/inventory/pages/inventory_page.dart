@@ -76,15 +76,6 @@ class _InventoryPageState extends State<InventoryPage> {
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppColors.darkBackground, Color(0xFF1A1D2E)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-          ),
           SafeArea(
             child: Column(
               children: [
@@ -120,7 +111,7 @@ class _InventoryPageState extends State<InventoryPage> {
           ),
           IconButton(
             onPressed: _fetchProducts,
-            icon: const Icon(Iconsax.refresh, color: Colors.white70),
+            icon: Icon(Iconsax.refresh, color: Theme.of(context).iconTheme.color),
           ),
         ],
       ),
@@ -157,11 +148,14 @@ class _InventoryPageState extends State<InventoryPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Total Stock Value", style: TextStyle(color: Colors.white54, fontSize: 14)),
+                  Text("Total Stock Value", style: Theme.of(context).textTheme.bodySmall),
                   const SizedBox(height: 5),
                   Text(
                     "₹${_totalValue.toStringAsFixed(0)}",
-                    style: const TextStyle(color: AppColors.success, fontSize: 28, fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: AppColors.success,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -201,10 +195,10 @@ class _InventoryPageState extends State<InventoryPage> {
               decoration: BoxDecoration(
                 color: isSelected 
                     ? (isLowStock ? AppColors.error : AppColors.primary)
-                    : Colors.white.withOpacity(0.05),
+                    : Theme.of(context).cardColor.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isSelected ? Colors.transparent : Colors.white10,
+                  color: isSelected ? Colors.transparent : Theme.of(context).dividerColor.withOpacity(0.1),
                 ),
               ),
               alignment: Alignment.center,
@@ -217,7 +211,9 @@ class _InventoryPageState extends State<InventoryPage> {
                   Text(
                     cat,
                     style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.white70,
+                      color: isSelected 
+                          ? Colors.white 
+                          : Theme.of(context).textTheme.bodyMedium?.color,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
@@ -311,11 +307,11 @@ class _InventoryPageState extends State<InventoryPage> {
                   ),
                   title: Text(
                     name,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   subtitle: Text(
                     category,
-                    style: const TextStyle(color: Colors.white54),
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                   trailing: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -327,9 +323,8 @@ class _InventoryPageState extends State<InventoryPage> {
                       ),
                       Text(
                         "Stock: $stock",
-                        style: TextStyle(
-                          color: isLowStock ? AppColors.error : Colors.white54,
-                          fontSize: 12,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: isLowStock ? AppColors.error : Theme.of(context).textTheme.bodySmall?.color,
                           fontWeight: isLowStock ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),

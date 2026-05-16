@@ -115,17 +115,6 @@ class _DashboardPageState extends State<DashboardPage> {
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // Dynamic Background
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppColors.darkBackground, Color(0xFF1A1D2E)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-          ),
-          
           // Content
           SafeArea(
             child: CustomScrollView(
@@ -180,11 +169,11 @@ class _DashboardPageState extends State<DashboardPage> {
             // Open drawer from parent Scaffold
             Scaffold.of(context).openDrawer();
           },
-          icon: const Icon(Iconsax.menu_1, color: Colors.white70),
+          icon: Icon(Iconsax.menu_1, color: Theme.of(context).iconTheme.color),
         ),
         IconButton(
           onPressed: () {},
-          icon: const Icon(Iconsax.notification, color: Colors.white70),
+          icon: Icon(Iconsax.notification, color: Theme.of(context).iconTheme.color),
         ),
       ],
     );
@@ -196,7 +185,9 @@ class _DashboardPageState extends State<DashboardPage> {
       children: [
         Text(
           "Welcome back,",
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white54),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: Theme.of(context).textTheme.bodySmall?.color,
+          ),
         ),
         Text(
           UserSession().userName ?? "Shop Owner",
@@ -237,15 +228,13 @@ class _DashboardPageState extends State<DashboardPage> {
               children: [
                 Text(
                   value,
-                  style: const TextStyle(
-                    fontSize: 20,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
                   ),
                 ),
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 12, color: Colors.white54),
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
@@ -306,8 +295,8 @@ class _DashboardPageState extends State<DashboardPage> {
             backgroundColor: AppColors.darkGlass,
             child: Icon(Iconsax.receipt, color: AppColors.primary, size: 18),
           ),
-          title: Text("Invoice #$invNum", style: const TextStyle(color: Colors.white)),
-          subtitle: Text("Customer: $customer", style: const TextStyle(color: Colors.white54)),
+          title: Text("Invoice #$invNum", style: Theme.of(context).textTheme.bodyLarge),
+          subtitle: Text("Customer: $customer", style: Theme.of(context).textTheme.bodySmall),
           trailing: Text("₹${amount.toStringAsFixed(0)}", style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold)),
         ),
       ),

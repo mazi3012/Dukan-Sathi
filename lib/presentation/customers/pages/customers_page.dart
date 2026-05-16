@@ -80,15 +80,6 @@ class _CustomersPageState extends State<CustomersPage> {
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppColors.darkBackground, Color(0xFF1A1D2E)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-          ),
           SafeArea(
             child: Column(
               children: [
@@ -135,7 +126,7 @@ class _CustomersPageState extends State<CustomersPage> {
           ),
           IconButton(
             onPressed: _fetchCustomers,
-            icon: const Icon(Iconsax.refresh, color: Colors.white70),
+            icon: Icon(Iconsax.refresh, color: Theme.of(context).iconTheme.color),
           ),
         ],
       ),
@@ -173,16 +164,14 @@ class _CustomersPageState extends State<CustomersPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     "Total Market Dues",
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 4),
                   Text(
                     "₹${_totalOutstanding.toStringAsFixed(2)}",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -200,12 +189,14 @@ class _CustomersPageState extends State<CustomersPage> {
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
       child: GlassBox(
         child: TextField(
-          style: const TextStyle(color: Colors.white),
+          style: Theme.of(context).textTheme.bodyLarge,
           onChanged: (val) => setState(() => _searchQuery = val),
           decoration: InputDecoration(
             hintText: "Search name or phone...",
-            hintStyle: const TextStyle(color: Colors.white38),
-            prefixIcon: const Icon(Iconsax.search_normal, color: Colors.white54),
+            hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).textTheme.bodySmall?.color,
+            ),
+            prefixIcon: Icon(Iconsax.search_normal, color: Theme.of(context).iconTheme.color),
             border: InputBorder.none,
             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
           ),
@@ -229,10 +220,12 @@ class _CustomersPageState extends State<CustomersPage> {
               onSelected: (selected) {
                 if (selected) setState(() => _filter = filter);
               },
-              backgroundColor: Colors.white10,
+              backgroundColor: Theme.of(context).cardColor.withOpacity(0.5),
               selectedColor: AppColors.primary.withOpacity(0.3),
               labelStyle: TextStyle(
-                color: isSelected ? AppColors.primary : Colors.white70,
+                color: isSelected 
+                    ? AppColors.primary 
+                    : Theme.of(context).textTheme.bodyMedium?.color,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
               shape: RoundedRectangleBorder(
@@ -327,11 +320,11 @@ class _CustomersPageState extends State<CustomersPage> {
               ),
               title: Text(
                 name,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               subtitle: Text(
                 phone,
-                style: const TextStyle(color: Colors.white54),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               trailing: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -346,9 +339,11 @@ class _CustomersPageState extends State<CustomersPage> {
                     ),
                   ),
                   if (hasDues)
-                    const Text(
+                    Text(
                       "Swipe to settle",
-                      style: TextStyle(color: Colors.white38, fontSize: 10),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Theme.of(context).textTheme.bodySmall?.color,
+                      ),
                     ),
                 ],
               ),

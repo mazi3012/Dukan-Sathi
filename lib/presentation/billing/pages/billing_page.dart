@@ -74,15 +74,6 @@ class _BillingPageState extends State<BillingPage> {
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppColors.darkBackground, Color(0xFF1A1D2E)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-          ),
           SafeArea(
             child: Column(
               children: [
@@ -128,7 +119,7 @@ class _BillingPageState extends State<BillingPage> {
           ),
           IconButton(
             onPressed: _fetchSales,
-            icon: const Icon(Iconsax.refresh, color: Colors.white70),
+            icon: Icon(Iconsax.refresh, color: Theme.of(context).iconTheme.color),
           ),
         ],
       ),
@@ -167,11 +158,14 @@ class _BillingPageState extends State<BillingPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Today's Collection", style: TextStyle(color: Colors.white54, fontSize: 14)),
+                  Text("Today's Collection", style: Theme.of(context).textTheme.bodySmall),
                   const SizedBox(height: 5),
                   Text(
                     "₹${_todayRevenue.toStringAsFixed(0)}",
-                    style: const TextStyle(color: AppColors.primary, fontSize: 28, fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -249,19 +243,21 @@ class _BillingPageState extends State<BillingPage> {
                 ),
                 title: Text(
                   "Invoice #$invNum",
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       customer,
-                      style: const TextStyle(color: Colors.white54),
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       DateFormat('dd MMM yyyy, hh:mm a').format(timestamp),
-                      style: const TextStyle(color: Colors.white24, fontSize: 11),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.5),
+                      ),
                     ),
                   ],
                 ),
@@ -271,7 +267,7 @@ class _BillingPageState extends State<BillingPage> {
                   children: [
                     Text(
                       "₹${amount.toStringAsFixed(0)}",
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
