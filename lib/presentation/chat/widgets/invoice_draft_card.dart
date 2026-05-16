@@ -5,6 +5,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
+import '../../../core/widgets/app_skeleton.dart';
 import '../../../core/session.dart';
 class InvoiceDraftCard extends StatefulWidget {
   final Map<String, dynamic>? payload;
@@ -407,58 +408,56 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                 color: Theme.of(context).cardColor.withOpacity(0.8),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Stack(
+              child: _isLoading ? Column(
                 children: [
-                  Column(
-                    children: [
-                      // Show Items Total → Discount → Taxable Value when discount is applied
-                      if (discAmt > 0) ...[
-                        _buildTaxLine("Items Total", "₹${(_data['subtotal_before_discount'] ?? _data['subtotalBeforeDiscount'] ?? tax['subtotal'] ?? 0.0).toStringAsFixed(2)}"),
-                        () {
-                          final discType = (_data['discount_type'] ?? _data['discountType'])?.toString();
-                          final discVal = (_data['discount_value'] ?? _data['discountValue'] ?? 0.0);
-                          final discValNum = (discVal is num) ? discVal.toDouble() : 0.0;
-                          final label = discType == 'PERCENT' ? "Discount (${discValNum.toStringAsFixed(1)}%)" : "Discount";
-                          return _buildTaxLine(label, "-₹${discAmt.toStringAsFixed(2)}", color: AppColors.success);
-                        }(),
-                        _buildTaxLine("Taxable Value", "₹${(_data['subtotal_after_discount'] ?? _data['subtotalAfterDiscount'] ?? tax['subtotal'] ?? 0.0).toStringAsFixed(2)}"),
-                      ] else
-                        _buildTaxLine("Subtotal", "₹${(tax['subtotal'] ?? 0.0).toStringAsFixed(2)}"),
-                      if (tax['rate_wise_summary'] != null && (tax['rate_wise_summary'] as List).isNotEmpty)
-                        ...(tax['rate_wise_summary'] as List).map((entry) {
-                          final rate = (entry['rate'] as num).toDouble();
-                          if (rate <= 0) return const SizedBox.shrink();
-                          final isIGST = gstType == 'IGST';
-                          if (isIGST) {
-                            final igst = (entry['igst'] as num).toDouble();
-                            return _buildTaxLine("IGST (${rate == rate.roundToDouble() ? rate.toInt() : rate.toStringAsFixed(1)}%)", "₹${igst.toStringAsFixed(2)}");
-                          } else {
-                            final cgst = (entry['cgst'] as num).toDouble();
-                            final sgst = (entry['sgst'] as num).toDouble();
-                            final halfRate = rate / 2;
-                            final halfRateStr = halfRate == halfRate.roundToDouble() ? halfRate.toInt() : halfRate.toStringAsFixed(1);
-                            return Column(
-                              children: [
-                                _buildTaxLine("CGST ($halfRateStr%)", "₹${cgst.toStringAsFixed(2)}"),
-                                _buildTaxLine("SGST ($halfRateStr%)", "₹${sgst.toStringAsFixed(2)}"),
-                              ],
-                            );
-                          }
-                        })
-                      else ...[
-                        if ((tax['cgst_amount'] ?? tax['cgstAmount'] ?? 0.0) > 0)
-                          _buildTaxLine("CGST", "₹${(tax['cgst_amount'] ?? tax['cgstAmount'] ?? 0.0).toStringAsFixed(2)}"),
-                        if ((tax['sgst_amount'] ?? tax['sgstAmount'] ?? 0.0) > 0)
-                          _buildTaxLine("SGST", "₹${(tax['sgst_amount'] ?? tax['sgstAmount'] ?? 0.0).toStringAsFixed(2)}"),
-                        if ((tax['igst_amount'] ?? tax['igstAmount'] ?? 0.0) > 0)
-                          _buildTaxLine("IGST", "₹${(tax['igst_amount'] ?? tax['igstAmount'] ?? 0.0).toStringAsFixed(2)}"),
-                      ],
-                    ],
-                  ),
-                  if (_isLoading)
-                    const Positioned.fill(
-                      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                    ),
+                  const AppSkeleton(width: double.infinity, height: 16, margin: EdgeInsets.only(bottom: 8)),
+                  const AppSkeleton(width: double.infinity, height: 16, margin: EdgeInsets.only(bottom: 8)),
+                  AppSkeleton(width: MediaQuery.of(context).size.width * 0.4, height: 16, margin: const EdgeInsets.only(bottom: 8)),
+                ],
+              ) : Column(
+                children: [
+                  // Show Items Total → Discount → Taxable Value when discount is applied
+                  if (discAmt > 0) ...[
+                    _buildTaxLine("Items Total", "₹${(_data['subtotal_before_discount'] ?? _data['subtotalBeforeDiscount'] ?? tax['subtotal'] ?? 0.0).toStringAsFixed(2)}"),
+                    () {
+                      final discType = (_data['discount_type'] ?? _data['discountType'])?.toString();
+                      final discVal = (_data['discount_value'] ?? _data['discountValue'] ?? 0.0);
+                      final discValNum = (discVal is num) ? discVal.toDouble() : 0.0;
+                      final label = discType == 'PERCENT' ? "Discount (${discValNum.toStringAsFixed(1)}%)" : "Discount";
+                      return _buildTaxLine(label, "-₹${discAmt.toStringAsFixed(2)}", color: AppColors.success);
+                    }(),
+                    _buildTaxLine("Taxable Value", "₹${(_data['subtotal_after_discount'] ?? _data['subtotalAfterDiscount'] ?? tax['subtotal'] ?? 0.0).toStringAsFixed(2)}"),
+                  ] else
+                    _buildTaxLine("Subtotal", "₹${(tax['subtotal'] ?? 0.0).toStringAsFixed(2)}"),
+                  if (tax['rate_wise_summary'] != null && (tax['rate_wise_summary'] as List).isNotEmpty)
+                    ...(tax['rate_wise_summary'] as List).map((entry) {
+                      final rate = (entry['rate'] as num).toDouble();
+                      if (rate <= 0) return const SizedBox.shrink();
+                      final isIGST = gstType == 'IGST';
+                      if (isIGST) {
+                        final igst = (entry['igst'] as num).toDouble();
+                        return _buildTaxLine("IGST (${rate == rate.roundToDouble() ? rate.toInt() : rate.toStringAsFixed(1)}%)", "₹${igst.toStringAsFixed(2)}");
+                      } else {
+                        final cgst = (entry['cgst'] as num).toDouble();
+                        final sgst = (entry['sgst'] as num).toDouble();
+                        final halfRate = rate / 2;
+                        final halfRateStr = halfRate == halfRate.roundToDouble() ? halfRate.toInt() : halfRate.toStringAsFixed(1);
+                        return Column(
+                          children: [
+                            _buildTaxLine("CGST ($halfRateStr%)", "₹${cgst.toStringAsFixed(2)}"),
+                            _buildTaxLine("SGST ($halfRateStr%)", "₹${sgst.toStringAsFixed(2)}"),
+                          ],
+                        );
+                      }
+                    })
+                  else ...[
+                    if ((tax['cgst_amount'] ?? tax['cgstAmount'] ?? 0.0) > 0)
+                      _buildTaxLine("CGST", "₹${(tax['cgst_amount'] ?? tax['cgstAmount'] ?? 0.0).toStringAsFixed(2)}"),
+                    if ((tax['sgst_amount'] ?? tax['sgstAmount'] ?? 0.0) > 0)
+                      _buildTaxLine("SGST", "₹${(tax['sgst_amount'] ?? tax['sgstAmount'] ?? 0.0).toStringAsFixed(2)}"),
+                    if ((tax['igst_amount'] ?? tax['igstAmount'] ?? 0.0) > 0)
+                      _buildTaxLine("IGST", "₹${(tax['igst_amount'] ?? tax['igstAmount'] ?? 0.0).toStringAsFixed(2)}"),
+                  ],
                 ],
               ),
             ),
@@ -501,7 +500,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                       ),
                     ],
                   ),
-                  Text(
+                  _isLoading ? const AppSkeleton(width: 120, height: 36, borderRadius: 8) : Text(
                     "₹${totalAmount.toStringAsFixed(2)}",
                     style: Theme.of(context).textTheme.displayLarge?.copyWith(
                       fontSize: 32,
@@ -515,7 +514,11 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
             ),
 
             // Payment Summary (Paid / Due)
-            if (paymentStatus == 'PARTIAL' || paymentStatus == 'UNPAID') ...[
+            if (_isLoading) ...[
+               const SizedBox(height: 8),
+               const AppSkeleton(width: double.infinity, height: 16, margin: EdgeInsets.only(bottom: 4)),
+               const AppSkeleton(width: double.infinity, height: 16, margin: EdgeInsets.only(bottom: 4)),
+            ] else if (paymentStatus == 'PARTIAL' || paymentStatus == 'UNPAID') ...[
               const SizedBox(height: 8),
               () {
                 final amtPaid = (_data['amount_paid'] ?? _data['amountPaid'] ?? 0.0);

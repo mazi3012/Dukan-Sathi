@@ -294,15 +294,7 @@ Future<void> main(List<String> arguments) async {
         } catch (e) {
           request.response..statusCode = 500..write(e.toString())..close();
         }
-      } else if (request.method == 'POST' && request.uri.path == '/api/update-draft') {
-        // ─── UPDATE DRAFT (GST, DISCOUNT, PAYMENT) ──────────────────────
-        var body = await utf8.decodeStream(request);
-        String currentType = 'unknown';
-        try {
-          final data = jsonDecode(body) as Map<String, dynamic>;
-        } catch (e) {
-          request.response..statusCode = 400..write('Invalid JSON')..close();
-        }
+
       } else if (request.method == 'POST' && request.uri.path == '/api/transcribe') {
         // ─── WHISPER TRANSCRIPTION ENDPOINT ───────────────────────────
         try {
@@ -363,19 +355,7 @@ Future<void> main(List<String> arguments) async {
           print('❌ Server Error during transcription: $e');
           request.response..statusCode = 500..write(e.toString())..close();
         }
-      } else if (request.method == 'GET' && request.uri.path == '/api/get-draft') {
-        // ─── GET DRAFT DETAILS ──────────────────────────────────────────
-        final approvalId = request.uri.queryParameters['approvalId'];
-        if (approvalId == null) {
-          request.response..statusCode = 400..close();
-          return;
-        }
-        final draft = await getApprovalDetails(approvalId);
-        request.response
-          ..statusCode = draft != null ? 200 : 404
-          ..headers.contentType = ContentType.json
-          ..write(jsonEncode(draft ?? {'error': 'Draft not found'}))
-          ..close();
+
       } else if (request.method == 'POST' && request.uri.path == '/api/update-draft') {
         // ─── UPDATE DRAFT (GST, DISCOUNT, PAYMENT) ──────────────────────
         var body = await utf8.decodeStream(request);
