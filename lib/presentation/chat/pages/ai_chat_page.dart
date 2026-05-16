@@ -138,11 +138,14 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
       if (previous?.length != next.length) {
         _scrollToBottom();
         
-        // If voice is enabled and the last message is from AI, speak it
-        if (_isVoiceEnabled && next.isNotEmpty) {
-          final lastMsg = next.last;
-          if (lastMsg.type == MessageType.aiText && !lastMsg.isTyping) {
-            _ttsService.speak(lastMsg.text);
+        // If voice is enabled, find the new messages and speak the AI text
+        if (_isVoiceEnabled && previous != null && next.length > previous.length) {
+          final newMessages = next.sublist(previous.length);
+          for (var msg in newMessages) {
+            if (msg.type == MessageType.aiText && !msg.isTyping) {
+              _ttsService.speak(msg.text);
+              break; // Speak the first new AI text found in this update
+            }
           }
         }
       }
