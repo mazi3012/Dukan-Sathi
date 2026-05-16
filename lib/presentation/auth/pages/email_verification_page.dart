@@ -258,7 +258,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Continue to Setup',
                         style: TextStyle(
                           color: Theme.of(context).textTheme.bodyMedium?.color,

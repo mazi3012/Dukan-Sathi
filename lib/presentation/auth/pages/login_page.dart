@@ -282,7 +282,7 @@ class _LoginPageState extends State<LoginPage> {
           child: const Icon(Iconsax.shop, size: 42, color: Colors.white),
         ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
         const SizedBox(height: 20),
-        const Text(
+        Text(
           'Dukan Sathi Pro',
           style: TextStyle(
             color: Theme.of(context).textTheme.displayLarge?.color,
@@ -292,7 +292,7 @@ class _LoginPageState extends State<LoginPage> {
           ),
         ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.3),
         const SizedBox(height: 8),
-        const Text(
+        Text(
           'Your AI-Powered Shop Assistant',
           style: TextStyle(
             color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6), 
