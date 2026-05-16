@@ -339,7 +339,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   }
 
   Widget _buildEmptyTransactions() {
-    return const Center(
+    return Center(
       child: Text(
         "No transaction history found.",
         style: Theme.of(context).textTheme.bodySmall,

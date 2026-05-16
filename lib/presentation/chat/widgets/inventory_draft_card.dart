@@ -99,9 +99,9 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
   @override
   Widget build(BuildContext context) {
     if (_products.isEmpty) {
-      return const GlassBox(
+      return GlassBox(
         child: Padding(
-          padding: EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16.0),
           child: Text("No products found.", style: Theme.of(context).textTheme.bodySmall),
         ),
       );
@@ -241,11 +241,11 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
                         width: 20, 
                         child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                       )
-                    : const Row(
+                    : Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Iconsax.add_square, color: Colors.white),
-                          SizedBox(width: 10),
+                          const Icon(Iconsax.add_square, color: Colors.white),
+                          const SizedBox(width: 10),
                           Text(
                             "Approve & Add to Inventory", 
                             style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
