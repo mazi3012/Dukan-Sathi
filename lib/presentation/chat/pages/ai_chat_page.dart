@@ -12,6 +12,8 @@ import '../providers/chat_provider.dart';
 import '../widgets/invoice_draft_card.dart';
 import '../widgets/inventory_draft_card.dart';
 import '../widgets/ai_thinking_indicator.dart';
+import '../../../core/services/tts_service.dart';
+
 
 class AiChatPage extends ConsumerStatefulWidget {
   const AiChatPage({super.key});
@@ -27,6 +29,15 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
   final AudioRecorder _audioRecorder = AudioRecorder();
   bool _isRecording = false;
   bool _isTranscribing = false;
+  bool _isVoiceEnabled = false;
+  final TtsService _ttsService = TtsService();
+
+  @override
+  void initState() {
+    super.initState();
+    _ttsService.init();
+  }
+
 
   @override
   void dispose() {
@@ -126,8 +137,17 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
     ref.listen<List<ChatMessage>>(chatControllerProvider, (previous, next) {
       if (previous?.length != next.length) {
         _scrollToBottom();
+        
+        // If voice is enabled and the last message is from AI, speak it
+        if (_isVoiceEnabled && next.isNotEmpty) {
+          final lastMsg = next.last;
+          if (lastMsg.type == MessageType.aiText && !lastMsg.isTyping) {
+            _ttsService.speak(lastMsg.text);
+          }
+        }
       }
     });
+
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -160,6 +180,30 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
           ],
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: Icon(
+              _isVoiceEnabled ? Iconsax.volume_high : Iconsax.volume_cross,
+              color: _isVoiceEnabled ? Theme.of(context).primaryColor : Theme.of(context).iconTheme.color,
+            ),
+            onPressed: () {
+              setState(() {
+                _isVoiceEnabled = !_isVoiceEnabled;
+              });
+              if (!_isVoiceEnabled) {
+                _ttsService.stop();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Voice Output Enabled"),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              }
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Stack(
         children: [
