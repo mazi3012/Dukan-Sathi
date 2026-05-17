@@ -70,7 +70,7 @@ class DesktopSidebar extends ConsumerWidget {
               child: Text(
                 "DUKAN SATHI",
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.black,
+                  fontWeight: FontWeight.w900,
                   letterSpacing: 1.2,
                 ),
               ).animate().fadeIn(),

@@ -5,7 +5,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../core/widgets/empty_state.dart';
-import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/database.dart';
 import '../../../core/session.dart';
