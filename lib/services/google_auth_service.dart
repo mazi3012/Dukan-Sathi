@@ -52,7 +52,7 @@ class GoogleAuthService {
       final accessToken = googleAuth.accessToken;
       debugPrint('[GoogleAuthService] googleAuth.idToken: ${idToken?.substring(0, 20)}...');
       debugPrint('[GoogleAuthService] googleAuth.accessToken: ${accessToken?.substring(0, 20)}...');
-      debugPrint('[GoogleAuthService] googleAuth tokens: hasId=${idToken!=null && idToken.isNotEmpty} hasAccess=${accessToken!=null && accessToken.isNotEmpty}']
+      debugPrint('[GoogleAuthService] googleAuth tokens: hasId=${idToken!=null && idToken.isNotEmpty} hasAccess=${accessToken!=null && accessToken.isNotEmpty}');
       if (accessToken == null || accessToken.isEmpty) {
         debugPrint('[GoogleAuthService] ERROR: accessToken is null or empty');
         return {

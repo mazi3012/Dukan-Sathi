@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/database.dart';
 import '../../../core/session.dart';
 import 'customer_details_page.dart';
@@ -21,6 +22,7 @@ class _CustomersPageState extends State<CustomersPage> {
   bool _isLoading = true;
   String _filter = 'All'; // All, Dues, Cleared
   String _searchQuery = '';
+  Map<String, dynamic>? _selectedCustomer;
 
   @override
   void initState() {
@@ -48,6 +50,15 @@ class _CustomersPageState extends State<CustomersPage> {
         setState(() {
           _customers = List<Map<String, dynamic>>.from(res);
           _isLoading = false;
+          
+          // Re-sync selected customer if it exists to fetch new balances
+          if (_selectedCustomer != null) {
+            final updatedCustomer = _customers.firstWhere(
+              (c) => c['id'] == _selectedCustomer!['id'],
+              orElse: () => _selectedCustomer!,
+            );
+            _selectedCustomer = updatedCustomer;
+          }
         });
       }
     } catch (e) {
@@ -76,34 +87,21 @@ class _CustomersPageState extends State<CustomersPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = ResponsiveLayout.isDesktop(context) || ResponsiveLayout.isTablet(context);
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           SafeArea(
-            child: Column(
-              children: [
-                _buildAppBar(),
-                _isLoading ? const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: SkeletonSummaryCard()) : _buildSummaryCard(),
-                _buildSearchBar(),
-                _buildFilterChips(),
-                Expanded(
-                  child: _isLoading
-                      ? _buildListSkeleton()
-                      : _filteredCustomers.isEmpty
-                          ? _buildEmptyState()
-                          : _buildCustomerList(),
-                ),
-              ],
-            ),
+            child: isDesktop ? _buildDesktopLayout() : _buildMobileLayout(),
           ),
         ],
       ),
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 80.0), // Above bottom nav
+        padding: EdgeInsets.only(bottom: isDesktop ? 20.0 : 80.0), // Above bottom nav on mobile
         child: FloatingActionButton.extended(
           onPressed: () {
-             // Show Add Customer Dialog
              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add Customer coming soon!')));
           },
           backgroundColor: AppColors.primary,
@@ -111,6 +109,72 @@ class _CustomersPageState extends State<CustomersPage> {
           label: const Text("Add", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         ).animate().scale(delay: 500.ms, curve: Curves.easeOutBack),
       ),
+    );
+  }
+
+  Widget _buildMobileLayout() {
+    return Column(
+      children: [
+        _buildAppBar(),
+        _isLoading ? const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: SkeletonSummaryCard()) : _buildSummaryCard(),
+        _buildSearchBar(),
+        _buildFilterChips(),
+        Expanded(
+          child: _isLoading
+              ? _buildListSkeleton()
+              : _filteredCustomers.isEmpty
+                  ? _buildEmptyState()
+                  : _buildCustomerList(isDesktop: false),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDesktopLayout() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Left Column: Customer List & Filters
+        Expanded(
+          flex: 40,
+          child: Column(
+            children: [
+              _buildAppBar(),
+              _isLoading ? const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: SkeletonSummaryCard()) : _buildSummaryCard(),
+              _buildSearchBar(),
+              _buildFilterChips(),
+              Expanded(
+                child: _isLoading
+                    ? _buildListSkeleton()
+                    : _filteredCustomers.isEmpty
+                        ? _buildEmptyState()
+                        : _buildCustomerList(isDesktop: true),
+              ),
+            ],
+          ),
+        ),
+        // Right Column: Split Pane customer profile & details
+        Expanded(
+          flex: 60,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 20.0, right: 20.0, bottom: 20.0),
+            child: GlassBox(
+              child: _selectedCustomer != null
+                  ? CustomerDetailsPage(
+                      key: ValueKey(_selectedCustomer!['id']),
+                      customer: _selectedCustomer!,
+                      isEmbedded: true,
+                      onPaymentProcessed: _fetchCustomers,
+                    )
+                  : const EmptyState(
+                      title: "Select a Customer",
+                      subtitle: "Choose a customer from the list to view their info, pending dues and transaction history.",
+                      icon: Iconsax.user,
+                    ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -261,9 +325,9 @@ class _CustomersPageState extends State<CustomersPage> {
     );
   }
 
-  Widget _buildCustomerList() {
+  Widget _buildCustomerList({required bool isDesktop}) {
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 100), // extra padding for nav/FAB
+      padding: EdgeInsets.fromLTRB(20, 10, 20, isDesktop ? 20 : 100),
       itemCount: _filteredCustomers.length,
       itemBuilder: (context, index) {
         final customer = _filteredCustomers[index];
@@ -271,6 +335,7 @@ class _CustomersPageState extends State<CustomersPage> {
         final phone = customer['phone'] ?? '';
         final balance = (customer['current_balance'] as num?)?.toDouble() ?? 0;
         final hasDues = balance > 0;
+        final isSelected = _selectedCustomer != null && _selectedCustomer!['id'] == customer['id'];
 
         return Container(
           margin: const EdgeInsets.only(bottom: 15),
@@ -293,65 +358,84 @@ class _CustomersPageState extends State<CustomersPage> {
               return false; // Don't actually dismiss the item
             },
             child: GlassBox(
+              color: isSelected 
+                  ? (Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.primary.withOpacity(0.2)
+                      : AppColors.lightPrimary.withOpacity(0.15))
+                  : null,
+              border: isSelected
+                  ? Border.all(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppColors.primary
+                          : AppColors.lightPrimary,
+                      width: 2.0,
+                    )
+                  : null,
               child: ListTile(
                 contentPadding: const EdgeInsets.all(15),
                 onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CustomerDetailsPage(customer: customer),
-                    ),
-                  );
-                  _fetchCustomers(); // Refresh balances when returning
+                  if (isDesktop) {
+                    setState(() {
+                      _selectedCustomer = customer;
+                    });
+                  } else {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CustomerDetailsPage(customer: customer),
+                      ),
+                    );
+                    _fetchCustomers(); // Refresh balances when returning
+                  }
                 },
                 leading: Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: hasDues 
-                      ? AppColors.error.withOpacity(0.1) 
-                      : AppColors.success.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  hasDues ? Iconsax.warning_2 : Iconsax.verify,
-                  color: hasDues ? AppColors.error : AppColors.success,
-                ),
-              ),
-              title: Text(
-                name,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              subtitle: Text(
-                phone,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    hasDues ? "Due: ₹${balance.toStringAsFixed(0)}" : "Cleared",
-                    style: TextStyle(
-                      color: hasDues ? AppColors.error : AppColors.success, 
-                      fontWeight: FontWeight.bold, 
-                      fontSize: 14,
-                    ),
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: hasDues 
+                        ? AppColors.error.withOpacity(0.1) 
+                        : AppColors.success.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  if (hasDues)
+                  child: Icon(
+                    hasDues ? Iconsax.warning_2 : Iconsax.verify,
+                    color: hasDues ? AppColors.error : AppColors.success,
+                  ),
+                ),
+                title: Text(
+                  name,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  phone,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
                     Text(
-                      "Swipe to settle",
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Theme.of(context).textTheme.bodySmall?.color,
+                      hasDues ? "Due: ₹${balance.toStringAsFixed(0)}" : "Cleared",
+                      style: TextStyle(
+                        color: hasDues ? AppColors.error : AppColors.success, 
+                        fontWeight: FontWeight.bold, 
+                        fontSize: 14,
                       ),
                     ),
-                ],
+                    if (hasDues)
+                      Text(
+                        "Swipe to settle",
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context).textTheme.bodySmall?.color,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ).animate().slideX(begin: 0.1, delay: (index * 50).ms).fadeIn();
-    },
+        ).animate().slideX(begin: 0.1, delay: (index * 50).ms).fadeIn();
+      },
     );
   }
 }

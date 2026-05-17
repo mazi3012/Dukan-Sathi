@@ -3,16 +3,23 @@ import 'package:iconsax/iconsax.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
-// import 'package:url_launcher/url_launcher.dart'; // We'll mock url launcher for now if not available
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/database.dart';
 import '../../../core/session.dart';
+import '../../../core/widgets/responsive_layout.dart';
 
 class CustomerDetailsPage extends StatefulWidget {
   final Map<String, dynamic> customer;
+  final bool isEmbedded;
+  final VoidCallback? onPaymentProcessed;
 
-  const CustomerDetailsPage({super.key, required this.customer});
+  const CustomerDetailsPage({
+    super.key, 
+    required this.customer, 
+    this.isEmbedded = false,
+    this.onPaymentProcessed,
+  });
 
   @override
   State<CustomerDetailsPage> createState() => _CustomerDetailsPageState();
@@ -29,6 +36,15 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
     super.initState();
     _currentBalance = (widget.customer['current_balance'] as num?)?.toDouble() ?? 0;
     _fetchTransactions();
+  }
+
+  @override
+  void didUpdateWidget(covariant CustomerDetailsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.customer['id'] != widget.customer['id']) {
+      _currentBalance = (widget.customer['current_balance'] as num?)?.toDouble() ?? 0;
+      _fetchTransactions();
+    }
   }
 
   Future<void> _fetchTransactions() async {
@@ -53,9 +69,6 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   }
 
   void _openWhatsApp() {
-    // In a real app, use url_launcher:
-    // final url = 'https://wa.me/${widget.customer['phone']}';
-    // launchUrl(Uri.parse(url));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Opening WhatsApp for ${widget.customer['name']}...')),
     );
@@ -69,6 +82,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
 
   void _showSettleDialog() {
     final TextEditingController amountController = TextEditingController(text: _currentBalance.toStringAsFixed(0));
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     showModalBottomSheet(
       context: context,
@@ -78,27 +92,53 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
-            border: Border(top: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.1))),
+            color: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+            borderRadius: const BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
+            border: Border(
+              top: BorderSide(color: isDark ? AppColors.darkGlassBorder : AppColors.lightGlassBorder),
+              left: BorderSide(color: isDark ? AppColors.darkGlassBorder : AppColors.lightGlassBorder),
+              right: BorderSide(color: isDark ? AppColors.darkGlassBorder : AppColors.lightGlassBorder),
+            ),
           ),
           padding: const EdgeInsets.all(30),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Receive Payment", style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                "Receive Payment", 
+                style: TextStyle(
+                  color: isDark ? Colors.white : AppColors.lightOnSurface,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Outfit',
+                ),
+              ),
               const SizedBox(height: 5),
-              Text("Current Due: ₹${_currentBalance.toStringAsFixed(2)}", style: Theme.of(context).textTheme.bodySmall),
+              Text(
+                "Current Due: ₹${_currentBalance.toStringAsFixed(2)}", 
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7),
+                  fontSize: 14,
+                ),
+              ),
               const SizedBox(height: 25),
               GlassBox(
                 child: TextField(
                   controller: amountController,
                   keyboardType: TextInputType.number,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: isDark ? Colors.white : AppColors.lightOnSurface,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
                   decoration: InputDecoration(
                     prefixText: "₹ ",
-                    prefixStyle: Theme.of(context).textTheme.headlineMedium?.copyWith(color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold),
+                    prefixStyle: TextStyle(
+                      color: AppColors.primary, 
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                   ),
@@ -160,6 +200,10 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
 
       setState(() => _currentBalance = newBalance < 0 ? 0 : newBalance);
       _fetchTransactions(); // refresh timeline
+
+      if (widget.onPaymentProcessed != null) {
+        widget.onPaymentProcessed!();
+      }
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -184,12 +228,14 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
     final phone = widget.customer['phone'] ?? '';
     final balance = _currentBalance;
     final hasDues = balance > 0;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: widget.isEmbedded 
+          ? Colors.transparent 
+          : (isDark ? AppColors.darkBackground : AppColors.lightBackground),
       body: Stack(
         children: [
-          // Background handled by Scaffold
           const SizedBox.expand(),
           SafeArea(
             child: Column(
@@ -201,10 +247,17 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor.withOpacity(0.3),
+                      color: isDark
+                          ? AppColors.darkSurface.withOpacity(0.5)
+                          : AppColors.lightSurface.withOpacity(0.5),
                       borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        topRight: Radius.circular(12),
+                        topLeft: Radius.circular(24),
+                        topRight: Radius.circular(24),
+                      ),
+                      border: Border(
+                        top: BorderSide(
+                          color: isDark ? AppColors.darkGlassBorder : AppColors.lightGlassBorder,
+                        ),
                       ),
                     ),
                     child: _isLoading
@@ -224,18 +277,25 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   }
 
   Widget _buildAppBar(String name) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: Icon(Iconsax.arrow_left_2, color: Theme.of(context).iconTheme.color),
-          ),
-          const SizedBox(width: 10),
+          if (!widget.isEmbedded) ...[
+            IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: Icon(Iconsax.arrow_left_2, color: Theme.of(context).iconTheme.color),
+            ),
+            const SizedBox(width: 10),
+          ],
           Text(
             "Customer Profile",
-            style: Theme.of(context).appBarTheme.titleTextStyle,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : AppColors.lightOnSurface,
+            ),
           ),
         ],
       ),
@@ -243,6 +303,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   }
 
   Widget _buildProfileHeader(String name, String phone, double balance, bool hasDues) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -260,11 +321,19 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
           const SizedBox(height: 15),
           Text(
             name,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : AppColors.lightOnSurface,
+              fontFamily: 'Outfit',
+            ),
           ).animate().fadeIn(delay: 100.ms),
           Text(
             phone,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).textTheme.bodySmall?.color),
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7),
+            ),
           ).animate().fadeIn(delay: 200.ms),
           const SizedBox(height: 20),
           GlassBox(
@@ -283,7 +352,11 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                     children: [
                       Text(
                         hasDues ? "Pending Dues" : "All Clear",
-                        style: Theme.of(context).textTheme.labelSmall,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? Colors.white60 : AppColors.lightOnSurface.withOpacity(0.6),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       Text(
                         "₹${balance.toStringAsFixed(2)}",
@@ -305,6 +378,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   }
 
   Widget _buildQuickActions() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 30),
       child: Row(
@@ -318,7 +392,8 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
     ).animate().fadeIn(delay: 400.ms);
   }
 
-  Widget _buildActionButton(IconData icon, String label, VoidCallback onTap, {Color color = Colors.white}) {
+  Widget _buildActionButton(IconData icon, String label, VoidCallback onTap, {Color? color}) {
+    final themeColor = color ?? (Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.lightOnSurface);
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -326,28 +401,33 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
           Container(
             padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
+              color: themeColor.withOpacity(0.15),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: color),
+            child: Icon(icon, color: themeColor),
           ),
           const SizedBox(height: 8),
-          Text(label, style: TextStyle(color: color.withOpacity(0.8), fontSize: 12)),
+          Text(label, style: TextStyle(color: themeColor.withOpacity(0.8), fontSize: 12)),
         ],
       ),
     );
   }
 
   Widget _buildEmptyTransactions() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Text(
         "No transaction history found.",
-        style: Theme.of(context).textTheme.bodySmall,
+        style: TextStyle(
+          color: isDark ? Colors.white60 : AppColors.lightOnSurface.withOpacity(0.6),
+          fontSize: 14,
+        ),
       ),
     );
   }
 
   Widget _buildTransactionTimeline() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListView.builder(
       padding: const EdgeInsets.all(20),
       itemCount: _transactions.length,
@@ -355,12 +435,11 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
         final tx = _transactions[index];
         final amount = (tx['amount'] as num?)?.toDouble() ?? 0;
         final amountPaid = (tx['amount_paid'] as num?)?.toDouble() ?? 0;
-        final isPayment = amountPaid > 0 && amount == 0; // simplistic check, maybe it's just a regular sale
+        final isPayment = amountPaid > 0 && amount == 0;
         final status = tx['payment_status'] ?? 'UNPAID';
         final dateStr = tx['timestamp'] as String?;
         final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
         
-        // Define colors based on status
         Color statusColor;
         IconData statusIcon;
         if (status == 'PAID') {
@@ -377,7 +456,6 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Timeline line & node
             Column(
               children: [
                 Container(
@@ -386,69 +464,75 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
                   decoration: BoxDecoration(
                     color: statusColor,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 3),
+                    border: Border.all(color: isDark ? AppColors.darkBackground : AppColors.lightBackground, width: 3),
                   ),
                 ),
                 if (index != _transactions.length - 1)
                   Container(
                     width: 2,
                     height: 60,
-                    color: Theme.of(context).dividerColor.withOpacity(0.1),
+                    color: isDark ? Colors.white12 : Colors.black12,
                   ),
               ],
             ),
             const SizedBox(width: 15),
-            // Content
             Expanded(
               child: Container(
                 margin: const EdgeInsets.only(bottom: 20),
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.1)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                child: GlassBox(
+                  child: Padding(
+                    padding: const EdgeInsets.all(15),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          isPayment ? "Payment Received" : "Bill: ${tx['invoice_number'] ?? 'N/A'}",
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          date != null ? DateFormat('MMM dd, yyyy - hh:mm a').format(date) : "Unknown Date",
-                          style: Theme.of(context).textTheme.labelSmall,
-                        ),
-                      ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          isPayment ? "+ ₹${amountPaid.toStringAsFixed(0)}" : "₹${amount.toStringAsFixed(0)}",
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: isPayment ? AppColors.success : Theme.of(context).textTheme.bodyLarge?.color, 
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Row(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(statusIcon, color: statusColor, size: 12),
-                            const SizedBox(width: 4),
                             Text(
-                              status,
-                              style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                              isPayment ? "Payment Received" : "Bill: ${tx['invoice_number'] ?? 'N/A'}",
+                              style: TextStyle(
+                                color: isDark ? Colors.white : AppColors.lightOnSurface,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              date != null ? DateFormat('MMM dd, yyyy - hh:mm a').format(date) : "Unknown Date",
+                              style: TextStyle(
+                                color: isDark ? Colors.white60 : AppColors.lightOnSurface.withOpacity(0.6),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              isPayment ? "+ ₹${amountPaid.toStringAsFixed(0)}" : "₹${amount.toStringAsFixed(0)}",
+                              style: TextStyle(
+                                color: isPayment ? AppColors.success : (isDark ? Colors.white : AppColors.lightOnSurface), 
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Row(
+                              children: [
+                                Icon(statusIcon, color: statusColor, size: 12),
+                                const SizedBox(width: 4),
+                                Text(
+                                  status,
+                                  style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -459,11 +543,13 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   }
 
   Widget _buildBottomSettleBar(double balance) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDesktop = ResponsiveLayout.isDesktop(context) || ResponsiveLayout.isTablet(context);
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, isDesktop ? 20 : 40),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        border: Border(top: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.1))),
+        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        border: Border(top: BorderSide(color: isDark ? AppColors.darkGlassBorder : AppColors.lightGlassBorder.withOpacity(0.3))),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -472,8 +558,21 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("To Collect", style: Theme.of(context).textTheme.bodySmall),
-              Text("₹${balance.toStringAsFixed(0)}", style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: AppColors.error, fontWeight: FontWeight.bold)),
+              Text(
+                "To Collect", 
+                style: TextStyle(
+                  color: isDark ? Colors.white60 : AppColors.lightOnSurface.withOpacity(0.6),
+                  fontSize: 12,
+                ),
+              ),
+              Text(
+                "₹${balance.toStringAsFixed(0)}", 
+                style: const TextStyle(
+                  color: AppColors.error, 
+                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                ),
+              ),
             ],
           ),
           ElevatedButton(
