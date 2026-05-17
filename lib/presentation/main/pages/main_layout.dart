@@ -5,6 +5,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/widgets/glass_box.dart';
+import '../../../core/widgets/responsive_layout.dart';
+import '../widgets/desktop_sidebar.dart';
 import '../../../core/session.dart';
 import '../../dashboard/pages/dashboard_page.dart';
 import '../../inventory/pages/inventory_page.dart';
@@ -22,6 +24,7 @@ class MainLayout extends ConsumerStatefulWidget {
 
 class _MainLayoutState extends ConsumerState<MainLayout> {
   int _currentIndex = 0;
+  bool _isSidebarCollapsed = false;
 
   final List<Widget> _pages = [
     const DashboardPage(),
@@ -33,11 +36,49 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      drawer: _buildDrawer(),
-      body: _pages[_currentIndex],
-      bottomNavigationBar: _buildBottomBar(),
+    return ResponsiveLayout(
+      mobile: Scaffold(
+        extendBody: true,
+        drawer: _buildDrawer(),
+        body: _pages[_currentIndex],
+        bottomNavigationBar: _buildBottomBar(),
+      ),
+      tablet: Scaffold(
+        body: Row(
+          children: [
+            DesktopSidebar(
+              currentIndex: _currentIndex,
+              onDestinationSelected: (index) {
+                setState(() => _currentIndex = index);
+              },
+              isCollapsed: true, // Always collapsed on tablet
+              onToggleCollapse: () {}, // No-op on tablet
+            ),
+            Expanded(
+              child: _pages[_currentIndex],
+            ),
+          ],
+        ),
+      ),
+      desktop: Scaffold(
+        body: Row(
+          children: [
+            DesktopSidebar(
+              currentIndex: _currentIndex,
+              onDestinationSelected: (index) {
+                setState(() => _currentIndex = index);
+              },
+              isCollapsed: _isSidebarCollapsed,
+              onToggleCollapse: () {
+                setState(() => _isSidebarCollapsed = !_isSidebarCollapsed);
+              },
+            ),
+            Expanded(
+              child: _pages[_currentIndex],
+            ),
+          ],
+        ),
+      ),
     );
   }
 

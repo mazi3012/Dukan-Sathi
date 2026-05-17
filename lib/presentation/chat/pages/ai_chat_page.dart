@@ -215,26 +215,34 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
           
           // Chat List
           SafeArea(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: EdgeInsets.all(20).copyWith(
-                bottom: MediaQuery.of(context).viewInsets.bottom + 140,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: EdgeInsets.all(20).copyWith(
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 140,
+                  ),
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    final msg = messages[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _buildMessageRow(context, msg),
+                    );
+                  },
+                ),
               ),
-              itemCount: messages.length,
-              itemBuilder: (context, index) {
-                final msg = messages[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: _buildMessageRow(context, msg),
-                );
-              },
             ),
           ),
           
           // Input Area
           Align(
             alignment: Alignment.bottomCenter,
-            child: _buildInputArea(context),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: _buildInputArea(context),
+            ),
           ),
         ],
       ),

@@ -5,6 +5,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/database.dart';
 import '../../../core/session.dart';
 
@@ -249,95 +251,117 @@ class _InventoryPageState extends State<InventoryPage> {
         child: Text("No products in '$_selectedCategory'", style: const TextStyle(color: Colors.white54)),
       );
     }
+    
+    final isDesktop = ResponsiveLayout.isDesktop(context);
+    final isTablet = ResponsiveLayout.isTablet(context);
+
+    if (isDesktop || isTablet) {
+      return GridView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: isDesktop ? 3 : 2,
+          crossAxisSpacing: 15,
+          mainAxisSpacing: 15,
+          childAspectRatio: 2.5,
+        ),
+        itemCount: filtered.length,
+        itemBuilder: (context, index) {
+          return _buildProductCard(filtered[index], index);
+        },
+      );
+    }
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemCount: filtered.length,
       itemBuilder: (context, index) {
-        final product = filtered[index];
-        final name = product['name'] ?? 'Unknown';
-        final price = (product['price'] as num?)?.toDouble() ?? 0;
-        final stock = product['stock_quantity'] as int? ?? 0;
-        final category = product['category'] ?? 'General';
-        final isLowStock = stock < 10;
-
         return Container(
           margin: const EdgeInsets.only(bottom: 15),
-          child: Dismissible(
-            key: Key(product['id'].toString()),
-            direction: DismissDirection.endToStart,
-            background: Container(
-              padding: const EdgeInsets.only(right: 20),
-              alignment: Alignment.centerRight,
-              decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.dark ? AppColors.primary.withOpacity(0.3) : AppColors.lightPrimary.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text("Restock +10", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  SizedBox(width: 10),
-                  Icon(Iconsax.add_circle, color: Colors.white),
-                ],
-              ),
-            ),
-            confirmDismiss: (direction) async {
-              await _restockProduct(product);
-              return false; // don't remove from list
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: isLowStock ? [
-                  BoxShadow(color: AppColors.error.withOpacity(0.2), blurRadius: 15, spreadRadius: 2)
-                ] : null,
-              ),
-              child: GlassBox(
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(15),
-                  leading: Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: isLowStock 
-                          ? AppColors.error.withOpacity(0.1) 
-                          : (Theme.of(context).brightness == Brightness.dark ? AppColors.primary.withOpacity(0.1) : AppColors.lightPrimarySoft),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(Iconsax.box, color: isLowStock ? AppColors.error : (Theme.of(context).brightness == Brightness.dark ? AppColors.primary : AppColors.lightPrimary)),
-                  ),
-                  title: Text(
-                    name,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    category,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  trailing: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        "₹${price.toStringAsFixed(0)}",
-                        style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      Text(
-                        "Stock: $stock",
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: isLowStock ? AppColors.error : Theme.of(context).textTheme.bodySmall?.color,
-                          fontWeight: isLowStock ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ).animate().slideY(begin: 0.1, delay: (index * 50).ms).fadeIn();
+          child: _buildProductCard(filtered[index], index),
+        );
       },
     );
+  }
+
+  Widget _buildProductCard(Map<String, dynamic> product, int index) {
+    final name = product['name'] ?? 'Unknown';
+    final price = (product['price'] as num?)?.toDouble() ?? 0;
+    final stock = product['stock_quantity'] as int? ?? 0;
+    final category = product['category'] ?? 'General';
+    final isLowStock = stock < 10;
+
+    return Dismissible(
+      key: Key(product['id'].toString()),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        padding: const EdgeInsets.only(right: 20),
+        alignment: Alignment.centerRight,
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.dark ? AppColors.primary.withOpacity(0.3) : AppColors.lightPrimary.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Text("Restock +10", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            SizedBox(width: 10),
+            Icon(Iconsax.add_circle, color: Colors.white),
+          ],
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        await _restockProduct(product);
+        return false; // don't remove from list
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: isLowStock ? [
+            BoxShadow(color: AppColors.error.withOpacity(0.2), blurRadius: 15, spreadRadius: 2)
+          ] : null,
+        ),
+        child: GlassBox(
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(15),
+            leading: Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: isLowStock 
+                    ? AppColors.error.withOpacity(0.1) 
+                    : (Theme.of(context).brightness == Brightness.dark ? AppColors.primary.withOpacity(0.1) : AppColors.lightPrimarySoft),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Iconsax.box, color: isLowStock ? AppColors.error : (Theme.of(context).brightness == Brightness.dark ? AppColors.primary : AppColors.lightPrimary)),
+            ),
+            title: Text(
+              name,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              category,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  "₹${price.toStringAsFixed(0)}",
+                  style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                Text(
+                  "Stock: $stock",
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: isLowStock ? AppColors.error : Theme.of(context).textTheme.bodySmall?.color,
+                    fontWeight: isLowStock ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ).animate().slideY(begin: 0.1, delay: (index * 50).ms).fadeIn();
   }
 }

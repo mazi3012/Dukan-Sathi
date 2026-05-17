@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_layout.dart';
 
 import '../../../core/database.dart';
 import '../../../core/session.dart';
@@ -145,37 +146,83 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ),
           // Content
-          SafeArea(
-            child: CustomScrollView(
-              slivers: [
-                _buildAppBar(context),
-                SliverPadding(
-                  padding: const EdgeInsets.all(20),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      _buildWelcomeSection(context),
-                      const SizedBox(height: 24),
-                      _isLoading 
-                        ? _buildOverviewSkeleton()
-                        : _buildOverviewCard(),
-                      const SizedBox(height: 20),
-                      _isLoading 
-                        ? _buildStatsSkeleton()
-                        : _buildStatsGrid(),
-                      const SizedBox(height: 30),
-                      _buildSectionTitle(context, "Recent Activity"),
-                      const SizedBox(height: 15),
-                      _isLoading 
-                        ? _buildActivitySkeleton()
-                        : _buildActivityList(),
-                      const SizedBox(height: 100), // Spacer for bottom bar
-                    ]),
+          ResponsiveLayout(
+            mobile: SafeArea(
+              child: CustomScrollView(
+                slivers: [
+                  _buildAppBar(context),
+                  SliverPadding(
+                    padding: const EdgeInsets.all(20),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        _buildWelcomeSection(context),
+                        const SizedBox(height: 24),
+                        _isLoading 
+                          ? _buildOverviewSkeleton()
+                          : _buildOverviewCard(),
+                        const SizedBox(height: 20),
+                        _isLoading 
+                          ? _buildStatsSkeleton()
+                          : _buildStatsGrid(),
+                        const SizedBox(height: 30),
+                        _buildSectionTitle(context, "Recent Activity"),
+                        const SizedBox(height: 15),
+                        _isLoading 
+                          ? _buildActivitySkeleton()
+                          : _buildActivityList(),
+                        const SizedBox(height: 100), // Spacer for bottom bar
+                      ]),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
+            desktop: _buildDesktopLayout(context),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopLayout(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 65,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildWelcomeSection(context),
+                    const SizedBox(height: 24),
+                    _isLoading ? _buildOverviewSkeleton() : _buildOverviewCard(),
+                    const SizedBox(height: 20),
+                    _isLoading ? _buildStatsSkeleton() : _buildStatsGrid(),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 30),
+            Expanded(
+              flex: 35,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 10), // Alignment
+                    _buildSectionTitle(context, "Recent Activity"),
+                    const SizedBox(height: 15),
+                    _isLoading ? _buildActivitySkeleton() : _buildActivityList(),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -316,13 +363,14 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildStatsGrid() {
+    final isDesktop = ResponsiveLayout.isDesktop(context);
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
+      crossAxisCount: isDesktop ? 4 : 2,
       crossAxisSpacing: 15,
       mainAxisSpacing: 15,
-      childAspectRatio: 1.4,
+      childAspectRatio: isDesktop ? 1.8 : 1.4,
       children: [
         _buildStatCard("Sales", "₹${_totalSales.toStringAsFixed(0)}", Iconsax.wallet_money),
         _buildStatCard("Invoices", _invoiceCount.toString(), Iconsax.document_text),
@@ -404,13 +452,14 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildStatsSkeleton() {
+    final isDesktop = ResponsiveLayout.isDesktop(context);
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
+      crossAxisCount: isDesktop ? 4 : 2,
       crossAxisSpacing: 15,
       mainAxisSpacing: 15,
-      childAspectRatio: 1.5,
+      childAspectRatio: isDesktop ? 1.8 : 1.5,
       children: List.generate(4, (index) => const SkeletonCard()),
     );
   }
