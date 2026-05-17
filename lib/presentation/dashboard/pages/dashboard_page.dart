@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
+import '../../main/pages/main_layout.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/widgets/skeleton.dart';
@@ -316,13 +317,11 @@ class _DashboardPageState extends State<DashboardPage> {
       floating: true,
       backgroundColor: Colors.transparent,
       elevation: 0,
-      leading: Builder(
-        builder: (context) => IconButton(
-          icon: const Icon(Iconsax.menu),
-          onPressed: () {
-            Scaffold.of(context).openDrawer();
-          },
-        ),
+      leading: IconButton(
+        icon: const Icon(Iconsax.menu),
+        onPressed: () {
+          mainScaffoldKey.currentState?.openDrawer();
+        },
       ),
       title: Row(
         children: [

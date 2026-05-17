@@ -15,6 +15,8 @@ import '../../customers/pages/customers_page.dart';
 import '../../chat/pages/ai_chat_page.dart';
 import '../../auth/pages/login_page.dart';
 
+final GlobalKey<ScaffoldState> mainScaffoldKey = GlobalKey<ScaffoldState>();
+
 class MainLayout extends ConsumerStatefulWidget {
   const MainLayout({super.key});
 
@@ -38,6 +40,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
   Widget build(BuildContext context) {
     return ResponsiveLayout(
       mobile: Scaffold(
+        key: mainScaffoldKey,
         extendBody: true,
         drawer: _buildDrawer(),
         body: _pages[_currentIndex],

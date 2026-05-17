@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../main/pages/main_layout.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/widgets/skeleton.dart';
@@ -111,11 +112,9 @@ class _InventoryPageState extends State<InventoryPage> {
           Row(
             children: [
               if (!isDesktop) ...[
-                Builder(
-                  builder: (context) => IconButton(
-                    icon: const Icon(Iconsax.menu, size: 24),
-                    onPressed: () => Scaffold.of(context).openDrawer(),
-                  ),
+                IconButton(
+                  icon: const Icon(Iconsax.menu, size: 24),
+                  onPressed: () => mainScaffoldKey.currentState?.openDrawer(),
                 ),
                 const SizedBox(width: 8),
               ],

@@ -5,6 +5,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:record/record.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../main/pages/main_layout.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../models/chat_message.dart';
@@ -162,11 +163,9 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                 icon: Icon(Iconsax.arrow_left_2, color: Theme.of(context).iconTheme.color),
                 onPressed: () => Navigator.pop(context),
               )
-            : Builder(
-                builder: (context) => IconButton(
-                  icon: Icon(Iconsax.menu, color: Theme.of(context).iconTheme.color),
-                  onPressed: () => Scaffold.of(context).openDrawer(),
-                ),
+            : IconButton(
+                icon: Icon(Iconsax.menu, color: Theme.of(context).iconTheme.color),
+                onPressed: () => mainScaffoldKey.currentState?.openDrawer(),
               ),
         title: Row(
           mainAxisSize: MainAxisSize.min,
