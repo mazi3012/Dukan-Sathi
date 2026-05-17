@@ -87,7 +87,7 @@ class _DashboardPageState extends State<DashboardPage> {
       // 5. Fetch Recent Activity
       final activityRes = await supabase
           .from('sales')
-          .select('invoice_number, customer_name, amount, timestamp')
+          .select('invoice_number, customer_name, amount, timestamp, payment_status')
           .eq('shop_id', shopId)
           .order('timestamp', ascending: false)
           .limit(6);
@@ -151,7 +151,7 @@ class _DashboardPageState extends State<DashboardPage> {
       final difference = now.difference(dateTime);
 
       if (difference.inMinutes < 60) {
-        return '${difference.inMinutes}m ago';
+        return '${difference.inMinutes}h ago'; // Short label
       } else if (difference.inHours < 24) {
         return '${difference.inHours}h ago';
       } else {
@@ -170,7 +170,7 @@ class _DashboardPageState extends State<DashboardPage> {
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // Ambient blur blobs
+          // Ambient neon blur blobs
           Positioned(
             top: -120,
             right: -50,
@@ -181,24 +181,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    AppColors.primary.withOpacity(0.12),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 80,
-            left: -100,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.success.withOpacity(0.08),
+                    const Color(0xFF10B981).withOpacity(0.08),
                     Colors.transparent,
                   ],
                 ),
@@ -223,15 +206,13 @@ class _DashboardPageState extends State<DashboardPage> {
             delegate: SliverChildListDelegate([
               _buildWelcomeSection(context),
               const SizedBox(height: 20),
-              _isLoading ? const SkeletonSummaryCard() : _buildOverviewCard(),
-              const SizedBox(height: 20),
               _isLoading ? _buildStatsSkeleton() : _buildStatsGrid(),
               const SizedBox(height: 25),
               _buildSectionTitle(context, "Dukan Sathi Insights"),
               const SizedBox(height: 12),
               _isLoading ? _buildInsightsSkeleton() : _buildInsightsGrid(isDesktop: false),
               const SizedBox(height: 25),
-              _buildSectionTitle(context, "Recent Activity"),
+              _buildSectionTitle(context, "Recent Invoices & Activity"),
               const SizedBox(height: 12),
               _isLoading ? _buildActivitySkeleton() : _buildActivityList(),
               const SizedBox(height: 100), // Navigation spacer
@@ -245,46 +226,82 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildDesktopLayout(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(24.0),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Left Side: Greetings, Metrics & Business Insights
+          _buildWelcomeSection(context),
+          const SizedBox(height: 28),
+          _isLoading ? _buildStatsSkeleton() : _buildStatsGrid(),
+          const SizedBox(height: 32),
           Expanded(
-            flex: 62,
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildWelcomeSection(context),
-                  const SizedBox(height: 24),
-                  _isLoading ? const SkeletonSummaryCard() : _buildOverviewCard(),
-                  const SizedBox(height: 24),
-                  _isLoading ? _buildStatsSkeleton() : _buildStatsGrid(),
-                  const SizedBox(height: 28),
-                  _buildSectionTitle(context, "Dukan Sathi Insights"),
-                  const SizedBox(height: 16),
-                  _isLoading ? _buildInsightsSkeleton() : _buildInsightsGrid(isDesktop: true),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 32),
-          // Right Side: Timeline Recent Activity Feed
-          Expanded(
-            flex: 38,
-            child: Column(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildSectionTitle(context, "Recent Activity"),
-                const SizedBox(height: 16),
+                // Left Column: Dukan Sathi Insights
                 Expanded(
-                  child: _isLoading 
-                      ? _buildActivitySkeleton() 
-                      : SingleChildScrollView(
-                          physics: const BouncingScrollPhysics(),
-                          child: _buildActivityList(),
-                        ),
+                  flex: 40,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionTitle(context, "Dukan Sathi Insights"),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: _isLoading ? _buildInsightsSkeleton() : _buildInsightsGrid(isDesktop: true),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 32),
+                // Right Column: Recent Invoices & Activity
+                Expanded(
+                  flex: 60,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildSectionTitle(context, "Recent Invoices & Activity"),
+                          // Search & Filter header controls
+                          Row(
+                            children: [
+                              Container(
+                                width: 140,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const SizedBox(width: 10),
+                                    const Icon(Iconsax.search_normal, size: 12, color: Colors.grey),
+                                    const SizedBox(width: 6),
+                                    Text("Search", style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                                ),
+                                child: const Icon(Iconsax.filter_search, size: 16, color: Colors.white70),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: _isLoading ? _buildActivitySkeleton() : _buildActivityCard(),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -331,8 +348,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildWelcomeSection(BuildContext context) {
     final isDesktop = ResponsiveLayout.isDesktop(context) || ResponsiveLayout.isTablet(context);
-    final userName = UserSession().userName ?? "Shop Owner";
-    final shopName = UserSession().shopName ?? "Your Retail Shop";
+    final userName = UserSession().userName ?? "Mazidur Rahman";
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -340,15 +356,11 @@ class _DashboardPageState extends State<DashboardPage> {
         Row(
           children: [
             CircleAvatar(
-              radius: isDesktop ? 26 : 22,
-              backgroundColor: Theme.of(context).brightness == Brightness.dark 
-                  ? AppColors.primary.withOpacity(0.2) 
-                  : AppColors.lightPrimarySoft,
-              child: Icon(
-                Iconsax.user, 
-                color: Theme.of(context).brightness == Brightness.dark ? AppColors.primary : AppColors.lightPrimary,
-                size: isDesktop ? 26 : 22,
+              radius: 26,
+              backgroundImage: const NetworkImage(
+                'https://api.dicebear.com/7.x/adventurer/png?seed=Mazidur',
               ),
+              backgroundColor: AppColors.primary.withOpacity(0.1),
             ),
             const SizedBox(width: 16),
             Column(
@@ -357,149 +369,77 @@ class _DashboardPageState extends State<DashboardPage> {
                 Text(
                   "Welcome back,",
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).textTheme.bodySmall?.color,
+                    color: Colors.grey.shade400,
                   ),
                 ),
                 Text(
                   userName,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w900,
-                    fontSize: isDesktop ? 24 : 20,
+                    fontSize: 22,
                   ),
                 ),
               ],
             ),
           ],
         ),
-        if (isDesktop)
-          IconButton(
-            tooltip: "Refresh Dashboard",
-            onPressed: _fetchDashboardData,
-            icon: Icon(Iconsax.refresh, color: Theme.of(context).iconTheme.color),
-          ),
-      ],
-    ).animate().fadeIn(duration: 500.ms).slideX(begin: -0.05);
-  }
-
-  Widget _buildOverviewCard() {
-    final isDesktop = ResponsiveLayout.isDesktop(context) || ResponsiveLayout.isTablet(context);
-    
-    final overviewGradient = BoxDecoration(
-      borderRadius: BorderRadius.circular(20),
-      gradient: const LinearGradient(
-        colors: [Color(0xFF047857), Color(0xFF064E3B)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: const Color(0xFF047857).withOpacity(0.25),
-          blurRadius: 16,
-          offset: const Offset(0, 8),
-        ),
-      ],
-    );
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: overviewGradient,
-      child: Stack(
-        children: [
-          Positioned(
-            right: -25,
-            top: -25,
-            child: CircleAvatar(
-              radius: 60,
-              backgroundColor: Colors.white.withOpacity(0.04),
-            ),
-          ),
-          isDesktop ? _buildDesktopOverviewContent() : _buildMobileOverviewContent(),
-        ],
-      ),
-    ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.08);
-  }
-
-  Widget _buildDesktopOverviewContent() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Row(
+        if (isDesktop) ...[
+          Row(
             children: [
-              _buildOverviewColumn("Total Sales", _totalSales, "12.5% vs last month"),
-              Container(
-                height: 50,
-                width: 1,
-                color: Colors.white24,
-                margin: const EdgeInsets.symmetric(horizontal: 40),
+              // Notification bell with red dot
+              Stack(
+                children: [
+                  IconButton(
+                    onPressed: () {},
+                    icon: const Icon(Iconsax.notification, color: Colors.white70),
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              _buildOverviewColumn("Total Revenue", _totalSales * 1.15, "8.3% vs last month"),
+              const SizedBox(width: 8),
+              // Settings gear
+              IconButton(
+                onPressed: () {},
+                icon: const Icon(Iconsax.setting_4, color: Colors.white70),
+                  ),
+              const SizedBox(width: 16),
+              // Search bar pill
+              Container(
+                width: 220,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(width: 12),
+                    Icon(Iconsax.search_normal, size: 16, color: Colors.grey.shade400),
+                    const SizedBox(width: 8),
+                    Text(
+                      "Search",
+                      style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-        ),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.18)),
-          ),
-          child: const Icon(Iconsax.trend_up, color: Colors.white, size: 28),
-        ),
+        ]
       ],
-    );
-  }
-
-  Widget _buildMobileOverviewContent() {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(child: _buildOverviewColumn("Total Sales", _totalSales, "12.5% vs last month")),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.18)),
-              ),
-              child: const Icon(Iconsax.trend_up, color: Colors.white, size: 20),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        const Divider(color: Colors.white24, height: 1),
-        const SizedBox(height: 16),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: _buildOverviewColumn("Total Revenue", _totalSales * 1.15, "8.3% vs last month"),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOverviewColumn(String title, double value, String helperText) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
-        const SizedBox(height: 4),
-        Text(
-          "₹${value.toStringAsFixed(0)}", 
-          style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: 0.5)
-        ),
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            const Icon(Icons.arrow_upward, color: Colors.greenAccent, size: 13),
-            const SizedBox(width: 4),
-            Text(helperText, style: TextStyle(color: Colors.greenAccent.shade100, fontSize: 11)),
-          ],
-        ),
-      ],
-    );
+    ).animate().fadeIn(duration: 500.ms).slideX(begin: -0.05);
   }
 
   Widget _buildStatsGrid() {
@@ -511,15 +451,15 @@ class _DashboardPageState extends State<DashboardPage> {
         if (width > 850) {
           crossAxisCount = 4;
         } else if (width > 480) {
-          crossAxisCount = 3;
-        } else {
           crossAxisCount = 2;
+        } else {
+          crossAxisCount = 1;
         }
 
         final cardWidth = (width - (crossAxisCount - 1) * 16) / crossAxisCount;
         
-        // Dynamic Aspect Ratio locks Card height to exactly 120.0px for perfect organization & zero clipping
-        const double cardHeight = 120.0;
+        // Dynamic Aspect Ratio locks Card height to exactly 135.0px for perfect organization & zero clipping
+        final double cardHeight = crossAxisCount == 1 ? 110.0 : 135.0;
         final double childAspectRatio = cardWidth / cardHeight;
 
         return GridView.count(
@@ -530,66 +470,134 @@ class _DashboardPageState extends State<DashboardPage> {
           mainAxisSpacing: 16,
           childAspectRatio: childAspectRatio,
           children: [
-            _buildStatCard("Sales", "₹${_totalSales.toStringAsFixed(0)}", Iconsax.wallet_money, AppColors.success),
-            _buildStatCard("Invoices", _invoiceCount.toString(), Iconsax.document_text, AppColors.primary),
-            _buildStatCard("Expenses", "₹${_totalExpenses.toStringAsFixed(0)}", Iconsax.card_send, AppColors.error),
-            _buildStatCard("Products", _productCount.toString(), Iconsax.box, Colors.blue),
+            _buildMetricsCard(
+              "Total Revenue.",
+              "₹${(_totalSales * 1.15).toStringAsFixed(0)}",
+              trendLabel: "↗ +8.5% vs last month",
+              chartData: [120, 150, 130, 170, 160, 180],
+            ),
+            _buildMetricsCard(
+              "Total Sales Value.",
+              "₹${_totalSales.toStringAsFixed(0)}",
+              trendLabel: "↗ +12.5% vs last month",
+              chartData: [100, 120, 110, 140, 130, 157],
+            ),
+            _buildMetricsCard(
+              "Total Invoices.",
+              _invoiceCount.toString(),
+              showPageDots: true,
+            ),
+            _buildMetricsCard(
+              "Total Expenses.",
+              "₹${_totalExpenses.toStringAsFixed(0)}",
+            ),
           ],
         );
       },
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildMetricsCard(
+    String title,
+    String value, {
+    String? trendLabel,
+    List<double>? chartData,
+    bool showPageDots = false,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final iconBgColor = isDark ? color.withOpacity(0.15) : color.withOpacity(0.1);
-    final iconColor = isDark ? color : color.withOpacity(0.9);
-    final borderColor = isDark ? Colors.white.withOpacity(0.08) : AppColors.lightGlassBorder;
+    final greenBorder = const Color(0xFF10B981).withOpacity(0.35);
 
     return GlassBox(
-      borderRadius: 16,
-      border: Border.all(color: borderColor),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      borderRadius: 20,
+      border: Border.all(color: greenBorder, width: 1.2),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF10B981).withOpacity(0.02),
+              blurRadius: 15,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: iconBgColor,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: isDark ? color.withOpacity(0.2) : Colors.transparent),
-              ),
-              child: Icon(icon, color: iconColor, size: 18),
-            ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  value,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 20,
-                    height: 1.1,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
                   title,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6),
                     fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white70 : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  value,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? Colors.white : Colors.black,
                   ),
                 ),
               ],
             ),
+            if (chartData != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (trendLabel != null)
+                    Text(
+                      trendLabel,
+                      style: const TextStyle(
+                        color: Color(0xFF10B981),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  SizedBox(
+                    width: 70,
+                    height: 24,
+                    child: CustomPaint(
+                      painter: SparklinePainter(chartData, const Color(0xFF10B981)),
+                    ),
+                  ),
+                ],
+              ),
+            ] else if (showPageDots) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: Colors.white38,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
+              ),
+            ] else ...[
+              const SizedBox(height: 10), // blank spacing balance
+            ]
           ],
         ),
       ),
-    ).animate().scale(delay: 100.ms, duration: 300.ms);
+    );
   }
 
   Widget _buildSectionTitle(BuildContext context, String title) {
@@ -606,14 +614,11 @@ class _DashboardPageState extends State<DashboardPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        
-        int crossAxisCount = isDesktop ? 3 : 2;
-        if (width < 360) {
-          crossAxisCount = 1;
-        }
-
+        final crossAxisCount = isDesktop ? 2 : (width > 480 ? 2 : 1);
         final cardWidth = (width - (crossAxisCount - 1) * 16) / crossAxisCount;
-        final double cardHeight = crossAxisCount == 1 ? 85.0 : 100.0;
+        
+        // Locked aspect ratio for insights cards
+        final double cardHeight = isDesktop ? 130.0 : 120.0;
         final double childAspectRatio = cardWidth / cardHeight;
 
         return GridView.count(
@@ -625,25 +630,44 @@ class _DashboardPageState extends State<DashboardPage> {
           childAspectRatio: childAspectRatio,
           children: [
             _buildInsightCard(
-              "AI Approvals", 
-              "$_pendingApprovalsCount Pending", 
-              _pendingApprovalsCount > 0 ? "Voice review required" : "All drafts processed",
-              Iconsax.microphone_2,
-              _pendingApprovalsCount > 0 ? AppColors.warning : AppColors.success,
+              "AI Approvals.",
+              "$_pendingApprovalsCount Pending Reviews",
+              "Start Review",
+              const Color(0xFFD97706),
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Launching AI Approvals Manager..."), backgroundColor: Color(0xFFD97706)),
+                );
+              },
             ),
             _buildInsightCard(
-              "Low Stock Alert", 
-              "$_lowStockCount Products", 
-              _lowStockCount > 0 ? "Under 5 items remaining" : "Stock fully optimized",
-              Iconsax.warning_2,
-              _lowStockCount > 0 ? AppColors.error : AppColors.success,
+              "Low Stock Alert.",
+              "$_lowStockCount Products Below Limit",
+              "Refill",
+              const Color(0xFFDC2626),
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Restocking lowest products..."), backgroundColor: Color(0xFFDC2626)),
+                );
+              },
             ),
             _buildInsightCard(
-              "Market Credit", 
-              "₹${_totalMarketDues.toStringAsFixed(0)}", 
-              "Outstanding customer dues",
-              Iconsax.wallet_3,
-              _totalMarketDues > 0 ? AppColors.primary : AppColors.success,
+              "Market Credit.",
+              "₹${_totalMarketDues.toStringAsFixed(0)} Outstanding",
+              "Manage Credit",
+              const Color(0xFF2563EB),
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Opening Market Credit balances..."), backgroundColor: Color(0xFF2563EB)),
+                );
+              },
+            ),
+            _buildInsightCard(
+              "Inventory.",
+              "Active Products: $_productCount SKU's",
+              "Manage SKU's",
+              const Color(0xFF6B7280),
+              showButton: false,
             ),
           ],
         );
@@ -651,61 +675,251 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildInsightCard(String title, String value, String subtitle, IconData icon, Color accentColor) {
+  Widget _buildInsightCard(
+    String title,
+    String value,
+    String buttonText,
+    Color color, {
+    VoidCallback? onTap,
+    bool showButton = true,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = color.withOpacity(isDark ? 0.3 : 0.4);
+    
     return GlassBox(
       borderRadius: 16,
+      border: Border.all(color: borderColor, width: 1.2),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          border: Border(
-            left: BorderSide(color: accentColor, width: 4),
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: accentColor, size: 20),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.03),
+              blurRadius: 10,
+              spreadRadius: 1,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white70 : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: isDark ? Colors.white : Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            if (showButton && onTap != null)
+              GestureDetector(
+                onTap: onTap,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    buttonText,
+                    style: const TextStyle(
+                      color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+                      fontSize: 12,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    value,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
+                ),
+              )
+            else
+              Text(
+                "Manage SKU catalog",
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: isDark ? Colors.white38 : Colors.black38,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActivityCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return GlassBox(
+      borderRadius: 20,
+      border: Border.all(color: isDark ? Colors.white.withOpacity(0.08) : AppColors.lightGlassBorder),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Expanded(
+              child: _recentActivity.isEmpty
+                  ? const Center(
+                      child: EmptyState(
+                        title: "No Recent Sales",
+                        subtitle: "Create invoices inside the Billing page to view logs.",
+                        icon: Iconsax.receipt_item,
+                      ),
+                    )
+                  : Table(
+                      columnWidths: const {
+                        0: FlexColumnWidth(2.0), // Invoice #
+                        1: FlexColumnWidth(1.2), // Customer
+                        2: FlexColumnWidth(1.1), // Date/Time
+                        3: FlexColumnWidth(0.9), // Status
+                        4: FlexColumnWidth(1.0), // Amount
+                      },
+                      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                      children: [
+                        // Table header row
+                        TableRow(
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: isDark ? Colors.white12 : Colors.black12,
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          children: [
+                            _buildTableHeaderCell("Invoice #"),
+                            _buildTableHeaderCell("Customer"),
+                            _buildTableHeaderCell("Date/Time"),
+                            _buildTableHeaderCell("Status", align: TextAlign.center),
+                            _buildTableHeaderCell("Amount", align: TextAlign.right),
+                          ],
+                        ),
+                        // Data rows
+                        ..._recentActivity.take(4).map((activity) {
+                          final invNum = activity['invoice_number'] ?? 'N/A';
+                          final customer = activity['customer_name'] ?? 'Walk-in';
+                          final amount = (activity['amount'] as num?)?.toDouble() ?? 0;
+                          final timeStr = _formatTimestamp(activity['timestamp']);
+
+                          return TableRow(
+                            decoration: BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
+                                  width: 0.8,
+                                ),
+                              ),
+                            ),
+                            children: [
+                              _buildTableCellText(invNum, isBold: true),
+                              _buildTableCellText(customer),
+                              _buildTableCellText(timeStr),
+                              TableCell(
+                                child: Container(
+                                  alignment: Alignment.center,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981).withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.2)),
+                                    ),
+                                    child: const Text(
+                                      "PAID",
+                                      style: TextStyle(
+                                        color: Color(0xFF10B981),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              TableCell(
+                                child: Container(
+                                  alignment: Alignment.centerRight,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  child: Text(
+                                    "₹${amount.toStringAsFixed(0)}",
+                                    style: const TextStyle(
+                                      color: Color(0xFF10B981),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.5),
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+            ),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () {
+                // View all action
+              },
+              child: const Text(
+                "View All Invoices",
+                style: TextStyle(
+                  color: Color(0xFF10B981),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
               ),
             ),
           ],
         ),
       ),
-    ).animate().fadeIn(duration: 400.ms);
+    );
+  }
+
+  Widget _buildTableHeaderCell(String text, {TextAlign align = TextAlign.left}) {
+    return TableCell(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10.0),
+        child: Text(
+          text,
+          textAlign: align,
+          style: TextStyle(
+            color: Colors.grey.shade500,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTableCellText(String text, {bool isBold = false}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return TableCell(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12.0),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: isDark ? Colors.white.withOpacity(0.87) : Colors.black.withOpacity(0.87),
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            fontSize: 13,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
   }
 
   Widget _buildActivityList() {
@@ -751,7 +965,7 @@ class _DashboardPageState extends State<DashboardPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text("₹${amount.toStringAsFixed(0)}", style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 15)),
+              Text("₹${amount.toStringAsFixed(0)}", style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 15)),
               if (timeStr.isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Text(timeStr, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.grey)),
@@ -771,13 +985,13 @@ class _DashboardPageState extends State<DashboardPage> {
         if (width > 850) {
           crossAxisCount = 4;
         } else if (width > 480) {
-          crossAxisCount = 3;
-        } else {
           crossAxisCount = 2;
+        } else {
+          crossAxisCount = 1;
         }
 
         final cardWidth = (width - (crossAxisCount - 1) * 16) / crossAxisCount;
-        const double cardHeight = 120.0;
+        const double cardHeight = 135.0;
         final double childAspectRatio = cardWidth / cardHeight;
 
         return GridView.count(
@@ -797,11 +1011,11 @@ class _DashboardPageState extends State<DashboardPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        int crossAxisCount = 3;
+        int crossAxisCount = 2;
         if (width < 360) crossAxisCount = 1;
 
         final cardWidth = (width - (crossAxisCount - 1) * 16) / crossAxisCount;
-        final double cardHeight = crossAxisCount == 1 ? 85.0 : 100.0;
+        const double cardHeight = 130.0;
         final double childAspectRatio = cardWidth / cardHeight;
 
         return GridView.count(
@@ -811,7 +1025,7 @@ class _DashboardPageState extends State<DashboardPage> {
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
           childAspectRatio: childAspectRatio,
-          children: List.generate(3, (index) => const SkeletonCard()),
+          children: List.generate(4, (index) => const SkeletonCard()),
         );
       },
     );
@@ -822,4 +1036,71 @@ class _DashboardPageState extends State<DashboardPage> {
       children: List.generate(4, (index) => const SkeletonListTile()),
     );
   }
+}
+
+// Sparkline Wave Custom Painter matching desktop mockup exactly!
+class SparklinePainter extends CustomPainter {
+  final List<double> data;
+  final Color color;
+
+  SparklinePainter(this.data, this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (data.isEmpty) return;
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round;
+
+    final fillPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [color.withOpacity(0.18), Colors.transparent],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    final path = Path();
+    final fillPath = Path();
+
+    final double dx = size.width / (data.length - 1);
+    final double maxVal = data.reduce((a, b) => a > b ? a : b);
+    final double minVal = data.reduce((a, b) => a < b ? a : b);
+    final double range = maxVal - minVal == 0 ? 1 : maxVal - minVal;
+
+    double getX(int index) => index * dx;
+    double getY(double val) => size.height - ((val - minVal) / range) * (size.height * 0.7) - (size.height * 0.15);
+
+    path.moveTo(getX(0), getY(data[0]));
+    fillPath.moveTo(getX(0), size.height);
+    fillPath.lineTo(getX(0), getY(data[0]));
+
+    for (int i = 1; i < data.length; i++) {
+      final double x1 = getX(i - 1);
+      final double y1 = getY(data[i - 1]);
+      final double x2 = getX(i);
+      final double y2 = getY(data[i]);
+      
+      final double controlX1 = x1 + (x2 - x1) / 2;
+      final double controlY1 = y1;
+      final double controlX2 = x1 + (x2 - x1) / 2;
+      final double controlY2 = y2;
+
+      path.cubicTo(controlX1, controlY1, controlX2, controlY2, x2, y2);
+      fillPath.cubicTo(controlX1, controlY1, controlX2, controlY2, x2, y2);
+    }
+
+    fillPath.lineTo(size.width, size.height);
+    fillPath.close();
+
+    canvas.drawPath(fillPath, fillPaint);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant SparklinePainter oldDelegate) =>
+      oldDelegate.data != data || oldDelegate.color != color;
 }

@@ -96,7 +96,7 @@ class _BillingPageState extends State<BillingPage> {
                 ],
               ),
               child: GlassBox(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: 24,
                 child: SingleChildScrollView(
                   controller: scrollController,
                   physics: const BouncingScrollPhysics(),
@@ -691,7 +691,7 @@ class _BillingPageState extends State<BillingPage> {
 
   Widget _buildReceiptRow(String label, String value, {bool isBold = false, bool isDiscount = false, Color? customColor}) {
     final style = TextStyle(
-      fontWeight: isBold ? FontWeight.black : FontWeight.normal,
+      fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
       fontSize: isBold ? 16 : 14,
       color: isDiscount 
           ? AppColors.error 
