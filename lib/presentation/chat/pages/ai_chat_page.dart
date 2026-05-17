@@ -157,10 +157,17 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(Iconsax.arrow_left_2, color: Theme.of(context).iconTheme.color),
-          onPressed: () => Navigator.pop(context),
-        ),
+        leading: Navigator.canPop(context)
+            ? IconButton(
+                icon: Icon(Iconsax.arrow_left_2, color: Theme.of(context).iconTheme.color),
+                onPressed: () => Navigator.pop(context),
+              )
+            : Builder(
+                builder: (context) => IconButton(
+                  icon: Icon(Iconsax.menu, color: Theme.of(context).iconTheme.color),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              ),
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

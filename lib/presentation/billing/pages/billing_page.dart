@@ -199,16 +199,32 @@ class _BillingPageState extends State<BillingPage> {
   }
 
   Widget _buildAppBar() {
+    final isDesktop = ResponsiveLayout.isDesktop(context) || ResponsiveLayout.isTablet(context);
+
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            "Sales History",
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w900,
-            ),
+          Row(
+            children: [
+              if (!isDesktop) ...[
+                Builder(
+                  builder: (context) => IconButton(
+                    icon: const Icon(Iconsax.menu, size: 24),
+                    onPressed: () => Scaffold.of(context).openDrawer(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                "Sales History",
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 22,
+                ),
+              ),
+            ],
           ),
           IconButton(
             onPressed: _fetchSales,

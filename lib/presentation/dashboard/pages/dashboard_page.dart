@@ -316,7 +316,14 @@ class _DashboardPageState extends State<DashboardPage> {
       floating: true,
       backgroundColor: Colors.transparent,
       elevation: 0,
-      automaticallyImplyLeading: false,
+      leading: Builder(
+        builder: (context) => IconButton(
+          icon: const Icon(Iconsax.menu),
+          onPressed: () {
+            Scaffold.of(context).openDrawer();
+          },
+        ),
+      ),
       title: Row(
         children: [
           Container(
