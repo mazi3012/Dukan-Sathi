@@ -108,7 +108,9 @@ class _InventoryPageState extends State<InventoryPage> {
         children: [
           Text(
             "Inventory",
-            style: Theme.of(context).textTheme.displaySmall,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+            ),
           ),
           IconButton(
             onPressed: _fetchProducts,
@@ -138,6 +140,8 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   Widget _buildValuationCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: GlassBox(
@@ -149,13 +153,19 @@ class _InventoryPageState extends State<InventoryPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Total Stock Value", style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    "Total Stock Value", 
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+                    ),
+                  ),
                   const SizedBox(height: 5),
                   Text(
                     "₹${_totalValue.toStringAsFixed(0)}",
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       color: AppColors.success,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],
@@ -163,10 +173,10 @@ class _InventoryPageState extends State<InventoryPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark ? AppColors.primary.withOpacity(0.2) : AppColors.lightPrimarySoft,
+                  color: isDark ? AppColors.primary.withOpacity(0.15) : AppColors.lightPrimarySoft,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Iconsax.chart_2, color: Theme.of(context).brightness == Brightness.dark ? AppColors.primary : AppColors.lightPrimary),
+                child: Icon(Iconsax.chart_2, color: isDark ? AppColors.primary : AppColors.lightPrimary),
               ),
             ],
           ),
@@ -255,17 +265,27 @@ class _InventoryPageState extends State<InventoryPage> {
     final isTablet = ResponsiveLayout.isTablet(context);
 
     if (isDesktop || isTablet) {
-      return GridView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: isDesktop ? 3 : 2,
-          crossAxisSpacing: 15,
-          mainAxisSpacing: 15,
-          childAspectRatio: 2.5,
-        ),
-        itemCount: filtered.length,
-        itemBuilder: (context, index) {
-          return _buildProductCard(filtered[index], index);
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final crossAxisCount = isDesktop ? 3 : 2;
+          final cardWidth = (width - (crossAxisCount - 1) * 15) / crossAxisCount;
+          const double cardHeight = 100.0;
+          final double childAspectRatio = cardWidth / cardHeight;
+
+          return GridView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 15,
+              mainAxisSpacing: 15,
+              childAspectRatio: childAspectRatio,
+            ),
+            itemCount: filtered.length,
+            itemBuilder: (context, index) {
+              return _buildProductCard(filtered[index], index);
+            },
+          );
         },
       );
     }

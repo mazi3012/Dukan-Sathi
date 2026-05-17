@@ -62,6 +62,9 @@ class _BillingPageState extends State<BillingPage> {
           _sales = List<Map<String, dynamic>>.from(res);
           _todayRevenue = today;
           _isLoading = false;
+          if (_sales.isNotEmpty && _selectedSaleIndex == null) {
+            _selectedSaleIndex = 0;
+          }
         });
       }
     } catch (e) {
@@ -70,17 +73,53 @@ class _BillingPageState extends State<BillingPage> {
     }
   }
 
+  void _showMobileInvoiceDetail(BuildContext context, Map<String, dynamic> sale) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.85,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: GlassBox(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  physics: const BouncingScrollPhysics(),
+                  child: _buildInvoiceDetail(sale, isMobileBottomSheet: true),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDesktop = ResponsiveLayout.isDesktop(context) || ResponsiveLayout.isTablet(context);
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           SafeArea(
-            child: ResponsiveLayout(
-              mobile: _buildMobileLayout(),
-              desktop: _buildDesktopLayout(),
-            ),
+            child: isDesktop ? _buildDesktopLayout() : _buildMobileLayout(),
           ),
         ],
       ),
@@ -90,7 +129,7 @@ class _BillingPageState extends State<BillingPage> {
             const SnackBar(content: Text('Opening AI Invoice Generator...')),
           );
         },
-        backgroundColor: Theme.of(context).primaryColor,
+        backgroundColor: AppColors.primary,
         icon: const Icon(Iconsax.add, color: Colors.white),
         label: const Text("New Bill", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ).animate().scale(delay: 500.ms),
@@ -109,7 +148,7 @@ class _BillingPageState extends State<BillingPage> {
               ? _buildListSkeleton()
               : _sales.isEmpty
                   ? _buildEmptyState()
-                  : _buildSalesList(),
+                  : _buildSalesList(isDesktop: false),
         ),
         const SizedBox(height: 80), // Padding for bottom bar
       ],
@@ -132,7 +171,7 @@ class _BillingPageState extends State<BillingPage> {
                     ? _buildListSkeleton()
                     : _sales.isEmpty
                         ? _buildEmptyState()
-                        : _buildSalesList(),
+                        : _buildSalesList(isDesktop: true),
               ),
             ],
           ),
@@ -140,10 +179,13 @@ class _BillingPageState extends State<BillingPage> {
         Expanded(
           flex: 60,
           child: Padding(
-            padding: const EdgeInsets.only(top: 20.0, right: 20.0, bottom: 20.0),
+            padding: const EdgeInsets.only(top: 20.0, right: 24.0, bottom: 20.0),
             child: GlassBox(
               child: _selectedSaleIndex != null && _selectedSaleIndex! < _sales.length
-                  ? _buildInvoiceDetail(_sales[_selectedSaleIndex!])
+                  ? SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: _buildInvoiceDetail(_sales[_selectedSaleIndex!]),
+                    )
                   : const EmptyState(
                       title: "Select an Invoice",
                       subtitle: "Choose an invoice from the list to view its details.",
@@ -164,7 +206,9 @@ class _BillingPageState extends State<BillingPage> {
         children: [
           Text(
             "Sales History",
-            style: Theme.of(context).textTheme.displaySmall,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+            ),
           ),
           IconButton(
             onPressed: _fetchSales,
@@ -196,6 +240,8 @@ class _BillingPageState extends State<BillingPage> {
   }
 
   Widget _buildSalesSummary() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: GlassBox(
@@ -207,13 +253,19 @@ class _BillingPageState extends State<BillingPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Today's Collection", style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    "Today's Collection", 
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+                    ),
+                  ),
                   const SizedBox(height: 5),
                   Text(
                     "₹${_todayRevenue.toStringAsFixed(0)}",
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: Theme.of(context).primaryColor,
-                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppColors.primary : AppColors.lightPrimary,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],
@@ -221,10 +273,10 @@ class _BillingPageState extends State<BillingPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark ? AppColors.primary.withOpacity(0.2) : AppColors.lightPrimarySoft,
+                  color: isDark ? AppColors.primary.withOpacity(0.15) : AppColors.lightPrimarySoft,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Iconsax.wallet_3, color: Theme.of(context).brightness == Brightness.dark ? AppColors.primary : AppColors.lightPrimary),
+                child: Icon(Iconsax.wallet_3, color: isDark ? AppColors.primary : AppColors.lightPrimary),
               ),
             ],
           ),
@@ -233,7 +285,7 @@ class _BillingPageState extends State<BillingPage> {
     );
   }
 
-  Widget _buildSalesList() {
+  Widget _buildSalesList({required bool isDesktop}) {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemCount: _sales.length,
@@ -244,15 +296,23 @@ class _BillingPageState extends State<BillingPage> {
         final amount = (sale['amount'] as num?)?.toDouble() ?? 0;
         final timestamp = DateTime.parse(sale['timestamp']);
         final paymentStatus = sale['payment_status'] ?? 'PAID';
+        final isSelected = isDesktop && _selectedSaleIndex == index;
 
         Color statusColor;
         if (paymentStatus == 'PAID') {
           statusColor = AppColors.success;
-        } else if (paymentStatus == 'PARTIAL') statusColor = Colors.orange;
-        else statusColor = AppColors.error;
+        } else if (paymentStatus == 'PARTIAL') {
+          statusColor = Colors.orange;
+        } else {
+          statusColor = AppColors.error;
+        }
+
+        final cardBorder = isSelected 
+            ? Border.all(color: AppColors.primary, width: 1.5)
+            : Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.08) : AppColors.lightGlassBorder);
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 15),
+          margin: const EdgeInsets.only(bottom: 12),
           child: Dismissible(
             key: Key(sale['id'].toString()),
             direction: DismissDirection.endToStart,
@@ -260,7 +320,7 @@ class _BillingPageState extends State<BillingPage> {
               padding: const EdgeInsets.only(right: 20),
               alignment: Alignment.centerRight,
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.3),
+                color: AppColors.success.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Row(
@@ -279,32 +339,41 @@ class _BillingPageState extends State<BillingPage> {
               return false;
             },
             child: GlassBox(
+              border: cardBorder,
               child: ListTile(
                 onTap: () {
                   setState(() {
                     _selectedSaleIndex = index;
                   });
+                  if (!isDesktop) {
+                    _showMobileInvoiceDetail(context, sale);
+                  }
                 },
-                contentPadding: const EdgeInsets.all(15),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 leading: Container(
-                  width: 50,
-                  height: 50,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(Iconsax.receipt, color: statusColor),
+                  child: Icon(Iconsax.receipt, color: statusColor, size: 20),
                 ),
                 title: Text(
                   "Invoice #$invNum",
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const SizedBox(height: 4),
                     Text(
                       customer,
                       style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -321,17 +390,20 @@ class _BillingPageState extends State<BillingPage> {
                   children: [
                     Text(
                       "₹${amount.toStringAsFixed(0)}",
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
+                    const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(4),
+                        color: statusColor.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         paymentStatus.toUpperCase(),
-                        style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.w900),
                       ),
                     ),
                   ],
@@ -339,63 +411,274 @@ class _BillingPageState extends State<BillingPage> {
               ),
             ),
           ),
-        ).animate().slideY(begin: 0.1, delay: (index * 50).ms).fadeIn();
+        ).animate().slideY(begin: 0.1, delay: (index * 40).ms).fadeIn();
       },
     );
   }
 
-  Widget _buildInvoiceDetail(Map<String, dynamic> sale) {
+  Widget _buildInvoiceDetail(Map<String, dynamic> sale, {bool isMobileBottomSheet = false}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final invNum = sale['invoice_number'] ?? 'N/A';
     final customer = sale['customer_name'] ?? 'Walk-in Customer';
     final amount = (sale['amount'] as num?)?.toDouble() ?? 0;
-    
+    final paidAmount = (sale['amount_paid'] as num?)?.toDouble() ?? 0;
+    final dueAmount = (sale['due_amount'] as num?)?.toDouble() ?? 0;
+    final discountAmount = (sale['discount_amount'] as num?)?.toDouble() ?? 0;
+    final subtotal = (sale['subtotal_before_discount'] as num?)?.toDouble() ?? amount;
+    final status = sale['payment_status'] ?? 'PAID';
+    final timestamp = DateTime.parse(sale['timestamp']);
+    final paymentMethod = sale['payment_method'] ?? 'cash';
+    final customerState = sale['customer_state'] ?? '';
+
+    Color statusColor = AppColors.success;
+    if (status == 'PARTIAL') {
+      statusColor = Colors.orange;
+    } else if (status == 'UNPAID') {
+      statusColor = AppColors.error;
+    }
+
     return Padding(
-      padding: const EdgeInsets.all(30),
+      padding: EdgeInsets.all(isMobileBottomSheet ? 20 : 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Receipt Header bar
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("Invoice Details", style: Theme.of(context).textTheme.headlineSmall),
-              const Icon(Iconsax.receipt_2, size: 30, color: AppColors.primary),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      "DUKAN SATHI TICKET",
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    "Invoice #$invNum",
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: statusColor.withOpacity(0.2)),
+                ),
+                child: Text(
+                  status.toUpperCase(),
+                  style: TextStyle(color: statusColor, fontWeight: FontWeight.w900, fontSize: 12),
+                ),
+              ),
             ],
           ),
-          const Divider(height: 40),
-          Text("Invoice #$invNum", style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          Text("Customer: $customer", style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 30),
+          const SizedBox(height: 8),
+          Text(
+            DateFormat('MMMM dd, yyyy  •  hh:mm a').format(timestamp),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 20),
+          const Divider(height: 1, thickness: 1),
+          const SizedBox(height: 20),
+          
+          // Customer & Shop details
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Total Amount:", style: TextStyle(fontSize: 18)),
-              Text("₹${amount.toStringAsFixed(0)}", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "BILLED TO", 
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      customer,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    if (customerState.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text("State Code: $customerState", style: Theme.of(context).textTheme.bodySmall),
+                    ],
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "PAYMENT METHOD", 
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(
+                          paymentMethod == 'cash' 
+                              ? Iconsax.wallet_money 
+                              : (paymentMethod == 'upi' ? Iconsax.mobile : Iconsax.card),
+                          size: 18, 
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          paymentMethod.toUpperCase(),
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-          const Spacer(),
+          const SizedBox(height: 24),
+          
+          // Dotted digital receipt container
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withOpacity(0.02) : Colors.black.withOpacity(0.02),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
+              ),
+            ),
+            child: Column(
+              children: [
+                _buildReceiptRow("Subtotal", "₹${subtotal.toStringAsFixed(2)}"),
+                if (discountAmount > 0) ...[
+                  const SizedBox(height: 10),
+                  _buildReceiptRow("Discounts", "-₹${discountAmount.toStringAsFixed(2)}", isDiscount: true),
+                ],
+                const SizedBox(height: 12),
+                const Divider(height: 1, thickness: 1),
+                const SizedBox(height: 12),
+                _buildReceiptRow(
+                  "Total Amount", 
+                  "₹${amount.toStringAsFixed(2)}", 
+                  isBold: true,
+                  customColor: isDark ? AppColors.primary : AppColors.lightPrimary,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          
+          // Dues structure cards
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.success.withOpacity(0.15)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Amount Paid", style: TextStyle(color: AppColors.success, fontSize: 11, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text(
+                        "₹${paidAmount.toStringAsFixed(0)}",
+                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: AppColors.success),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: dueAmount > 0 ? AppColors.error.withOpacity(0.08) : Colors.grey.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: dueAmount > 0 ? AppColors.error.withOpacity(0.15) : Colors.grey.withOpacity(0.15)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Dues Remaining", 
+                        style: TextStyle(
+                          color: dueAmount > 0 ? AppColors.error : Colors.grey, 
+                          fontSize: 11, 
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "₹${dueAmount.toStringAsFixed(0)}",
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900, 
+                          fontSize: 18, 
+                          color: dueAmount > 0 ? AppColors.error : Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 36),
+          
+          // Receipt action tools
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Downloading Receipt PDF...')),
+                    );
+                  },
                   icon: const Icon(Iconsax.document_download),
                   label: const Text("Download PDF"),
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    backgroundColor: Theme.of(context).primaryColor,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                 ),
               ),
               const SizedBox(width: 15),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Sharing Receipt #$invNum...')),
+                    );
+                  },
                   icon: const Icon(Iconsax.share),
                   label: const Text("Share"),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    side: BorderSide(color: isDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.15)),
                   ),
                 ),
               ),
@@ -403,6 +686,24 @@ class _BillingPageState extends State<BillingPage> {
           )
         ],
       ),
+    );
+  }
+
+  Widget _buildReceiptRow(String label, String value, {bool isBold = false, bool isDiscount = false, Color? customColor}) {
+    final style = TextStyle(
+      fontWeight: isBold ? FontWeight.black : FontWeight.normal,
+      fontSize: isBold ? 16 : 14,
+      color: isDiscount 
+          ? AppColors.error 
+          : (customColor ?? (isBold ? Theme.of(context).textTheme.bodyLarge?.color : Theme.of(context).textTheme.bodySmall?.color)),
+    );
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: style),
+        Text(value, style: style),
+      ],
     );
   }
 }
