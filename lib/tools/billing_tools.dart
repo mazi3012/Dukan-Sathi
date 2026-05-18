@@ -86,6 +86,9 @@ bool _isMissingColumnError(Object error) {
   return text.contains('could not find the') && text.contains('column');
 }
 
+/// Computes invoice-level discount amounts WITHOUT mutating item unit prices.
+/// Per Section 15(3)(a) CGST Act, the discount is applied to the aggregate
+/// subtotal to establish taxable value. Items are returned unchanged.
 Map<String, dynamic> _applyDiscountToItems({
   required List<CartItem> items,
   required String? discountType,
@@ -100,7 +103,7 @@ Map<String, dynamic> _applyDiscountToItems({
       'subtotalBeforeDiscount': 0.0,
       'discountAmount': 0.0,
       'subtotalAfterDiscount': 0.0,
-      'items': items,
+      'items': items, // original items unchanged
     };
   }
 
@@ -124,18 +127,12 @@ Map<String, dynamic> _applyDiscountToItems({
   }
 
   final subtotalAfterDiscount = _roundToTwoDecimals(subtotal - discountAmount);
-  final ratio = subtotal == 0 ? 1.0 : subtotalAfterDiscount / subtotal;
-
-  final adjustedItems = items.map((item) {
-    final adjustedUnitPrice = _roundToTwoDecimals(item.unitPrice * ratio);
-    return item.copyWith(unitPrice: adjustedUnitPrice);
-  }).toList();
 
   return {
     'subtotalBeforeDiscount': subtotal,
     'discountAmount': _roundToTwoDecimals(discountAmount),
     'subtotalAfterDiscount': subtotalAfterDiscount,
-    'items': adjustedItems,
+    'items': items, // original items unchanged — no unit price mutation
   };
 }
 
@@ -363,16 +360,17 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
       discountType: discountType,
       discountValue: discountValue,
     );
-    final adjustedItems = billingAdjustments['items'] as List<CartItem>;
+    // Items are returned unchanged (original unit prices preserved)
     final subtotalBeforeDiscount = billingAdjustments['subtotalBeforeDiscount'] as double;
     final discountAmount = billingAdjustments['discountAmount'] as double;
     final subtotalAfterDiscount = billingAdjustments['subtotalAfterDiscount'] as double;
 
-    // Calculate tax using GST calculator
+    // Calculate tax using GST calculator with invoice-level discount
     final taxBreakdown = GSTCalculator.calculateTax(
-      items: adjustedItems,
+      items: items,
       shopConfig: shopConfig,
       customerState: customerState,
+      invoiceDiscount: discountAmount,
     );
 
     final finalTotal = taxBreakdown.totalAmount;
@@ -415,7 +413,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
       'created_at': DateTime.now().toIso8601String(),
       'original_items': originalItems,
       'original_subtotal': subtotalBeforeDiscount,
-      'proposed_items': adjustedItems.map((item) => item.toJson()).toList(),
+      'proposed_items': items.map((item) => item.toJson()).toList(),
       'proposed_tax_breakdown': {
         'subtotal': taxBreakdown.subtotal,
         'cgst_amount': taxBreakdown.cgstAmount,
@@ -455,7 +453,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
       'shop_id': effectiveShopId,
       'customer_id': resolvedCustomerId,
       'created_at': DateTime.now().toIso8601String(),
-        'proposed_items': adjustedItems.map((item) => item.toJson()).toList(),
+        'proposed_items': items.map((item) => item.toJson()).toList(),
         'proposed_tax_breakdown': {
           'subtotal': taxBreakdown.subtotal,
           'cgst_amount': taxBreakdown.cgstAmount,
@@ -482,7 +480,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
       'customerId': resolvedCustomerId,
       'customerName': resolvedCustomerName,
       'customerState': customerState,
-      'items': adjustedItems.map((item) => item.toJson()).toList(),
+      'items': items.map((item) => item.toJson()).toList(),
       'discount': {
         'discountType': discountType,
         'discountValue': discountValue,

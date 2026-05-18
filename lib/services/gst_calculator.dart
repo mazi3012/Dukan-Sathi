@@ -12,10 +12,15 @@ class GSTCalculator {
   /// Calculate complete tax breakdown for items based on shop config.
   /// Each CartItem now carries its own `gstRate` — calculations use that
   /// instead of a flat 18%.
+  /// [invoiceDiscount] — flat discount applied at invoice level (post-subtotal,
+  /// pre-tax) per Section 15(3)(a) CGST Act. When supplied the taxable value
+  /// becomes (subtotal − invoiceDiscount); the discount is distributed
+  /// proportionally across GST rate groups for accurate rate-wise breakdown.
   static TaxBreakdown calculateTax({
     required List<CartItem> items,
     required ShopConfig shopConfig,
     String? customerState,
+    double invoiceDiscount = 0.0,
   }) {
     if (items.isEmpty) {
       throw ArgumentError('Items list cannot be empty');
@@ -31,18 +36,21 @@ class GSTCalculator {
           shopState: shopConfig.state,
           customerState: customerState,
           isInterState: isInterState,
+          invoiceDiscount: invoiceDiscount,
         );
 
       case GSTMode.unregistered:
         return _calculateUnregisteredTax(
           items: items,
           shopState: shopConfig.state,
+          invoiceDiscount: invoiceDiscount,
         );
 
       case GSTMode.composite:
         return _calculateCompositeTax(
           items: items,
           shopState: shopConfig.state,
+          invoiceDiscount: invoiceDiscount,
         );
     }
   }
@@ -54,6 +62,7 @@ class GSTCalculator {
     required String shopState,
     String? customerState,
     required bool isInterState,
+    double invoiceDiscount = 0.0,
   }) {
     double subtotal = 0;
     double totalCGST = 0;
@@ -61,7 +70,7 @@ class GSTCalculator {
     double totalIGST = 0;
     final breakdown = <Map<String, dynamic>>[];
 
-    // Accumulators for rate-wise summary
+    // Accumulators for rate-wise summary (before discount)
     final rateAccum = <double, Map<String, double>>{};
 
     for (final item in items) {
@@ -69,7 +78,6 @@ class GSTCalculator {
       subtotal += lineTotal;
 
       final rate = item.gstRate; // per-product GST rate
-      final halfRate = rate / 2;
 
       // Ensure rate accumulator entry exists
       rateAccum.putIfAbsent(rate, () => {
@@ -79,13 +87,52 @@ class GSTCalculator {
         'igst': 0.0,
       });
       rateAccum[rate]!['taxableAmount'] = rateAccum[rate]!['taxableAmount']! + lineTotal;
+    }
+
+    // Round the pre-discount subtotal
+    subtotal = _roundToTwoDecimals(subtotal);
+
+    // Clamp the invoice discount
+    final effectiveDiscount = invoiceDiscount.clamp(0.0, subtotal);
+    final taxableValue = _roundToTwoDecimals(subtotal - effectiveDiscount);
+    // Ratio for proportionally distributing the discount across rate groups
+    final discountRatio = subtotal > 0 ? taxableValue / subtotal : 1.0;
+
+    // Now compute tax per rate group on discounted taxable amounts
+    final sortedRates = rateAccum.keys.toList()..sort();
+    for (final rate in sortedRates) {
+      final acc = rateAccum[rate]!;
+      // Apply proportional discount to this rate group's taxable amount
+      final originalTaxable = acc['taxableAmount']!;
+      final discountedTaxable = _roundToTwoDecimals(originalTaxable * discountRatio);
+      acc['taxableAmount'] = discountedTaxable;
+
+      final halfRate = rate / 2;
 
       if (isInterState) {
-        // Inter-state: IGST only
-        final igst = _roundToTwoDecimals((lineTotal * rate) / 100);
+        final igst = _roundToTwoDecimals((discountedTaxable * rate) / 100);
         totalIGST += igst;
-        rateAccum[rate]!['igst'] = rateAccum[rate]!['igst']! + igst;
+        acc['igst'] = igst;
+      } else {
+        final cgst = _roundToTwoDecimals((discountedTaxable * halfRate) / 100);
+        final sgst = _roundToTwoDecimals((discountedTaxable * halfRate) / 100);
+        totalCGST += cgst;
+        totalSGST += sgst;
+        acc['cgst'] = cgst;
+        acc['sgst'] = sgst;
+      }
+    }
 
+    // Build per-item breakdown (using original item prices, taxes proportional)
+    for (final item in items) {
+      final lineTotal = item.quantity * item.unitPrice;
+      final rate = item.gstRate;
+      final halfRate = rate / 2;
+      // Discount-adjusted line total for tax computation
+      final adjustedLineTotal = _roundToTwoDecimals(lineTotal * discountRatio);
+
+      if (isInterState) {
+        final igst = _roundToTwoDecimals((adjustedLineTotal * rate) / 100);
         breakdown.add({
           'productId': item.productId,
           'quantity': item.quantity,
@@ -95,17 +142,11 @@ class GSTCalculator {
           'cgst': 0,
           'sgst': 0,
           'igst': igst,
-          'totalWithTax': lineTotal + igst,
+          'totalWithTax': adjustedLineTotal + igst,
         });
       } else {
-        // Intra-state: CGST + SGST
-        final cgst = _roundToTwoDecimals((lineTotal * halfRate) / 100);
-        final sgst = _roundToTwoDecimals((lineTotal * halfRate) / 100);
-        totalCGST += cgst;
-        totalSGST += sgst;
-        rateAccum[rate]!['cgst'] = rateAccum[rate]!['cgst']! + cgst;
-        rateAccum[rate]!['sgst'] = rateAccum[rate]!['sgst']! + sgst;
-
+        final cgst = _roundToTwoDecimals((adjustedLineTotal * halfRate) / 100);
+        final sgst = _roundToTwoDecimals((adjustedLineTotal * halfRate) / 100);
         breakdown.add({
           'productId': item.productId,
           'quantity': item.quantity,
@@ -115,15 +156,14 @@ class GSTCalculator {
           'cgst': cgst,
           'sgst': sgst,
           'igst': 0,
-          'totalWithTax': lineTotal + cgst + sgst,
+          'totalWithTax': adjustedLineTotal + cgst + sgst,
         });
       }
     }
 
-    final totalAmount = subtotal + totalCGST + totalSGST + totalIGST;
+    final totalAmount = taxableValue + totalCGST + totalSGST + totalIGST;
 
-    // Build rate-wise summary (sorted by rate ascending)
-    final sortedRates = rateAccum.keys.toList()..sort();
+    // Build rate-wise summary
     final rateWiseSummary = sortedRates.map((rate) {
       final acc = rateAccum[rate]!;
       final taxableAmt = _roundToTwoDecimals(acc['taxableAmount']!);
@@ -153,7 +193,7 @@ class GSTCalculator {
               }).join(' | ');
 
     return TaxBreakdown(
-      subtotal: _roundToTwoDecimals(subtotal),
+      subtotal: taxableValue,
       cgstAmount: _roundToTwoDecimals(totalCGST),
       sgstAmount: _roundToTwoDecimals(totalSGST),
       igstAmount: _roundToTwoDecimals(totalIGST),
@@ -170,6 +210,7 @@ class GSTCalculator {
   static TaxBreakdown _calculateUnregisteredTax({
     required List<CartItem> items,
     required String shopState,
+    double invoiceDiscount = 0.0,
   }) {
     double subtotal = 0;
 
@@ -177,15 +218,18 @@ class GSTCalculator {
       subtotal += item.quantity * item.unitPrice;
     }
 
+    subtotal = _roundToTwoDecimals(subtotal);
+    final taxableValue = _roundToTwoDecimals(subtotal - invoiceDiscount.clamp(0.0, subtotal));
+
     return TaxBreakdown(
-      subtotal: _roundToTwoDecimals(subtotal),
+      subtotal: taxableValue,
       cgstAmount: 0,
       sgstAmount: 0,
       igstAmount: 0,
       gstMode: 'UNREGISTERED',
       applicableState: shopState,
       taxSlab: 'No GST (Unregistered)',
-      totalAmount: _roundToTwoDecimals(subtotal),
+      totalAmount: taxableValue,
       breakdown: [],
       rateWiseSummary: [],
     );
@@ -195,6 +239,7 @@ class GSTCalculator {
   static TaxBreakdown _calculateCompositeTax({
     required List<CartItem> items,
     required String shopState,
+    double invoiceDiscount = 0.0,
   }) {
     double subtotal = 0;
 
@@ -202,19 +247,22 @@ class GSTCalculator {
       subtotal += item.quantity * item.unitPrice;
     }
 
+    subtotal = _roundToTwoDecimals(subtotal);
+    final taxableValue = _roundToTwoDecimals(subtotal - invoiceDiscount.clamp(0.0, subtotal));
+
     // Composite GST: 3% standard for retail
     const compositeRate = 3.0;
-    final compositeTax = (subtotal * compositeRate) / 100;
+    final compositeTax = (taxableValue * compositeRate) / 100;
 
     return TaxBreakdown(
-      subtotal: _roundToTwoDecimals(subtotal),
+      subtotal: taxableValue,
       cgstAmount: 0,
       sgstAmount: 0,
       igstAmount: 0,
       gstMode: 'COMPOSITE',
       applicableState: shopState,
       taxSlab: 'Composite GST 3%',
-      totalAmount: _roundToTwoDecimals(subtotal + compositeTax),
+      totalAmount: _roundToTwoDecimals(taxableValue + compositeTax),
       breakdown: [],
       rateWiseSummary: [],
     );

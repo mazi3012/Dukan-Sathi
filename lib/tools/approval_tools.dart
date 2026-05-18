@@ -27,6 +27,9 @@ String _normalizePaymentStatus(dynamic value, double amountPaid, double totalAmo
   throw StateError('Invalid payment status in draft approval.');
 }
 
+/// Computes invoice-level discount amounts WITHOUT mutating item unit prices.
+/// Per Section 15(3)(a) CGST Act, the discount is applied to the aggregate
+/// subtotal to establish taxable value. Items are returned unchanged.
 Map<String, dynamic> _applyDiscountToItems({
   required List<CartItem> items,
   required String? discountType,
@@ -41,7 +44,7 @@ Map<String, dynamic> _applyDiscountToItems({
       'subtotalBeforeDiscount': 0.0,
       'discountAmount': 0.0,
       'subtotalAfterDiscount': 0.0,
-      'items': items,
+      'items': items, // original items unchanged
     };
   }
 
@@ -65,18 +68,12 @@ Map<String, dynamic> _applyDiscountToItems({
   }
 
   final subtotalAfterDiscount = _roundToTwoDecimals(subtotal - discountAmount);
-  final ratio = subtotal == 0 ? 1.0 : subtotalAfterDiscount / subtotal;
-
-  final adjustedItems = items.map((item) {
-    final adjustedUnitPrice = _roundToTwoDecimals(item.unitPrice * ratio);
-    return item.copyWith(unitPrice: adjustedUnitPrice);
-  }).toList();
 
   return {
     'subtotalBeforeDiscount': subtotal,
     'discountAmount': _roundToTwoDecimals(discountAmount),
     'subtotalAfterDiscount': subtotalAfterDiscount,
-    'items': adjustedItems,
+    'items': items, // original items unchanged — no unit price mutation
   };
 }
 
@@ -313,7 +310,7 @@ Future<Map<String, dynamic>> updateDraftItem({
       discountType: discountType,
       discountValue: discountValue,
     );
-    final adjustedItems = billingAdjustments['items'] as List<CartItem>;
+    // Items are returned unchanged (original unit prices preserved)
     final subtotalBeforeDiscount = billingAdjustments['subtotalBeforeDiscount'] as double;
     final discountAmount = billingAdjustments['discountAmount'] as double;
     final subtotalAfterDiscount = billingAdjustments['subtotalAfterDiscount'] as double;
@@ -341,9 +338,10 @@ Future<Map<String, dynamic>> updateDraftItem({
     );
 
     final taxBreakdown = GSTCalculator.calculateTax(
-      items: adjustedItems,
+      items: originalItems,
       shopConfig: shopConfig,
       customerState: customerState,
+      invoiceDiscount: discountAmount,
     );
 
     final paymentStatus = _normalizePaymentStatus(
@@ -361,7 +359,7 @@ Future<Map<String, dynamic>> updateDraftItem({
 
     await supabase.from('draft_approvals').update({
       'original_items': originalItems.map((item) => item.toJson()).toList(),
-      'proposed_items': adjustedItems.map((item) => item.toJson()).toList(),
+      'proposed_items': originalItems.map((item) => item.toJson()).toList(),
       'proposed_tax_breakdown': {
         'subtotal': taxBreakdown.subtotal,
         'cgst_amount': taxBreakdown.cgstAmount,
@@ -436,7 +434,7 @@ Future<Map<String, dynamic>> updateDraftDiscount({
       discountType: discountType,
       discountValue: discountValue,
     );
-    final adjustedItems = billingAdjustments['items'] as List<CartItem>;
+    // Items are returned unchanged (original unit prices preserved)
     final subtotalBeforeDiscount = billingAdjustments['subtotalBeforeDiscount'] as double;
     final discountAmount = billingAdjustments['discountAmount'] as double;
     final subtotalAfterDiscount = billingAdjustments['subtotalAfterDiscount'] as double;
@@ -464,9 +462,10 @@ Future<Map<String, dynamic>> updateDraftDiscount({
     );
 
     final taxBreakdown = GSTCalculator.calculateTax(
-      items: adjustedItems,
+      items: originalItems,
       shopConfig: shopConfig,
       customerState: customerState,
+      invoiceDiscount: discountAmount,
     );
 
     final paymentStatus = _normalizePaymentStatus(
@@ -483,7 +482,7 @@ Future<Map<String, dynamic>> updateDraftDiscount({
     final dueAmount = _roundToTwoDecimals(taxBreakdown.totalAmount - amountPaid);
 
     await supabase.from('draft_approvals').update({
-      'proposed_items': adjustedItems.map((item) => item.toJson()).toList(),
+      'proposed_items': originalItems.map((item) => item.toJson()).toList(),
       'proposed_tax_breakdown': {
         'subtotal': taxBreakdown.subtotal,
         'cgst_amount': taxBreakdown.cgstAmount,
@@ -714,7 +713,9 @@ Future<Map<String, dynamic>> rejectDraftInvoice({
   }
 }
 
-/// Switch an existing PENDING draft between CGST/SGST and IGST
+/// Switch an existing PENDING draft between CGST/SGST and IGST.
+/// Persists the synthetic customer_state so subsequent operations
+/// (discount, edit_item) continue to use the correct GST type.
 Future<Map<String, dynamic>> switchGstType({
   required String approvalId,
   required String newGstType, // 'IGST' or 'CGST_SGST'
@@ -741,6 +742,9 @@ Future<Map<String, dynamic>> switchGstType({
       );
     }).toList();
 
+    // Read existing discount amount for invoice-level discounting
+    final discountAmount = (approvalData['discount_amount'] as num?)?.toDouble() ?? 0.0;
+
     // Fetch shop config
     final shopRows = await supabase
         .from('shops')
@@ -752,8 +756,15 @@ Future<Map<String, dynamic>> switchGstType({
 
     // Recalculate tax for IGST (inter-state) or CGST+SGST (intra-state)
     final isInterState = newGstType == 'IGST';
-    // Build a fake "other state" to trigger inter-state calc
-    final customerState = isInterState ? 'DL' : shopState;
+    // Build a synthetic customer state to trigger inter/intra-state calc.
+    // For IGST, use a state guaranteed to differ from shopState.
+    String customerState;
+    if (isInterState) {
+      // Pick a state that is definitely different from shopState
+      customerState = shopState == 'DL' ? 'MH' : 'DL';
+    } else {
+      customerState = shopState;
+    }
 
     final shopConfig = ShopConfig(
       shopId: shopId,
@@ -768,8 +779,24 @@ Future<Map<String, dynamic>> switchGstType({
       items: proposedItems,
       shopConfig: shopConfig,
       customerState: customerState,
+      invoiceDiscount: discountAmount,
     );
 
+    // Recalculate payment amounts with the new total
+    final paymentStatus = _normalizePaymentStatus(
+      approvalData['payment_status'],
+      (approvalData['amount_paid'] as num?)?.toDouble() ?? 0.0,
+      newTaxBreakdown.totalAmount,
+    );
+
+    final amountPaid = paymentStatus == 'PAID'
+        ? newTaxBreakdown.totalAmount
+        : paymentStatus == 'PARTIAL'
+            ? (_roundToTwoDecimals((approvalData['amount_paid'] as num?)?.toDouble() ?? 0.0)).clamp(0.0, newTaxBreakdown.totalAmount)
+            : 0.0;
+    final dueAmount = _roundToTwoDecimals(newTaxBreakdown.totalAmount - amountPaid);
+
+    // Persist customer_state so subsequent operations respect the GST type
     await supabase.from('draft_approvals').update({
       'proposed_tax_breakdown': {
         'subtotal': newTaxBreakdown.subtotal,
@@ -785,6 +812,10 @@ Future<Map<String, dynamic>> switchGstType({
       },
       'proposed_total': newTaxBreakdown.totalAmount,
       'gst_type': newGstType,
+      'customer_state': customerState, // persist so discount/edit ops stay consistent
+      'payment_status': paymentStatus,
+      'amount_paid': amountPaid,
+      'due_amount': dueAmount,
     }).eq('approval_id', approvalId);
 
     return {

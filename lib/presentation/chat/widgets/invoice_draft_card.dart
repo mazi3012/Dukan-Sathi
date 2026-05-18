@@ -7,6 +7,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/widgets/app_skeleton.dart';
 import '../../../core/session.dart';
+import '../../../services/invoice_pdf_generator.dart';
+import '../../billing/pages/invoice_pdf_preview_screen.dart';
+
 class InvoiceDraftCard extends StatefulWidget {
   final Map<String, dynamic>? payload;
   const InvoiceDraftCard({super.key, this.payload});
@@ -188,6 +191,38 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       },
     );
   }
+  Future<void> _generateAndOpenPdf(String aid, String invoiceNo) async {
+    try {
+      final generatedPdf = await InvoicePdfGenerator.generateApprovedInvoicePdf(
+        approvalId: aid,
+        invoiceNumber: invoiceNo,
+      );
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => InvoicePdfPreviewScreen(
+              pdfFile: generatedPdf.file,
+              invoiceNumber: invoiceNo,
+              caption: generatedPdf.caption,
+            ),
+          ),
+        );
+      }
+    } catch (pdfError) {
+      debugPrint("Failed to automatically generate preview: $pdfError");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Invoice approved, but preview generation failed."),
+            backgroundColor: AppColors.warning,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _approveDraft() async {
     // Block approval if PARTIAL with no amount paid entered
     final currentPaymentStatus = (_data['payment_status'] ?? _data['paymentStatus'] ?? 'UNPAID').toString();
@@ -228,9 +263,14 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
               backgroundColor: AppColors.success,
             ),
           );
+          final invoiceNo = result['invoiceNumber'] as String? ?? 'INV-${aid.substring(0, 8).toUpperCase()}';
           setState(() {
             _data['approval_status'] = 'APPROVED';
+            _data['invoice_number'] = invoiceNo;
           });
+
+          // Automatically generate and show PDF preview
+          await _generateAndOpenPdf(aid, invoiceNo);
         }
       } else {
         if (mounted) {
@@ -606,30 +646,54 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
               )
             else
               GestureDetector(
-                onTap: () {
+                onTap: () async {
                   final aid = _approvalId;
-                  _openDownloadUrl('/api/download-invoice?approvalId=$aid');
+                  final invoiceNo = _data['invoice_number'] as String? ?? 
+                                    _data['invoiceNumber'] as String? ?? 
+                                    'INV-${aid.substring(0, 8).toUpperCase()}';
+                  await _generateAndOpenPdf(aid, invoiceNo);
                 },
                 child: Container(
                   width: double.infinity,
-                  height: 50,
+                  height: 52,
                   decoration: BoxDecoration(
-                    color: AppColors.success.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.success.withOpacity(0.3)),
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.success,
+                        AppColors.success.withOpacity(0.85),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.success.withOpacity(0.3),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
                   ),
                   child: const Center(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Iconsax.document_download, color: AppColors.success, size: 20),
+                        Icon(Iconsax.document, color: Colors.white, size: 22),
                         SizedBox(width: 10),
-                        Text("Download Invoice PDF", style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold)),
+                        Text(
+                          "View, Print & Share Invoice PDF", 
+                          style: TextStyle(
+                            color: Colors.white, 
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            letterSpacing: 0.5,
+                          )
+                        ),
                       ],
                     ),
                   ),
                 ),
-              ).animate().shimmer(),
+              ).animate().shimmer(duration: 1500.ms),
           ],
         ),
       ),
