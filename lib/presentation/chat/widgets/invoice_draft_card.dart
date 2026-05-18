@@ -407,19 +407,21 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                             style: Theme.of(context).textTheme.labelSmall,
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
+                        if (discAmt == 0) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).primaryColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text('GST $gstRateStr', style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 9, fontWeight: FontWeight.bold)),
                           ),
-                          child: Text('GST $gstRateStr', style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 9, fontWeight: FontWeight.bold)),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '+₹${taxAmount.toStringAsFixed(2)}',
-                          style: TextStyle(color: Colors.amber.shade300, fontSize: 11, fontWeight: FontWeight.w500),
-                        ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '+₹${taxAmount.toStringAsFixed(2)}',
+                            style: TextStyle(color: Colors.amber.shade300, fontSize: 11, fontWeight: FontWeight.w500),
+                          ),
+                        ],
                       ],
                     ),
                     const Divider(color: Colors.white10, height: 12),
@@ -429,7 +431,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                       children: [
                         const Text('Total: ', style: TextStyle(fontSize: 11)),
                         Text(
-                          '₹${totalWithTax.toStringAsFixed(2)}',
+                          '₹${(discAmt > 0 ? taxableValue : totalWithTax).toStringAsFixed(2)}',
                           style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ],
