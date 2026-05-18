@@ -172,7 +172,7 @@ class _LoginPageState extends State<LoginPage> {
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(FontAwesomeIcons.google, size: 20, color: Color(0xFFDB4437)), // Google Red
+                  const FaIcon(FontAwesomeIcons.google, size: 20, color: Color(0xFFDB4437)), // Google Red
                   const SizedBox(width: 12),
                   const Text(
                     'Sign in with Google',
