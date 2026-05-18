@@ -36,8 +36,13 @@ class InvoicePdfPreviewScreen extends StatelessWidget {
                 height: 320,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.primary.withOpacity(0.12),
-                  blurRadius: 100,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.12),
+                      blurRadius: 100,
+                      spreadRadius: 20,
+                    ),
+                  ],
                 ),
               ),
             ),
