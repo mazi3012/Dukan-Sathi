@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:printing/printing.dart';
@@ -6,13 +6,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_colors.dart';
 
 class InvoicePdfPreviewScreen extends StatelessWidget {
-  final File pdfFile;
+  final Uint8List pdfBytes;
   final String invoiceNumber;
   final String caption;
 
   const InvoicePdfPreviewScreen({
     super.key,
-    required this.pdfFile,
+    required this.pdfBytes,
     required this.invoiceNumber,
     required this.caption,
   });
@@ -129,7 +129,7 @@ class InvoicePdfPreviewScreen extends StatelessWidget {
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: PdfPreview(
-                        build: (format) => pdfFile.readAsBytes(),
+                        build: (format) => pdfBytes,
                         allowPrinting: true,
                         allowSharing: true,
                         canChangePageFormat: false,

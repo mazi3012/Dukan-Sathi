@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
@@ -7,6 +6,7 @@ import '../core/database.dart';
 import '../models/cart_item.dart';
 import '../models/draft_approval.dart';
 import '../models/tax_breakdown.dart';
+import 'pdf_file_helper.dart';
 
 enum InvoicePdfTemplate {
   igst,
@@ -17,12 +17,14 @@ enum InvoicePdfTemplate {
 
 class GeneratedInvoicePdf {
   GeneratedInvoicePdf({
-    required this.file,
+    this.file,
+    required this.bytes,
     required this.caption,
     required this.template,
   });
 
-  final File file;
+  final dynamic file; // io.File on native, null on web
+  final Uint8List bytes;
   final String caption;
   final InvoicePdfTemplate template;
 }
@@ -107,12 +109,11 @@ class InvoicePdfGenerator {
 
     final bytes = await document.save();
     final safeInvoiceNumber = invoiceNumber.replaceAll(RegExp(r'[^A-Za-z0-9_-]+'), '_');
-    final tempDir = await Directory.systemTemp.createTemp('dukansathi_invoice_');
-    final file = File('${tempDir.path}/$safeInvoiceNumber.pdf');
-    await file.writeAsBytes(bytes, flush: true);
+    final file = await savePdfToTemp(bytes, safeInvoiceNumber);
 
     return GeneratedInvoicePdf(
       file: file,
+      bytes: bytes,
       caption: _buildCaption(
         invoiceNumber: invoiceNumber,
         approval: approval,

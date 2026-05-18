@@ -203,7 +203,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
           context,
           MaterialPageRoute(
             builder: (context) => InvoicePdfPreviewScreen(
-              pdfFile: generatedPdf.file,
+              pdfBytes: generatedPdf.bytes,
               invoiceNumber: invoiceNo,
               caption: generatedPdf.caption,
             ),
