@@ -6,7 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/session.dart';
-import '../../auth/pages/login_page.dart';
+import '../../auth/pages/welcome_auth_flow.dart';
 
 class DesktopSidebar extends ConsumerWidget {
   final int currentIndex;
@@ -179,7 +179,7 @@ class DesktopSidebar extends ConsumerWidget {
             if (context.mounted) {
               Navigator.of(context).pushAndRemoveUntil(
                 PageRouteBuilder(
-                  pageBuilder: (_, a, _) => const LoginPage(),
+                  pageBuilder: (_, a, _) => const WelcomeAuthFlow(),
                   transitionsBuilder: (_, anim, _, child) => FadeTransition(opacity: anim, child: child),
                   transitionDuration: const Duration(milliseconds: 500),
                 ),

@@ -4,7 +4,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'core/session.dart';
 import 'presentation/main/pages/main_layout.dart';
-import 'presentation/auth/pages/login_page.dart';
+import 'presentation/auth/pages/welcome_auth_flow.dart';
 import 'presentation/auth/pages/shop_setup_page.dart';
 import 'presentation/auth/pages/email_verification_page.dart';
 
@@ -95,7 +95,7 @@ class AuthGate extends StatelessWidget {
         
         // Not logged in
         if (!session.isLoggedIn) {
-          return const LoginPage();
+          return const WelcomeAuthFlow();
         }
         
         // Logged in but email not verified (optional verification)

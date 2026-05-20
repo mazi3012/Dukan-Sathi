@@ -13,7 +13,7 @@ import '../../inventory/pages/inventory_page.dart';
 import '../../billing/pages/billing_page.dart';
 import '../../customers/pages/customers_page.dart';
 import '../../chat/pages/ai_chat_page.dart';
-import '../../auth/pages/login_page.dart';
+import '../../auth/pages/welcome_auth_flow.dart';
 
 final GlobalKey<ScaffoldState> mainScaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -174,7 +174,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
             PageRouteBuilder(
-              pageBuilder: (_, a, _) => const LoginPage(),
+              pageBuilder: (_, a, _) => const WelcomeAuthFlow(),
               transitionsBuilder: (_, anim, _, child) => FadeTransition(opacity: anim, child: child),
               transitionDuration: const Duration(milliseconds: 500),
             ),
