@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
-import 'package:dukansathi_new/services/admin_service.dart';
+import 'package:dukansathi_server/shared/services/admin_service.dart';
 
 /// Admin API Handler - All admin endpoints for the dashboard
 class AdminApiHandler {

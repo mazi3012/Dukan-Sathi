@@ -1,8 +1,8 @@
 import 'package:uuid/uuid.dart';
 import '../core/database.dart';
-import '../models/cart_item.dart';
-import '../services/gst_calculator.dart';
-import '../models/shop_config.dart';
+import '../shared/models/cart_item.dart';
+import '../shared/services/gst_calculator.dart';
+import '../shared/models/shop_config.dart';
 
 double _roundToTwoDecimals(double value) => (value * 100).round() / 100;
 

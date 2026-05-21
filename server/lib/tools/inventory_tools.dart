@@ -3,7 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../core/database.dart';
 import '../runtime/genkit_runtime.dart';
-import '../models/product.dart';
+import '../shared/models/product.dart';
 
 Product _productFromRow(Map row) {
   final data = Map<String, dynamic>.from(row);

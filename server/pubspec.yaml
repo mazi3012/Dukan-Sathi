@@ -6,8 +6,6 @@ environment:
   sdk: ^3.10.0
 
 dependencies:
-  dukansathi_new:
-    path: ../
   genkit: ^0.12.1
   genkit_google_genai: ^0.2.4
   genkit_openai: ^0.2.4

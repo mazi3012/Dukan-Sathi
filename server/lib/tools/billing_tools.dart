@@ -1,10 +1,10 @@
 import 'package:schemantic/schemantic.dart';
 
 import '../core/database.dart';
-import '../models/cart_item.dart';
-import '../models/shop_config.dart';
+import '../shared/models/cart_item.dart';
+import '../shared/models/shop_config.dart';
 import '../runtime/genkit_runtime.dart';
-import '../services/gst_calculator.dart';
+import '../shared/services/gst_calculator.dart';
 
 String _normalizeProductQuery(String input) {
   return input
