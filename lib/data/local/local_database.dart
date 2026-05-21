@@ -389,6 +389,16 @@ class MockTransaction implements Transaction {
   }
 
   @override
+  Future<QueryCursor> queryCursor(String table, {bool? distinct, List<String>? columns, String? where, List<Object?>? whereArgs, String? groupBy, String? having, String? orderBy, int? bufferSize, int? limit, int? offset}) {
+    throw UnimplementedError('queryCursor is not supported on Web.');
+  }
+
+  @override
+  Future<QueryCursor> rawQueryCursor(String sql, List<Object?>? arguments, {int? bufferSize}) {
+    throw UnimplementedError('rawQueryCursor is not supported on Web.');
+  }
+
+  @override
   Batch batch() {
     throw UnimplementedError();
   }
