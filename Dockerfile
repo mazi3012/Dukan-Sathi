@@ -1,20 +1,18 @@
-# ─── Render: Dart Backend Only ────────────────────────────────────────────────
-# Vercel handles the Flutter web frontend separately.
-# This Dockerfile ONLY builds the Dart API server.
-FROM dart:stable
+# ─── Render: Dart Backend Only (Multi-Stage) ─────────────────────────────────
+# Stage 1: Build the server binary
+FROM dart:stable AS build
 
 WORKDIR /app
-
-# Copy workspace files
-COPY . .
-
-# Get dependencies using pure Dart in the server subdirectory
+COPY server/ server/
 RUN cd server && dart pub get
-
-# Compile the server binary
 RUN cd server && dart compile exe bin/genkit_server.dart -o bin/server
 
-# Expose the port (Render provides PORT env var)
+# Stage 2: Minimal runtime image (~15MB vs ~800MB)
+FROM scratch
+COPY --from=build /runtime/ /
+COPY --from=build /app/server/bin/server /app/server/bin/server
+
+WORKDIR /app
 EXPOSE 3100
 
 CMD ["./server/bin/server"]
