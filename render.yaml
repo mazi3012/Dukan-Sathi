@@ -4,7 +4,7 @@ services:
     env: docker
     plan: free
     region: singapore # Change as needed
-    dockerCommand: ./bin/server
+    dockerCommand: ./server/bin/server
     envVars:
       - key: PORT
         value: 3100
