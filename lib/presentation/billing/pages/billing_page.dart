@@ -236,8 +236,10 @@ class _BillingPageState extends State<BillingPage> {
       children: [
         Expanded(
           flex: 40,
-          child: Column(
-            children: [
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: Column(
+              children: [
               _buildAppBar(),
               _isLoading ? const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: SkeletonSummaryCard()) : _buildSalesSummary(),
               const SizedBox(height: 10),
@@ -251,11 +253,14 @@ class _BillingPageState extends State<BillingPage> {
             ],
           ),
         ),
+        ),
         Expanded(
           flex: 60,
-          child: Padding(
-            padding: const EdgeInsets.only(top: 20.0, right: 24.0, bottom: 20.0),
-            child: GlassBox(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 20.0, right: 24.0, bottom: 20.0),
+              child: GlassBox(
               child: _selectedSaleIndex != null && _selectedSaleIndex! < _sales.length
                   ? SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
@@ -266,6 +271,7 @@ class _BillingPageState extends State<BillingPage> {
                       subtitle: "Choose an invoice from the list to view its details.",
                       icon: Iconsax.document_text,
                     ),
+              ),
             ),
           ),
         ),

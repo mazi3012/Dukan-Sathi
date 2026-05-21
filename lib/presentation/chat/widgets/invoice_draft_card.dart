@@ -220,9 +220,10 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
         return AlertDialog(
           backgroundColor: AppColors.darkBackground,
           title: Text("Edit $name", style: const TextStyle(color: Colors.white)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
               TextField(
                 controller: qtyCtrl,
                 keyboardType: TextInputType.number,
@@ -248,6 +249,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
               ),
             ],
           ),
+        ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
