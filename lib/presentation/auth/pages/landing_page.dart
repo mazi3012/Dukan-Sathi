@@ -587,7 +587,8 @@ class _LandingPageState extends State<LandingPage> {
         ),
         const SizedBox(height: 16),
         // Mini Chart Mock
-        Expanded(
+        SizedBox(
+          height: 120,
           child: Stack(
             children: [
               CustomPaint(

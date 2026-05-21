@@ -143,9 +143,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                 // Left Column: Dukan Sathi Insights
                 Expanded(
                   flex: 40,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 900),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                       _buildSectionTitle(context, "Dukan Sathi Insights"),
                       const SizedBox(height: 16),
                       Expanded(
@@ -154,13 +156,16 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                     ],
                   ),
                 ),
+                ),
                 const SizedBox(width: 32),
                 // Right Column: Recent Invoices & Activity
                 Expanded(
                   flex: 60,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 900),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -211,6 +216,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                       ),
                     ],
                   ),
+                ),
                 ),
               ],
             ),
