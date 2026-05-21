@@ -3,6 +3,7 @@ services:
     name: dukan-sathi-pro
     env: docker
     plan: free
+    dockerCommand: /app/server/bin/server
     region: singapore # Change as needed
     envVars:
       - key: SUPABASE_URL
