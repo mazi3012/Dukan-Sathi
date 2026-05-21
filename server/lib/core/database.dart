@@ -7,10 +7,16 @@ SupabaseClient? _supabaseInstance;
 SupabaseClient get supabase {
   if (_supabaseInstance != null) return _supabaseInstance!;
 
-  final env = DotEnv()..load();
+  final env = DotEnv(includePlatformEnvironment: true);
+  if (File('.env').existsSync()) {
+    env.load(['.env']);
+  }
   final url = Platform.environment['SUPABASE_URL'] ?? env['SUPABASE_URL'] ?? '';
   // Prioritize service role key on server for RLS bypass
-  final serviceKey = Platform.environment['SUPABASE_SERVICE_ROLE_KEY'] ?? env['SUPABASE_SERVICE_ROLE_KEY'] ?? env['SUPABASE_ANON_KEY'] ?? '';
+  final serviceKey = Platform.environment['SUPABASE_SERVICE_ROLE_KEY'] ?? 
+                     Platform.environment['SUPABASE_ANON_KEY'] ??
+                     env['SUPABASE_SERVICE_ROLE_KEY'] ?? 
+                     env['SUPABASE_ANON_KEY'] ?? '';
 
   if (url.isEmpty || serviceKey.isEmpty) {
     throw StateError('SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing!');
