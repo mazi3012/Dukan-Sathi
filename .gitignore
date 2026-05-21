@@ -64,3 +64,7 @@ Thumbs.db
 *.pdf
 __pycache__/
 *.pyc
+
+# Freezed & JsonSerializable generated files
+*.freezed.dart
+*.g.dart

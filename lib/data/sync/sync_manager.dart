@@ -27,8 +27,8 @@ class SyncManager {
   bool get isSyncing => _isSyncing;
 
   Future<void> updatePendingCount() async {
-    final countList = await _localDb.queryAll('sync_queue');
-    pendingCountNotifier.value = countList.length;
+    final count = await _localDb.count('sync_queue');
+    pendingCountNotifier.value = count;
   }
 
   /// Queues an operation locally and schedules synchronization
@@ -44,6 +44,7 @@ class SyncManager {
       'record_id': recordId,
       'payload': jsonEncode(payload),
       'created_at': DateTime.now().toIso8601String(),
+      'retry_count': 0,
     });
     
     await updatePendingCount();
@@ -82,6 +83,7 @@ class SyncManager {
         final action = op['action'] as String;
         final recordId = op['record_id'] as String;
         final payload = jsonDecode(op['payload'] as String) as Map<String, dynamic>;
+        final retryCount = (op['retry_count'] as num?)?.toInt() ?? 0;
 
         final success = await _syncRecordToCloud(tableName, action, recordId, payload);
         
@@ -95,8 +97,28 @@ class SyncManager {
           await updatePendingCount();
           debugPrint('[SyncManager] Synced $action on $tableName (ID: $recordId)');
         } else {
-          debugPrint('[SyncManager] Sync failed for record $recordId. Pausing queue processing.');
-          break;
+          final nextRetries = retryCount + 1;
+          if (nextRetries >= 5) {
+            // Drop poisoned record after 5 consecutive failures to prevent permanent queue lock
+            debugPrint('[SyncManager] Sync permanently failed for record $recordId on $tableName after 5 attempts. Skipping.');
+            await _localDb.delete(
+              'sync_queue',
+              where: 'id = ?',
+              whereArgs: [queueId],
+            );
+            await updatePendingCount();
+            continue; // Continue to next record in the queue
+          } else {
+            // Update retry count and pause queue processing until next connectivity change
+            await _localDb.update(
+              'sync_queue',
+              {'retry_count': nextRetries},
+              where: 'id = ?',
+              whereArgs: [queueId],
+            );
+            debugPrint('[SyncManager] Sync failed for record $recordId (Attempt $nextRetries/5). Pausing queue processing.');
+            break;
+          }
         }
       }
     } catch (e) {

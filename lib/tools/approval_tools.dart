@@ -89,6 +89,7 @@ Future<void> _deductInventoryStock({
   final productRows = await supabase
       .from('products')
       .select('id, name, stock_quantity')
+      .eq('shop_id', shopId)
       .inFilter('id', productIds);
 
   final stockById = <String, Map<String, dynamic>>{};
@@ -100,6 +101,7 @@ Future<void> _deductInventoryStock({
     }
   }
 
+  final updates = <Map<String, dynamic>>[];
   for (final item in items) {
     final productData = stockById[item.productId];
     if (productData == null) {
@@ -111,16 +113,16 @@ Future<void> _deductInventoryStock({
     if (currentStock < item.quantity) {
       throw StateError('Insufficient stock for "$productName". Available: $currentStock, required: ${item.quantity}. Please update inventory or edit the draft.');
     }
+
+    updates.add({
+      'id': item.productId,
+      'shop_id': shopId,
+      'stock_quantity': currentStock - item.quantity,
+    });
   }
 
-  for (final item in items) {
-    final currentStock = (stockById[item.productId]!['stock_quantity'] as num?)?.toInt() ?? 0;
-    await supabase
-        .from('products')
-        .update({'stock_quantity': currentStock - item.quantity})
-        .eq('shop_id', shopId)
-        .eq('id', item.productId);
-  }
+  // Batch update stock quantities in a single O(1) network operation
+  await supabase.from('products').upsert(updates);
 }
 
 Future<void> _updateCustomerBalance({

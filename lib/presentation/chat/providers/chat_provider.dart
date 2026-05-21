@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../models/chat_message.dart';
 import '../../../core/session.dart';
 import '../models/ai_intent.dart';
 import '../../../services/intent_executor.dart';
+import '../../../data/local/local_database.dart';
 
 final chatControllerProvider = StateNotifierProvider<ChatController, List<ChatMessage>>((ref) {
   return ChatController();
@@ -23,18 +25,77 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
     ),
   ]);
 
+  Future<void> loadHistory() async {
+    final shopId = UserSession().shopId;
+    if (shopId.isEmpty) return;
+
+    try {
+      final rows = await LocalDatabase.instance.queryAll(
+        'chat_messages',
+        where: 'shop_id = ?',
+        whereArgs: [shopId],
+        orderBy: 'timestamp ASC',
+      );
+
+      if (rows.isNotEmpty) {
+        final messages = rows.map((r) {
+          final payloadStr = r['payload'] as String?;
+          final payload = payloadStr != null ? jsonDecode(payloadStr) : null;
+          
+          final typeStr = r['type'] as String;
+          final type = MessageType.values.firstWhere(
+            (e) => e.toString().split('.').last == typeStr,
+            orElse: () => MessageType.aiText,
+          );
+
+          return ChatMessage(
+            id: r['id'] as String,
+            text: r['text'] as String,
+            type: type,
+            payload: payload,
+            isTyping: false,
+          );
+        }).toList();
+
+        state = messages;
+      }
+    } catch (e) {
+      debugPrint('[ChatController] Failed to load chat history: $e');
+    }
+  }
+
+  Future<void> _saveMessageToDb(ChatMessage msg) async {
+    if (msg.isTyping) return;
+    
+    final shopId = UserSession().shopId;
+    if (shopId.isEmpty) return;
+
+    try {
+      await LocalDatabase.instance.insert('chat_messages', {
+        'id': msg.id,
+        'shop_id': shopId,
+        'text': msg.text,
+        'type': msg.type.toString().split('.').last,
+        'payload': msg.payload != null ? jsonEncode(msg.payload) : null,
+        'is_typing': 0,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('[ChatController] Failed to save message to SQLite: $e');
+    }
+  }
+
   Future<void> sendMessage(String text) async {
     if (text.trim().isEmpty) return;
 
     // 1. Add User Message
-    state = [
-      ...state,
-      ChatMessage(
-        id: _uuid.v4(),
-        text: text,
-        type: MessageType.user,
-      ),
-    ];
+    final userMsg = ChatMessage(
+      id: _uuid.v4(),
+      text: text,
+      type: MessageType.user,
+    );
+    state = [...state, userMsg];
+    _saveMessageToDb(userMsg);
 
     // 2. Add "Typing" Indicator
     final typingId = _uuid.v4();
@@ -102,21 +163,32 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
           }
         }
 
+        final aiTextMsg = ChatMessage(
+          id: _uuid.v4(),
+          text: aiText,
+          type: MessageType.aiText,
+        );
+
+        ChatMessage? aiCardMsg;
+        if (cardType != null && cardPayload != null) {
+          aiCardMsg = ChatMessage(
+            id: _uuid.v4(),
+            text: "",
+            type: cardType,
+            payload: cardPayload,
+          );
+        }
+
         state = [
           ...state,
-          ChatMessage(
-            id: _uuid.v4(),
-            text: aiText,
-            type: MessageType.aiText,
-          ),
-          if (cardType != null && cardPayload != null)
-            ChatMessage(
-              id: _uuid.v4(),
-              text: "",
-              type: cardType,
-              payload: cardPayload,
-            ),
+          aiTextMsg,
+          if (aiCardMsg != null) aiCardMsg,
         ];
+
+        _saveMessageToDb(aiTextMsg);
+        if (aiCardMsg != null) {
+          _saveMessageToDb(aiCardMsg);
+        }
       } else {
         throw Exception('Server returned ${response.statusCode}');
       }

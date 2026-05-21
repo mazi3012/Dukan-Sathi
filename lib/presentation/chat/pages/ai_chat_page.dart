@@ -50,6 +50,9 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
         });
       }
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(chatControllerProvider.notifier).loadHistory();
+    });
   }
 
 

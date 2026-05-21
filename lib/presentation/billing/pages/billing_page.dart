@@ -72,19 +72,26 @@ class _BillingPageState extends State<BillingPage> {
     }
 
     try {
-      final res = await _saleRepo.getSales(
-        shopId,
-        limit: _pageSize,
-        offset: 0,
-      );
+      final todayStart = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).toIso8601String();
 
-      if (mounted) {
-        final todayStart = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).toIso8601String();
-        final todayRes = await _localDb.queryAll(
+      // Parallelize local database queries to maximize UI loading speeds
+      final results = await Future.wait([
+        _saleRepo.getSales(
+          shopId,
+          limit: _pageSize,
+          offset: 0,
+        ),
+        _localDb.queryAll(
           'sales',
           where: 'shop_id = ? AND timestamp >= ?',
           whereArgs: [shopId, todayStart],
-        );
+        ),
+      ]);
+
+      final res = results[0] as List<dynamic>;
+      final todayRes = results[1] as List<Map<String, dynamic>>;
+
+      if (mounted) {
         double today = 0;
         for (var s in todayRes) {
           today += ((s['amount_paid'] as num?)?.toDouble() ?? 0);

@@ -11,7 +11,15 @@ import 'package:dukansathi_new/models/shop_config.dart';
 class UserSession extends ChangeNotifier {
   static final UserSession _instance = UserSession._();
   factory UserSession() => _instance;
-  UserSession._();
+  UserSession._() {
+    _googleSignIn = GoogleSignIn(
+      clientId: kIsWeb ? '648987320349-asplif3bmr9ai0k3lkp9ulth5gne9eru.apps.googleusercontent.com' : null,
+      scopes: [
+        'email',
+        'https://www.googleapis.com/auth/userinfo.profile',
+      ],
+    );
+  }
 
   static const String _baseUrl = String.fromEnvironment('API_URL', defaultValue: '');
   static const String _userIdKey = 'ds_user_id';
@@ -25,16 +33,6 @@ class UserSession extends ChangeNotifier {
 
   // Google Sign-In client
   late GoogleSignIn _googleSignIn;
-
-  UserSession._internal() {
-    _googleSignIn = GoogleSignIn(
-      clientId: kIsWeb ? '648987320349-asplif3bmr9ai0k3lkp9ulth5gne9eru.apps.googleusercontent.com' : null,
-      scopes: [
-        'email',
-        'https://www.googleapis.com/auth/userinfo.profile',
-      ],
-    );
-  }
 
   String? _userId;
   String? _userName;
@@ -359,9 +357,11 @@ class UserSession extends ChangeNotifier {
       Future.microtask(() async {
         try {
           debugPrint('[CacheWarmup] Warming up caches for shop $_shopId...');
-          await ProductRepository().syncProductsFromCloud(_shopId!);
-          await CustomerRepository().syncCustomersFromCloud(_shopId!);
-          await SaleRepository().syncSalesFromCloud(_shopId!);
+          await Future.wait([
+            ProductRepository().syncProductsFromCloud(_shopId!),
+            CustomerRepository().syncCustomersFromCloud(_shopId!),
+            SaleRepository().syncSalesFromCloud(_shopId!),
+          ]);
           debugPrint('[CacheWarmup] Caches warmed successfully!');
         } catch (e) {
           debugPrint('[CacheWarmup] Warmup failed: $e');

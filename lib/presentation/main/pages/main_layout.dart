@@ -30,16 +30,41 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
   int _currentIndex = 0;
   bool _isSidebarCollapsed = false;
 
-  final List<Widget> _pages = [
-    const DashboardPage(),
-    const InventoryPage(),
-    const BillingPage(),
-    const CustomersPage(),
-    const AiChatPage(),
-  ];
+  final List<Widget?> _loadedPages = List.filled(5, null);
+
+  Widget _getPage(int index) {
+    if (_loadedPages[index] == null) {
+      switch (index) {
+        case 0:
+          _loadedPages[index] = const DashboardPage();
+          break;
+        case 1:
+          _loadedPages[index] = const InventoryPage();
+          break;
+        case 2:
+          _loadedPages[index] = const BillingPage();
+          break;
+        case 3:
+          _loadedPages[index] = const CustomersPage();
+          break;
+        case 4:
+          _loadedPages[index] = const AiChatPage();
+          break;
+      }
+    }
+    return _loadedPages[index]!;
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Warm up the current active page slot
+    _getPage(_currentIndex);
+
+    final pageBody = IndexedStack(
+      index: _currentIndex,
+      children: List.generate(5, (index) => _loadedPages[index] ?? const SizedBox.shrink()),
+    );
+
     return ResponsiveLayout(
       mobile: Scaffold(
         key: mainScaffoldKey,
@@ -48,7 +73,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
         body: Column(
           children: [
             const ConnectivityBanner(),
-            Expanded(child: _pages[_currentIndex]),
+            Expanded(child: pageBody),
           ],
         ),
         bottomNavigationBar: _buildBottomBar(),
@@ -68,7 +93,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
               child: Column(
                 children: [
                   const ConnectivityBanner(),
-                  Expanded(child: _pages[_currentIndex]),
+                  Expanded(child: pageBody),
                 ],
               ),
             ),
@@ -92,7 +117,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
               child: Column(
                 children: [
                   const ConnectivityBanner(),
-                  Expanded(child: _pages[_currentIndex]),
+                  Expanded(child: pageBody),
                 ],
               ),
             ),

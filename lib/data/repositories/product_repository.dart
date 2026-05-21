@@ -69,14 +69,13 @@ class ProductRepository {
           final mapped = Map<String, dynamic>.from(p);
           mapped['is_service'] = (mapped['is_service'] == true) ? 1 : 0;
           
-          // Inject barcode into the local metadata json block for SQLite storage
+          // Inject barcode into the local metadata json block for compatibility
           final metadataMap = Map<String, dynamic>.from(mapped['metadata'] ?? {});
           if (mapped['barcode'] != null) {
             metadataMap['barcode'] = mapped['barcode'];
           }
           
           mapped['metadata'] = jsonEncode(metadataMap);
-          mapped.remove('barcode');
 
           await txn.insert(
             'products',
@@ -93,11 +92,11 @@ class ProductRepository {
 
   /// Fetches a product instantly by barcode, utilizing local cache or cloud
   Future<Product?> getProductByBarcode(String shopId, String barcode) async {
-    // 1. Check local DB first by looking inside metadata JSON text
+    // 1. Check local DB first using fast barcode column query
     final localMaps = await _localDb.queryAll(
       'products',
-      where: "shop_id = ? AND metadata LIKE ?",
-      whereArgs: [shopId, '%"barcode":"$barcode"%'],
+      where: "shop_id = ? AND barcode = ?",
+      whereArgs: [shopId, barcode],
       limit: 1,
     );
     
@@ -109,9 +108,7 @@ class ProductRepository {
       final metadataMap = jsonDecode(metadataStr) as Map<String, dynamic>;
       map['metadata'] = metadataMap;
       
-      if (metadataMap.containsKey('barcode')) {
-        map['barcode'] = metadataMap['barcode'];
-      }
+      map['barcode'] = map['barcode'] ?? metadataMap['barcode'];
       
       return Product.fromJson(map);
     }
@@ -138,7 +135,6 @@ class ProductRepository {
           
           // Cache the found product locally
           final sqliteMapped = Map<String, dynamic>.from(mapped);
-          sqliteMapped.remove('barcode');
           await _localDb.insert('products', sqliteMapped);
           
           return Product.fromJson(mapped);
@@ -161,7 +157,6 @@ class ProductRepository {
       metadataMap['barcode'] = product.barcode;
     }
     map['metadata'] = jsonEncode(metadataMap);
-    map.remove('barcode');
 
     // 1. Write locally
     await _localDb.insert('products', map);
@@ -186,7 +181,6 @@ class ProductRepository {
       metadataMap['barcode'] = product.barcode;
     }
     map['metadata'] = jsonEncode(metadataMap);
-    map.remove('barcode');
 
     // 1. Write locally
     await _localDb.update(

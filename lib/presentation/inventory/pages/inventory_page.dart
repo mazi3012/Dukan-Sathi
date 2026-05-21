@@ -23,6 +23,7 @@ class InventoryPage extends StatefulWidget {
 
 class _InventoryPageState extends State<InventoryPage> {
   List<Map<String, dynamic>> _products = [];
+  List<Map<String, dynamic>> _allProductsCached = [];
   bool _isLoading = true;
   double _totalValue = 0;
   String _selectedCategory = 'All';
@@ -55,6 +56,32 @@ class _InventoryPageState extends State<InventoryPage> {
 
   final ProductRepository _productRepo = ProductRepository();
 
+  void _applyFilterAndPagination({bool resetPage = false}) {
+    if (resetPage) {
+      _currentPage = 0;
+    }
+
+    final filtered = _allProductsCached.where((p) {
+      if (_selectedCategory == 'All') return true;
+      if (_selectedCategory == 'Low Stock') return (p['stock_quantity'] as int? ?? 0) < 10;
+      return p['category'] == _selectedCategory;
+    }).toList();
+
+    final nextOffset = _currentPage * _pageSize;
+    final chunk = filtered.skip(nextOffset).take(_pageSize).toList();
+
+    if (mounted) {
+      setState(() {
+        if (resetPage) {
+          _products = chunk;
+        } else {
+          _products.addAll(chunk);
+        }
+        _hasMore = filtered.length > nextOffset + chunk.length;
+      });
+    }
+  }
+
   Future<void> _fetchProducts() async {
     if (!mounted) return;
     setState(() {
@@ -74,6 +101,8 @@ class _InventoryPageState extends State<InventoryPage> {
       final allLocalProducts = await _productRepo.getProducts(shopId);
       double value = 0;
       Set<String> cats = {};
+      final List<Map<String, dynamic>> cachedList = [];
+
       for (var p in allLocalProducts) {
         final price = p.price;
         final stock = p.stockQuantity;
@@ -81,24 +110,17 @@ class _InventoryPageState extends State<InventoryPage> {
         if (p.category.isNotEmpty) {
           cats.add(p.category);
         }
+        cachedList.add(p.toJson());
       }
 
-      // Fetch paginated chunk for the UI list
-      final res = await _productRepo.getProducts(
-        shopId,
-        limit: _pageSize,
-        offset: 0,
-      );
-      final productsMap = res.map((p) => p.toJson()).toList();
-      
       if (mounted) {
         setState(() {
-          _products = productsMap;
+          _allProductsCached = cachedList;
           _totalValue = value;
           _categories = ['All', 'Low Stock', ...cats];
           _isLoading = false;
-          _hasMore = res.length == _pageSize;
         });
+        _applyFilterAndPagination(resetPage: true);
       }
     } catch (e) {
       debugPrint('[Inventory] Fetch error: $e');
@@ -106,37 +128,18 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
-  Future<void> _loadMoreProducts() async {
+  void _loadMoreProducts() {
     if (_isLoadingMore || !_hasMore) return;
 
     setState(() => _isLoadingMore = true);
 
-    final shopId = UserSession().shopId;
-    if (shopId == null) {
-      if (mounted) setState(() => _isLoadingMore = false);
-      return;
-    }
-
     try {
-      final nextOffset = (_currentPage + 1) * _pageSize;
-      final res = await _productRepo.getProducts(
-        shopId,
-        limit: _pageSize,
-        offset: nextOffset,
-      );
-      final productsMap = res.map((p) => p.toJson()).toList();
-
-      if (mounted) {
-        setState(() {
-          _currentPage++;
-          _products.addAll(productsMap);
-          _hasMore = res.length == _pageSize;
-          _isLoadingMore = false;
-        });
-      }
+      _currentPage++;
+      _applyFilterAndPagination(resetPage: false);
+      setState(() => _isLoadingMore = false);
     } catch (e) {
       debugPrint('[Inventory] Load more error: $e');
-      if (mounted) setState(() => _isLoadingMore = false);
+      setState(() => _isLoadingMore = false);
     }
   }
 
@@ -282,7 +285,12 @@ class _InventoryPageState extends State<InventoryPage> {
           final isLowStock = cat == 'Low Stock';
           
           return GestureDetector(
-            onTap: () => setState(() => _selectedCategory = cat),
+            onTap: () {
+              setState(() {
+                _selectedCategory = cat;
+              });
+              _applyFilterAndPagination(resetPage: true);
+            },
             child: Container(
               margin: const EdgeInsets.only(right: 10),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -328,12 +336,23 @@ class _InventoryPageState extends State<InventoryPage> {
 
     // Save previous state for rollback
     final previousProducts = List<Map<String, dynamic>>.from(_products.map((p) => Map<String, dynamic>.from(p)));
+    final previousAllProducts = List<Map<String, dynamic>>.from(_allProductsCached.map((p) => Map<String, dynamic>.from(p)));
     final previousTotalValue = _totalValue;
 
     // 1. Optimistic Update (Immediate UI response)
     if (mounted) {
       setState(() {
         _products = _products.map((p) {
+          if (p['id'] == productId) {
+            final updatedP = Map<String, dynamic>.from(p);
+            final currentStock = (updatedP['stock_quantity'] as int? ?? 0);
+            updatedP['stock_quantity'] = currentStock + adjustAmount;
+            return updatedP;
+          }
+          return p;
+        }).toList();
+
+        _allProductsCached = _allProductsCached.map((p) {
           if (p['id'] == productId) {
             final updatedP = Map<String, dynamic>.from(p);
             final currentStock = (updatedP['stock_quantity'] as int? ?? 0);
@@ -366,6 +385,7 @@ class _InventoryPageState extends State<InventoryPage> {
       if (mounted) {
         setState(() {
           _products = previousProducts;
+          _allProductsCached = previousAllProducts;
           _totalValue = previousTotalValue;
         });
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -380,13 +400,7 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   Widget _buildProductList() {
-    final filtered = _products.where((p) {
-      if (_selectedCategory == 'All') return true;
-      if (_selectedCategory == 'Low Stock') return (p['stock_quantity'] as int? ?? 0) < 10;
-      return p['category'] == _selectedCategory;
-    }).toList();
-
-    if (filtered.isEmpty) {
+    if (_products.isEmpty) {
       return Center(
         child: Text("No products in '$_selectedCategory'", style: const TextStyle(color: Colors.white54)),
       );
@@ -413,17 +427,17 @@ class _InventoryPageState extends State<InventoryPage> {
               mainAxisSpacing: 15,
               childAspectRatio: childAspectRatio,
             ),
-            itemCount: filtered.length + (_isLoadingMore ? crossAxisCount : 0),
+            itemCount: _products.length + (_isLoadingMore ? crossAxisCount : 0),
             itemBuilder: (context, index) {
-              if (index >= filtered.length) {
-                if (index == filtered.length + (crossAxisCount ~/ 2)) {
+              if (index >= _products.length) {
+                if (index == _products.length + (crossAxisCount ~/ 2)) {
                   return const Center(
                     child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
                   );
                 }
                 return const SizedBox.shrink();
               }
-              return _buildProductCard(filtered[index], index);
+              return _buildProductCard(_products[index], index);
             },
           );
         },
@@ -433,9 +447,9 @@ class _InventoryPageState extends State<InventoryPage> {
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: filtered.length + (_isLoadingMore ? 1 : 0),
+      itemCount: _products.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
-        if (index == filtered.length) {
+        if (index == _products.length) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Center(
@@ -445,7 +459,7 @@ class _InventoryPageState extends State<InventoryPage> {
         }
         return Container(
           margin: const EdgeInsets.only(bottom: 15),
-          child: _buildProductCard(filtered[index], index),
+          child: _buildProductCard(_products[index], index),
         );
       },
     );

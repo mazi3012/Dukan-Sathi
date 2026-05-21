@@ -78,31 +78,33 @@ class _DashboardPageState extends State<DashboardPage> {
       // 2. Fetch Invoice Count locally
       final invoiceCount = salesRes.length;
 
-      // 3. Fetch Expenses (Online-only with safety fallback)
+      // 3 & 4. Fetch Expenses and Pending Approvals (Online-only parallelized queries)
       double expenses = 0;
-      if (_connectivity.isOnline) {
-        try {
-          final expensesRes = await supabase
-              .from('expenses')
-              .select('amount')
-              .eq('shop_id', shopId);
-          for (var row in expensesRes) {
-            expenses += (row['amount'] as num).toDouble();
-          }
-        } catch (_) {}
-      }
-
-      // 4. Fetch Pending Approvals Count (Online-only with safety fallback)
       int pendingApprovals = 0;
       if (_connectivity.isOnline) {
         try {
-          final approvalsRes = await supabase
-              .from('draft_approvals')
-              .select('approval_id')
-              .eq('shop_id', shopId)
-              .eq('approval_status', 'PENDING');
+          final results = await Future.wait([
+            supabase
+                .from('expenses')
+                .select('amount')
+                .eq('shop_id', shopId),
+            supabase
+                .from('draft_approvals')
+                .select('approval_id')
+                .eq('shop_id', shopId)
+                .eq('approval_status', 'PENDING'),
+          ]);
+
+          final expensesRes = results[0] as List<dynamic>;
+          for (var row in expensesRes) {
+            expenses += (row['amount'] as num).toDouble();
+          }
+
+          final approvalsRes = results[1] as List<dynamic>;
           pendingApprovals = approvalsRes.length;
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('[Dashboard] Online parallel query error: $e');
+        }
       }
 
       // 5. Fetch Low Stock Count (< 5 units) locally
@@ -136,13 +138,13 @@ class _DashboardPageState extends State<DashboardPage> {
 
       if (mounted) {
         setState(() {
-          _grossSales = sales > 0 ? sales * 1.2 : 25000;
-          _netRevenue = sales > 0 ? sales : 21000;
+          _grossSales = sales > 0 ? sales * 1.2 : 0.0;
+          _netRevenue = sales > 0 ? sales : 0.0;
           _gstCollected = _netRevenue * 0.18;
-          _invoiceCountToday = invoiceCount > 0 ? invoiceCount : 45;
+          _invoiceCountToday = invoiceCount;
 
           _pendingApprovalsCount = pendingApprovals;
-          _totalMarketDues = dues > 0 ? dues : 12500;
+          _totalMarketDues = dues > 0 ? dues : 0.0;
           _aiRestockItemsCount = lowStock;
           _expectedRevenueTomorrow = _netRevenue * 1.05; // 5% growth projection
 

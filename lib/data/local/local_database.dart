@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LocalDatabase {
   static final LocalDatabase instance = LocalDatabase._init();
@@ -15,8 +16,10 @@ class LocalDatabase {
     'customers': [],
     'sales': [],
     'sync_queue': [],
+    'chat_messages': [],
   };
   int _webSyncQueueIdCounter = 1;
+  bool _isWebDbLoaded = false;
 
   LocalDatabase._init();
 
@@ -35,8 +38,9 @@ class LocalDatabase {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 4,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
@@ -54,6 +58,7 @@ class LocalDatabase {
         is_service INTEGER NOT NULL DEFAULT 0,
         gst_rate REAL NOT NULL DEFAULT 0.0,
         hsn_sac_code TEXT,
+        barcode TEXT,
         cost_price REAL NOT NULL DEFAULT 0.0,
         metadata TEXT NOT NULL DEFAULT '{}'
       )
@@ -104,14 +109,114 @@ class LocalDatabase {
         action TEXT NOT NULL,
         record_id TEXT NOT NULL,
         payload TEXT NOT NULL,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        retry_count INTEGER NOT NULL DEFAULT 0
       )
     ''');
+
+    // 5. Chat Messages Table for offline persistent history
+    await db.execute('''
+      CREATE TABLE chat_messages (
+        id TEXT PRIMARY KEY,
+        shop_id TEXT NOT NULL,
+        text TEXT NOT NULL,
+        type TEXT NOT NULL,
+        payload TEXT,
+        is_typing INTEGER NOT NULL DEFAULT 0,
+        timestamp TEXT NOT NULL
+      )
+    ''');
+
+    // 6. Create indexes for fast querying on shop_id, stock, and timestamp
+    await db.execute('CREATE INDEX idx_products_shop_id ON products(shop_id)');
+    await db.execute('CREATE INDEX idx_products_stock ON products(shop_id, stock_quantity)');
+    await db.execute('CREATE INDEX idx_customers_shop_id ON customers(shop_id)');
+    await db.execute('CREATE INDEX idx_sales_shop_id ON sales(shop_id)');
+    await db.execute('CREATE INDEX idx_sales_timestamp ON sales(shop_id, timestamp DESC)');
+    await db.execute('CREATE INDEX idx_chat_messages_shop_id ON chat_messages(shop_id)');
+    await db.execute('CREATE INDEX idx_products_barcode ON products(shop_id, barcode)');
+  }
+
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_products_shop_id ON products(shop_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_products_stock ON products(shop_id, stock_quantity)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_customers_shop_id ON customers(shop_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_sales_shop_id ON sales(shop_id)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_sales_timestamp ON sales(shop_id, timestamp DESC)');
+      
+      try {
+        await db.execute('ALTER TABLE sync_queue ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0');
+      } catch (_) {}
+    }
+
+    if (oldVersion < 3) {
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS chat_messages (
+            id TEXT PRIMARY KEY,
+            shop_id TEXT NOT NULL,
+            text TEXT NOT NULL,
+            type TEXT NOT NULL,
+            payload TEXT,
+            is_typing INTEGER NOT NULL DEFAULT 0,
+            timestamp TEXT NOT NULL
+          )
+        ''');
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_chat_messages_shop_id ON chat_messages(shop_id)');
+      } catch (_) {}
+    }
+
+    if (oldVersion < 4) {
+      try {
+        await db.execute('ALTER TABLE products ADD COLUMN barcode TEXT');
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(shop_id, barcode)');
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _ensureWebDbLoaded() async {
+    if (!kIsWeb || _isWebDbLoaded) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString('dukan_sathi_web_db');
+      if (jsonStr != null) {
+        final decoded = jsonDecode(jsonStr) as Map<String, dynamic>;
+        decoded.forEach((key, value) {
+          if (value is List) {
+            _webDb[key] = List<Map<String, dynamic>>.from(
+              value.map((item) => Map<String, dynamic>.from(item as Map)),
+            );
+          }
+        });
+        
+        // Restore sync queue ID counter to prevent key collisions
+        final syncQueue = _webDb['sync_queue'] ?? [];
+        if (syncQueue.isNotEmpty) {
+          final maxId = syncQueue.map((item) => item['id'] as int? ?? 0).reduce((a, b) => a > b ? a : b);
+          _webSyncQueueIdCounter = maxId + 1;
+        }
+      }
+    } catch (e) {
+      debugPrint('[LocalDatabase] Failed to load web db: $e');
+    }
+    _isWebDbLoaded = true;
+  }
+
+  Future<void> _saveWebDb() async {
+    if (!kIsWeb) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('dukan_sathi_web_db', jsonEncode(_webDb));
+    } catch (e) {
+      debugPrint('[LocalDatabase] Failed to save web db: $e');
+    }
   }
 
   // Helper CRUD methods
   Future<int> insert(String table, Map<String, dynamic> row) async {
     if (kIsWeb) {
+      await _ensureWebDbLoaded();
       final list = _webDb[table] ??= [];
       final rowCopy = Map<String, dynamic>.from(row);
       
@@ -122,7 +227,7 @@ class LocalDatabase {
       
       // If table has primary key, replace any existing item with the same primary key
       String? primaryKeyField;
-      if (table == 'products' || table == 'customers' || table == 'sales') {
+      if (table == 'products' || table == 'customers' || table == 'sales' || table == 'chat_messages') {
         primaryKeyField = 'id';
       } else if (table == 'sync_queue') {
         primaryKeyField = 'id';
@@ -133,6 +238,7 @@ class LocalDatabase {
       }
       
       list.add(rowCopy);
+      await _saveWebDb();
       return rowCopy['id'] is int ? rowCopy['id'] as int : 1;
     }
 
@@ -169,6 +275,10 @@ class LocalDatabase {
       return row['shop_id'] == shopId && ts.compareTo(since) >= 0;
     }
     
+    if (normalized == 'shop_id = ? AND barcode = ?' && whereArgs.length >= 2) {
+      return row['shop_id'] == whereArgs[0] && row['barcode'] == whereArgs[1];
+    }
+    
     if (normalized == 'shop_id = ? AND metadata LIKE ?' && whereArgs.length >= 2) {
       final shopId = whereArgs[0];
       final barcodeQuery = whereArgs[1].toString().replaceAll('%', '').replaceAll('"', '');
@@ -191,6 +301,7 @@ class LocalDatabase {
     int? offset,
   }) async {
     if (kIsWeb) {
+      await _ensureWebDbLoaded();
       var list = List<Map<String, dynamic>>.from(_webDb[table] ?? []);
       
       // Simple where clause filtering
@@ -205,6 +316,12 @@ class LocalDatabase {
             final tA = a['timestamp']?.toString() ?? '';
             final tB = b['timestamp']?.toString() ?? '';
             return tB.compareTo(tA);
+          });
+        } else if (orderBy.contains('timestamp ASC')) {
+          list.sort((a, b) {
+            final tA = a['timestamp']?.toString() ?? '';
+            final tB = b['timestamp']?.toString() ?? '';
+            return tA.compareTo(tB);
           });
         } else if (orderBy.contains('name ASC')) {
           list.sort((a, b) {
@@ -249,6 +366,7 @@ class LocalDatabase {
     required List<dynamic> whereArgs,
   }) async {
     if (kIsWeb) {
+      await _ensureWebDbLoaded();
       final list = _webDb[table] ?? [];
       int count = 0;
       for (var i = 0; i < list.length; i++) {
@@ -258,6 +376,7 @@ class LocalDatabase {
           count++;
         }
       }
+      await _saveWebDb();
       return count;
     }
 
@@ -277,9 +396,11 @@ class LocalDatabase {
     required List<dynamic> whereArgs,
   }) async {
     if (kIsWeb) {
+      await _ensureWebDbLoaded();
       final list = _webDb[table] ?? [];
       final before = list.length;
       list.removeWhere((item) => _rowMatches(item, where, whereArgs));
+      await _saveWebDb();
       return before - list.length;
     }
 
@@ -289,7 +410,9 @@ class LocalDatabase {
 
   Future<void> clearTable(String table) async {
     if (kIsWeb) {
+      await _ensureWebDbLoaded();
       _webDb[table]?.clear();
+      await _saveWebDb();
       return;
     }
     final db = await database;
@@ -298,14 +421,30 @@ class LocalDatabase {
 
   Future<void> executeInTransaction(Future<void> Function(Transaction txn) action) async {
     if (kIsWeb) {
+      await _ensureWebDbLoaded();
       final mockTxn = MockTransaction(this);
       await action(mockTxn);
+      await _saveWebDb();
       return;
     }
     final db = await database;
     await db.transaction((txn) async {
       await action(txn);
     });
+  }
+
+  Future<int> count(String table, {String? where, List<dynamic>? whereArgs}) async {
+    if (kIsWeb) {
+      await _ensureWebDbLoaded();
+      final list = _webDb[table] ?? [];
+      if (where != null && whereArgs != null) {
+        return list.where((item) => _rowMatches(item, where, whereArgs)).length;
+      }
+      return list.length;
+    }
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) as cnt FROM $table${where != null ? ' WHERE $where' : ''}', whereArgs);
+    return Sqflite.firstIntValue(result) ?? 0;
   }
 
   Future<void> execute(String sql, [List<Object?>? arguments]) async {
@@ -318,6 +457,7 @@ class LocalDatabase {
 
   Future<int> rawUpdate(String sql, [List<Object?>? arguments]) async {
     if (kIsWeb) {
+      await _ensureWebDbLoaded();
       if (sql.contains('UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?') && arguments != null && arguments.length >= 2) {
         final delta = arguments[0] as int;
         final id = arguments[1] as String;
@@ -327,6 +467,7 @@ class LocalDatabase {
             final updated = Map<String, dynamic>.from(list[i]);
             updated['stock_quantity'] = (updated['stock_quantity'] ?? 0) + delta;
             list[i] = updated;
+            await _saveWebDb();
             return 1;
           }
         }
