@@ -6,7 +6,8 @@ import 'package:http/http.dart' as http;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/session.dart';
-
+import '../../../models/product.dart';
+import '../../../data/repositories/product_repository.dart';
 class InventoryDraftCard extends StatefulWidget {
   final dynamic payload;
   const InventoryDraftCard({super.key, this.payload});
@@ -56,41 +57,35 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
 
     setState(() => _isApproving = true);
     try {
-      final userId = UserSession().userId;
-      final response = await http.post(
-        Uri.parse('/api/approve-batch'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'batchId': _batchId,
-          'userId': userId,
-        }),
-      );
+      final productRepo = ProductRepository();
+      
+      // Save all products locally via SQLite repository
+      for (final pMap in _products) {
+        final product = Product.fromJson(Map<String, dynamic>.from(pMap));
+        await productRepo.saveProduct(product);
+      }
 
-      final result = jsonDecode(response.body);
-      if (result['success'] == true) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ?? "Products Added to Inventory!"),
-              backgroundColor: AppColors.success,
-            ),
-          );
-          setState(() {
-            _isApproved = true;
-          });
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['error'] ?? "Approval failed"),
-              backgroundColor: AppColors.error,
-            ),
-          );
-        }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Products Added to Inventory!"),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        setState(() {
+          _isApproved = true;
+        });
       }
     } catch (e) {
       debugPrint("Approve batch error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Approval failed: $e"),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isApproving = false);
     }

@@ -67,7 +67,7 @@ class IntentExecutor {
       final json = Map<String, dynamic>.from(item as Map);
       final String name = json['name']?.toString() ?? 'Unnamed Product';
       final double price = (json['price'] as num?)?.toDouble() ?? 0.0;
-      final int stock = (json['stock'] as num?)?.toInt() ?? 0;
+      final int stock = (json['stock_quantity'] as num?)?.toInt() ?? (json['stock'] as num?)?.toInt() ?? 0;
       final double gstRate = (json['gst_rate'] as num?)?.toDouble() ?? 18.0;
       final String? hsn = json['hsn_sac_code']?.toString();
       final String category = json['category']?.toString() ?? 'General';
@@ -87,13 +87,15 @@ class IntentExecutor {
         costPrice: price * 0.7, // fallback cost price
       );
 
-      await productRepo.saveProduct(product);
+      // Do NOT save to DB here. This is a draft, wait for UI approval!
       addedProducts.add(product);
     }
 
     return {
       'success': true,
       'type': 'ADD_PRODUCT_CONFIRMATION',
+      'batchId': _uuid.v4(),
+      'status': 'PENDING',
       'products': addedProducts.map((p) => p.toJson()).toList(),
     };
   }
