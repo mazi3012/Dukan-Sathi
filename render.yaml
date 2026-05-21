@@ -4,18 +4,18 @@ services:
     env: docker
     plan: free
     dockerCommand: /app/server/bin/server
-    region: singapore # Change as needed
+    region: singapore
     envVars:
       - key: SUPABASE_URL
-        sync: true
+        sync: false
       - key: SUPABASE_ANON_KEY
-        sync: true
-      - key: TELEGRAM_BOT_TOKEN
-        sync: true
+        sync: false
       - key: GROQ_API_KEY
-        sync: true
-        value: your-groq-api-key-here
+        sync: false
       - key: MODEL_ID
-        sync: true
         value: llama-3.3-70b-versatile
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: PORT
+        value: "3100"
     autoDeploy: true

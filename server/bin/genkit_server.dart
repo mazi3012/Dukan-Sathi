@@ -83,6 +83,13 @@ class RateLimiter {
 Future<void> main(List<String> arguments) async {
   print('--- Genkit Server Initializing ---');
   try {
+    initializeGenkit();
+    print('✅ Genkit initialized successfully');
+  } catch (e) {
+    print('❌ FATAL: Could not initialize Genkit: $e');
+    exit(1);
+  }
+  try {
     initializeBackend();
   } catch (e) {
     print('❌ Error during initializeBackend: $e');
