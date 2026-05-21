@@ -9,6 +9,10 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/database.dart';
 import '../../../core/session.dart';
+import 'package:dukansathi_new/data/repositories/product_repository.dart';
+import 'package:dukansathi_new/models/product.dart';
+
+
 
 class InventoryPage extends StatefulWidget {
   const InventoryPage({super.key});
@@ -30,6 +34,8 @@ class _InventoryPageState extends State<InventoryPage> {
     _fetchProducts();
   }
 
+  final ProductRepository _productRepo = ProductRepository();
+
   Future<void> _fetchProducts() async {
     setState(() => _isLoading = true);
     
@@ -40,16 +46,13 @@ class _InventoryPageState extends State<InventoryPage> {
     }
 
     try {
-      final res = await supabase
-          .from('products')
-          .select()
-          .eq('shop_id', shopId)
-          .order('name');
+      final res = await _productRepo.getProducts(shopId);
+      final productsMap = res.map((p) => p.toJson()).toList();
       
       if (mounted) {
         double value = 0;
         Set<String> cats = {};
-        for (var p in res) {
+        for (var p in productsMap) {
           final price = (p['price'] as num?)?.toDouble() ?? 0;
           final stock = (p['stock_quantity'] as int?) ?? 0;
           value += price * stock;
@@ -60,7 +63,7 @@ class _InventoryPageState extends State<InventoryPage> {
         }
 
         setState(() {
-          _products = List<Map<String, dynamic>>.from(res);
+          _products = productsMap;
           _totalValue = value;
           _categories = ['All', 'Low Stock', ...cats];
           _isLoading = false;
@@ -255,7 +258,8 @@ class _InventoryPageState extends State<InventoryPage> {
   Future<void> _restockProduct(Map<String, dynamic> product) async {
     final newStock = (product['stock_quantity'] as int? ?? 0) + 10;
     try {
-      await supabase.from('products').update({'stock_quantity': newStock}).eq('id', product['id']);
+      final updatedProduct = Product.fromJson({...product, 'stock_quantity': newStock});
+      await _productRepo.updateProduct(updatedProduct);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Restocked +10 for ${product['name']}', style: const TextStyle(color: Colors.white)), backgroundColor: AppColors.success));
       _fetchProducts();
     } catch (e) {

@@ -10,6 +10,9 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/database.dart';
 import '../../../core/session.dart';
+import 'package:dukansathi_new/data/repositories/sale_repository.dart';
+
+
 
 class BillingPage extends StatefulWidget {
   const BillingPage({super.key});
@@ -30,6 +33,8 @@ class _BillingPageState extends State<BillingPage> {
     _fetchSales();
   }
 
+  final SaleRepository _saleRepo = SaleRepository();
+
   Future<void> _fetchSales() async {
     setState(() => _isLoading = true);
     
@@ -40,11 +45,8 @@ class _BillingPageState extends State<BillingPage> {
     }
 
     try {
-      final res = await supabase
-          .from('sales')
-          .select()
-          .eq('shop_id', shopId)
-          .order('timestamp', ascending: false);
+      final res = await _saleRepo.getSales(shopId);
+
       
       if (mounted) {
         double today = 0;

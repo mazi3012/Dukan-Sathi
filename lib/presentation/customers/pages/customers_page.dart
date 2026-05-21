@@ -10,6 +10,9 @@ import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/database.dart';
 import '../../../core/session.dart';
 import 'customer_details_page.dart';
+import 'package:dukansathi_new/data/repositories/customer_repository.dart';
+
+
 
 class CustomersPage extends StatefulWidget {
   const CustomersPage({super.key});
@@ -31,6 +34,8 @@ class _CustomersPageState extends State<CustomersPage> {
     _fetchCustomers();
   }
 
+  final CustomerRepository _customerRepo = CustomerRepository();
+
   Future<void> _fetchCustomers() async {
     setState(() => _isLoading = true);
     
@@ -41,15 +46,13 @@ class _CustomersPageState extends State<CustomersPage> {
     }
 
     try {
-      final res = await supabase
-          .from('customers')
-          .select()
-          .eq('shop_id', shopId)
-          .order('name');
+      final res = await _customerRepo.getCustomers(shopId);
+      final customersMap = res.map((c) => c.toJson()).toList();
+
       
       if (mounted) {
         setState(() {
-          _customers = List<Map<String, dynamic>>.from(res);
+          _customers = customersMap;
           _isLoading = false;
           
           // Re-sync selected customer if it exists to fetch new balances
