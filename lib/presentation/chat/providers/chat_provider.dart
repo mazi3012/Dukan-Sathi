@@ -85,6 +85,7 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
               cardPayload = executorResult;
             } else if (executorResult['type'] == 'INVOICE_DRAFT') {
               cardType = MessageType.aiDraftInvoice;
+              // draft is already the toJson() output of DraftApproval — pass directly
               cardPayload = executorResult['draft'] as Map<String, dynamic>?;
             }
           }
@@ -92,8 +93,12 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
           final type = card['type'] as String?;
           if (type == 'inventory' || type == 'batch') {
             cardType = MessageType.aiDraftInventory;
+            cardPayload = card;
           } else if (type == 'invoice') {
             cardType = MessageType.aiDraftInvoice;
+            // Normalize: server may wrap under 'draft', 'payload', or directly in card
+            final nested = card['draft'] ?? card['payload'] ?? card['data'];
+            cardPayload = (nested is Map<String, dynamic>) ? nested : card;
           }
         }
 

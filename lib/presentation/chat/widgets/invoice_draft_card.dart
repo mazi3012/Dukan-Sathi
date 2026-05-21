@@ -1,8 +1,8 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
@@ -26,29 +26,6 @@ class InvoiceDraftCard extends StatefulWidget {
   State<InvoiceDraftCard> createState() => _InvoiceDraftCardState();
 }
 
-void _openDownloadUrl(String url) {
-  // On web, we can use the underlying JS to open a URL
-  // This is a simple approach that works with Flutter web
-  try {
-    // Use ServicesBinding to launch the URL
-    WidgetsBinding.instance.platformDispatcher.sendPlatformMessage(
-      'flutter/platform',
-      null,
-      (_) {},
-    );
-  } catch (_) {}
-  // Fallback: use http to trigger download
-  _triggerDownload(url);
-}
-
-Future<void> _triggerDownload(String url) async {
-  try {
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200) {
-      // File downloaded, handled by browser
-    }
-  } catch (_) {}
-}
 
 class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
   late Map<String, dynamic> _data;
@@ -534,8 +511,17 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
   }
   @override
   Widget build(BuildContext context) {
+    // Guard: empty or malformed payload
     if (_data.isEmpty) {
       return const _StaticPlaceholder();
+    }
+
+    // Guard: missing required items — show diagnostic error instead of blank box
+    final itemsRaw = _data['proposed_items'] ?? _data['items'];
+    if (itemsRaw == null || (itemsRaw as List).isEmpty) {
+      return _ErrorPlaceholder(
+        message: 'Draft data is missing item details.\nPayload keys: ${_data.keys.join(', ')}',
+      );
     }
     final isApproved = _data['approval_status'] == 'APPROVED';
     final items = (_data['proposed_items'] ?? _data['items']) as List<dynamic>? ?? [];
@@ -891,55 +877,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                 ],
               )
             else
-              GestureDetector(
-                onTap: () async {
-                  final aid = _approvalId;
-                  final invoiceNo = _data['invoice_number'] as String? ?? 
-                                    _data['invoiceNumber'] as String? ?? 
-                                    'INV-${aid.substring(0, 8).toUpperCase()}';
-                  await _generateAndOpenPdf(aid, invoiceNo);
-                },
-                child: Container(
-                  width: double.infinity,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.success,
-                        AppColors.success.withOpacity(0.85),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.success.withOpacity(0.3),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Iconsax.document, color: Colors.white, size: 22),
-                        SizedBox(width: 10),
-                        Text(
-                          "View, Print & Share Invoice PDF", 
-                          style: TextStyle(
-                            color: Colors.white, 
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            letterSpacing: 0.5,
-                          )
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ).animate().shimmer(duration: 1500.ms),
+              _buildApprovedActions(),
           ],
         ),
       ),
@@ -1196,12 +1134,214 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       ),
     );
   }
+  Widget _buildApprovedActions() {
+    final aid = _approvalId;
+    final invoiceNo = _data['invoice_number'] as String? ??
+        _data['invoiceNumber'] as String? ??
+        'INV-${aid.isNotEmpty ? aid.substring(0, 8).toUpperCase() : 'DRAFT'}';
+    return Column(
+      children: [
+        // Primary: View & Print button
+        GestureDetector(
+          onTap: () async => _generateAndOpenPdf(aid, invoiceNo),
+          child: Container(
+            width: double.infinity,
+            height: 52,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.success, AppColors.success.withOpacity(0.82)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.success.withOpacity(0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Iconsax.document_download, color: Colors.white, size: 20),
+                SizedBox(width: 10),
+                Text(
+                  'View, Print & Share Invoice PDF',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ).animate().shimmer(duration: 1800.ms),
+        if (kIsWeb) ...[
+          const SizedBox(height: 10),
+          // Secondary: Direct browser download on Web
+          GestureDetector(
+            onTap: () async {
+              try {
+                final generatedPdf = await _buildPdfForDownload(aid, invoiceNo);
+                // savePdfToTemp on web triggers browser download automatically
+                await generatedPdf;
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('📥 PDF download started in your browser!'),
+                      backgroundColor: AppColors.success,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Download failed: $e'),
+                      backgroundColor: AppColors.error,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              }
+            },
+            child: Container(
+              width: double.infinity,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.success.withOpacity(0.5)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Iconsax.import, color: AppColors.success, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Download PDF to Device',
+                    style: TextStyle(
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Generates PDF bytes and triggers download (web) or returns file (native).
+  Future<dynamic> _buildPdfForDownload(String aid, String invoiceNo) async {
+    final session = UserSession();
+    final shopConfig = session.shopConfig;
+    final draftApproval = DraftApproval.fromJson({
+      'approval_id': aid,
+      'shop_id': session.shopId ?? '',
+      'customer_id': _data['customer_id'] ?? _data['customerId'],
+      'customer_name': _data['customer_name'] ?? _data['customerName'] ?? 'Walk-in Customer',
+      'customer_state': _data['customer_state'] ?? _data['customerState'] ?? shopConfig.state,
+      'proposed_items': _data['proposed_items'] ?? _data['items'] ?? [],
+      'proposed_tax_breakdown': _data['proposed_tax_breakdown'] ?? _data['taxBreakdown'] ?? {},
+      'proposed_total': _data['proposed_total'] ?? _data['proposedTotal'] ?? 0.0,
+      'subtotal_before_discount': _data['subtotal_before_discount'] ?? _data['subtotalBeforeDiscount'] ?? 0.0,
+      'subtotal_after_discount': _data['subtotal_after_discount'] ?? _data['subtotalAfterDiscount'] ?? 0.0,
+      'discount_type': _data['discount_type'] ?? _data['discountType'],
+      'discount_value': _data['discount_value'] ?? _data['discountValue'],
+      'discount_amount': _data['discount_amount'] ?? _data['discountAmount'] ?? 0.0,
+      'amount_paid': _data['amount_paid'] ?? _data['amountPaid'] ?? 0.0,
+      'payment_status': _data['payment_status'] ?? _data['paymentStatus'] ?? 'UNPAID',
+      'due_amount': _data['due_amount'] ?? _data['dueAmount'] ?? 0.0,
+      'approval_status': 'APPROVED',
+      'reviewed_by': session.userId ?? 'merchant',
+      'reviewed_at': DateTime.now().toIso8601String(),
+      'created_at': DateTime.now().toIso8601String(),
+    });
+    final productDetails = <String, Map<String, dynamic>>{};
+    final itemsList = (_data['proposed_items'] ?? _data['items'] ?? []) as List<dynamic>;
+    for (final itemJson in itemsList) {
+      final json = Map<String, dynamic>.from(itemJson as Map);
+      final pId = json['productId'] as String;
+      productDetails[pId] = {
+        'name': json['productName'] ?? json['name'] ?? 'Item',
+        'hsn_sac_code': json['hsn_sac_code'] ?? json['hsnSacCode'] ?? '-',
+        'gst_rate': json['gstRate'] ?? 18.0,
+      };
+    }
+    final generated = await InvoicePdfGenerator.generateApprovedInvoicePdfOffline(
+      approval: draftApproval,
+      invoiceNumber: invoiceNo,
+      shopName: (session.shopName?.isNotEmpty == true) ? session.shopName! : 'Dukan Sathi',
+      shopState: shopConfig.state,
+      gstNumber: shopConfig.gstRegistrationNumber,
+      businessType: shopConfig.businessType,
+      customerName: draftApproval.customerName ?? 'Walk-in Customer',
+      customerPhone: null,
+      productDetails: productDetails,
+    );
+    return generated.file; // On web this already triggered the download
+  }
 }
 
 class _StaticPlaceholder extends StatelessWidget {
   const _StaticPlaceholder();
   @override
   Widget build(BuildContext context) {
-    return const Center(child: Text("Preparing Draft...", style: TextStyle(color: Colors.white54)));
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+            SizedBox(height: 12),
+            Text('Preparing Draft...', style: TextStyle(color: Colors.white54, fontSize: 13)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorPlaceholder extends StatelessWidget {
+  final String message;
+  const _ErrorPlaceholder({required this.message});
+  @override
+  Widget build(BuildContext context) {
+    return GlassBox(
+      blur: 15,
+      opacity: 0.1,
+      border: Border.all(color: AppColors.error.withOpacity(0.4)),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Iconsax.warning_2, color: AppColors.warning, size: 36),
+            const SizedBox(height: 12),
+            const Text(
+              'Invoice draft could not be rendered',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: const TextStyle(color: Colors.white54, fontSize: 11),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
