@@ -61,6 +61,63 @@ class InvoicePdfGenerator {
     }
   }
 
+  static Future<GeneratedInvoicePdf> generateApprovedInvoicePdfOffline({
+    required DraftApproval approval,
+    required String invoiceNumber,
+    required String shopName,
+    required String shopState,
+    required String? gstNumber,
+    required String businessType,
+    required String customerName,
+    required String? customerPhone,
+    required Map<String, Map<String, dynamic>> productDetails,
+  }) async {
+    final template = resolveTemplate(approval.proposedTaxBreakdown);
+    final approvedAt = approval.reviewedAt ?? DateTime.now();
+    final theme = await _loadTheme();
+
+    final document = pw.Document(theme: theme);
+    document.addPage(
+      pw.MultiPage(
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(28.35), // 10mm margins
+        ),
+        footer: (context) => _buildFooter(template: template),
+        build: (context) => [
+          _buildInvoicePage(
+            approval: approval,
+            shopName: shopName,
+            shopState: shopState,
+            gstNumber: gstNumber,
+            businessType: businessType,
+            customerName: customerName,
+            customerPhone: customerPhone,
+            invoiceNumber: invoiceNumber,
+            approvedAt: approvedAt,
+            productDetails: productDetails,
+            template: template,
+          ),
+        ],
+      ),
+    );
+
+    final bytes = await document.save();
+    final safeInvoiceNumber = invoiceNumber.replaceAll(RegExp(r'[^A-Za-z0-9_-]+'), '_');
+    final file = await savePdfToTemp(bytes, safeInvoiceNumber);
+
+    return GeneratedInvoicePdf(
+      file: file,
+      bytes: bytes,
+      caption: _buildCaption(
+        invoiceNumber: invoiceNumber,
+        approval: approval,
+        template: template,
+      ),
+      template: template,
+    );
+  }
+
   static Future<GeneratedInvoicePdf> generateApprovedInvoicePdf({
     required String approvalId,
     required String invoiceNumber,

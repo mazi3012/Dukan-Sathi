@@ -6,7 +6,7 @@ import 'database.dart'; // Import supabase client
 import 'package:dukansathi_new/data/repositories/product_repository.dart';
 import 'package:dukansathi_new/data/repositories/customer_repository.dart';
 import 'package:dukansathi_new/data/repositories/sale_repository.dart';
-
+import 'package:dukansathi_new/models/shop_config.dart';
 
 class UserSession extends ChangeNotifier {
   static final UserSession _instance = UserSession._();
@@ -18,6 +18,10 @@ class UserSession extends ChangeNotifier {
   static const String _userNameKey = 'ds_user_name';
   static const String _shopIdKey = 'ds_shop_id';
   static const String _shopNameKey = 'ds_shop_name';
+  static const String _shopStateKey = 'ds_shop_state';
+  static const String _shopGstModeKey = 'ds_shop_gst_mode';
+  static const String _shopGstNumKey = 'ds_shop_gst_num';
+  static const String _shopBusinessTypeKey = 'ds_shop_business_type';
 
   // Google Sign-In client
   late GoogleSignIn _googleSignIn;
@@ -36,6 +40,10 @@ class UserSession extends ChangeNotifier {
   String? _userName;
   String? _shopId;
   String? _shopName;
+  String? _shopState;
+  String? _shopGstMode;
+  String? _shopGstNum;
+  String? _shopBusinessType;
   bool _emailVerified = true; // default true if not using email verification
   bool _isLoading = true;
 
@@ -43,10 +51,30 @@ class UserSession extends ChangeNotifier {
   String? get userName => _userName;
   String? get shopId => _shopId;
   String? get shopName => _shopName;
+  String? get shopState => _shopState;
+  String? get shopGstMode => _shopGstMode;
+  String? get shopGstNum => _shopGstNum;
+  String? get shopBusinessType => _shopBusinessType;
   bool get isLoggedIn => _userId != null;
   bool get hasShop => _shopId != null;
   bool get emailVerified => _emailVerified;
   bool get isLoading => _isLoading;
+
+  ShopConfig get shopConfig {
+    final modeStr = _shopGstMode ?? 'UNREGISTERED';
+    final gstMode = GSTMode.values.firstWhere(
+      (e) => e.name == modeStr.toLowerCase(),
+      orElse: () => GSTMode.unregistered,
+    );
+    return ShopConfig(
+      shopId: _shopId ?? 'default',
+      state: _shopState ?? 'DL',
+      gstRegistrationNumber: _shopGstNum,
+      gstMode: gstMode,
+      businessType: _shopBusinessType ?? 'Retail',
+      createdAt: DateTime.now(),
+    );
+  }
 
   Future<void> _fetchAndPersistShop(String userId) async {
     try {
@@ -54,17 +82,25 @@ class UserSession extends ChangeNotifier {
       // This allows both Telegram-onboarded and form-onboarded users to proceed
       final shopResult = await supabase
           .from('shops')
-          .select('id, name')
+          .select('id, name, state, gst_mode, gst_registration_number, business_type')
           .eq('owner_id', userId)
           .maybeSingle();
 
       if (shopResult != null) {
         _shopId = shopResult['id'] as String?;
         _shopName = shopResult['name'] as String?;
+        _shopState = shopResult['state'] as String?;
+        _shopGstMode = shopResult['gst_mode'] as String?;
+        _shopGstNum = shopResult['gst_registration_number'] as String?;
+        _shopBusinessType = shopResult['business_type'] as String?;
 
         final prefs = await SharedPreferences.getInstance();
         if (_shopId != null) await prefs.setString(_shopIdKey, _shopId!);
         if (_shopName != null) await prefs.setString(_shopNameKey, _shopName!);
+        if (_shopState != null) await prefs.setString(_shopStateKey, _shopState!);
+        if (_shopGstMode != null) await prefs.setString(_shopGstModeKey, _shopGstMode!);
+        if (_shopGstNum != null) await prefs.setString(_shopGstNumKey, _shopGstNum!);
+        if (_shopBusinessType != null) await prefs.setString(_shopBusinessTypeKey, _shopBusinessType!);
       }
     } catch (e) {
       debugPrint('[Session] Fetch shop error: $e');
@@ -87,6 +123,10 @@ class UserSession extends ChangeNotifier {
       _userName = prefs.getString(_userNameKey);
       _shopId = prefs.getString(_shopIdKey);
       _shopName = prefs.getString(_shopNameKey);
+      _shopState = prefs.getString(_shopStateKey);
+      _shopGstMode = prefs.getString(_shopGstModeKey);
+      _shopGstNum = prefs.getString(_shopGstNumKey);
+      _shopBusinessType = prefs.getString(_shopBusinessTypeKey);
 
       final currentSupabaseUser = supabase.auth.currentUser;
       
@@ -183,7 +223,7 @@ class UserSession extends ChangeNotifier {
       // Fetch user's shop if exists
       final shopResult = await supabase
           .from('shops')
-          .select('id, name')
+          .select('id, name, state, gst_mode, gst_registration_number, business_type')
           .eq('owner_id', userId)
           .maybeSingle();
 
@@ -191,6 +231,10 @@ class UserSession extends ChangeNotifier {
       _userName = userName;
       _shopId = shopResult?['id'] as String?;
       _shopName = shopResult?['name'] as String?;
+      _shopState = shopResult?['state'] as String?;
+      _shopGstMode = shopResult?['gst_mode'] as String?;
+      _shopGstNum = shopResult?['gst_registration_number'] as String?;
+      _shopBusinessType = shopResult?['business_type'] as String?;
       _emailVerified = respUser.emailConfirmedAt != null || true; // Google users are pre-verified
 
       // Persist to local storage
@@ -199,6 +243,10 @@ class UserSession extends ChangeNotifier {
       await prefs.setString(_userNameKey, userName);
       if (_shopId != null) await prefs.setString(_shopIdKey, _shopId!);
       if (_shopName != null) await prefs.setString(_shopNameKey, _shopName!);
+      if (_shopState != null) await prefs.setString(_shopStateKey, _shopState!);
+      if (_shopGstMode != null) await prefs.setString(_shopGstModeKey, _shopGstMode!);
+      if (_shopGstNum != null) await prefs.setString(_shopGstNumKey, _shopGstNum!);
+      if (_shopBusinessType != null) await prefs.setString(_shopBusinessTypeKey, _shopBusinessType!);
 
       if (_shopId != null) {
         triggerCacheWarmup();
@@ -243,13 +291,19 @@ class UserSession extends ChangeNotifier {
 
       _shopId = result['id'] as String?;
       _shopName = result['name'] as String?;
+      _shopState = result['state'] as String?;
+      _shopGstMode = result['gst_mode'] as String?;
+      _shopGstNum = result['gst_registration_number'] as String?;
+      _shopBusinessType = result['business_type'] as String?;
 
       if (_shopId != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_shopIdKey, _shopId!);
-        if (_shopName != null) {
-          await prefs.setString(_shopNameKey, _shopName!);
-        }
+        if (_shopName != null) await prefs.setString(_shopNameKey, _shopName!);
+        if (_shopState != null) await prefs.setString(_shopStateKey, _shopState!);
+        if (_shopGstMode != null) await prefs.setString(_shopGstModeKey, _shopGstMode!);
+        if (_shopGstNum != null) await prefs.setString(_shopGstNumKey, _shopGstNum!);
+        if (_shopBusinessType != null) await prefs.setString(_shopBusinessTypeKey, _shopBusinessType!);
       }
 
       if (_shopId != null) {
@@ -271,18 +325,25 @@ class UserSession extends ChangeNotifier {
     notifyListeners();
   }
 
-
   Future<void> _clearLocal() async {
     _userId = null;
     _userName = null;
     _shopId = null;
     _shopName = null;
+    _shopState = null;
+    _shopGstMode = null;
+    _shopGstNum = null;
+    _shopBusinessType = null;
     _emailVerified = true;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userIdKey);
     await prefs.remove(_userNameKey);
     await prefs.remove(_shopIdKey);
     await prefs.remove(_shopNameKey);
+    await prefs.remove(_shopStateKey);
+    await prefs.remove(_shopGstModeKey);
+    await prefs.remove(_shopGstNumKey);
+    await prefs.remove(_shopBusinessTypeKey);
   }
 
   /// Mark the current user's email as verified and notify listeners.
@@ -309,4 +370,5 @@ class UserSession extends ChangeNotifier {
     }
   }
 }
+
 

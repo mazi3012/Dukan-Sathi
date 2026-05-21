@@ -816,62 +816,21 @@ class WebChatSession {
         return {'text': 'Error checking dues: $e'};
       }
     }
-    // Catalog intent → direct DB query, return structured card data
-    if (_isCatalogIntent(n)) {
-      try {
-        final rows = await supabase
-            .from('products')
-            .select('id, shop_id, name, price, stock_quantity, category, cost_price')
-            .eq('shop_id', shopId!)
-            .limit(20);
-        final products = (rows as List<dynamic>)
-            .map((row) => Map<String, dynamic>.from(row as Map))
-            .toList();
-
-        if (products.isEmpty) {
-          const text = '🏪 Your catalog is empty right now.\n\nTip: Say "Add product" to add your first product!';
-          _addToHistory(input, text);
-          return {'text': text};
-        }
-
-        final summary = '📦 Here are your products (${products.length}):';
-        _addToHistory(input, summary);
-        return {
-          'text': summary,
-          'card': {'type': 'inventory', 'items': products},
-        };
-      } catch (e) {
-        return {'text': '⚠️ Could not load catalog: $e'};
-      }
-    }
-
-    // Add product intent → direct tool call (MUST be checked before inventory!)
+    // Add product intent (MUST be checked before inventory!)
     if (_isAddProductIntent(n)) {
       final products = _parseAddProductRequest(input);
       if (products.isNotEmpty) {
-        try {
-          final result = await createProductBatchRequest(
-            userIdentifier: userIdentifier,
-            products: products,
-            shopId: _currentShopId,
-          );
-          if (result['success'] == true) {
-            final text = 'Product draft created! Batch ID: ${result['batchId']}';
-            _addToHistory(input, text);
-            return {
-              'text': text,
-              'card': {'type': 'batch', ...result},
-            };
-          } else {
-            final text = '⚠️ Failed to create product draft: ${result['message']}';
-            _addToHistory(input, text);
-            return {'text': text};
+        final text = 'I\'ve drafted product proposal(s) based on your request. Please review and approve to add to your inventory.';
+        _addToHistory(input, text);
+        return {
+          'text': text,
+          'intent': {
+            'type': 'ADD_PRODUCT',
+            'entities': {
+              'products': products,
+            }
           }
-        } catch (e) {
-          final text = '⚠️ Error creating product draft: $e';
-          _addToHistory(input, text);
-          return {'text': text};
-        }
+        };
       }
     }
 
@@ -900,31 +859,23 @@ class WebChatSession {
       };
     }
 
-    // Billing intent → direct tool call
+    // Billing intent
     if (_isBillingIntent(n)) {
       final requestedItems = _parseBillingItems(input);
       if (requestedItems.isNotEmpty) {
-        try {
-          final customerName = _extractCustomerName(input);
-          final result = await createDraftInvoiceRequest(
-            input: {
+        final customerName = _extractCustomerName(input);
+        final text = 'I\'ve generated a draft invoice based on your instructions. Please review the GST settings and finalize.';
+        _addToHistory(input, text);
+        return {
+          'text': text,
+          'intent': {
+            'type': 'CREATE_INVOICE',
+            'entities': {
+              'customerName': customerName,
               'requestedItems': requestedItems,
-              'customerName': ?customerName,
-              'shopId': _currentShopId,
-            },
-            userIdentifier: userIdentifier,
-          );
-          final text = 'Draft invoice created! Approval ID: ${result['approvalId']}';
-          _addToHistory(input, text);
-          return {
-            'text': text,
-            'card': {'type': 'invoice', ...result},
-          };
-        } catch (e) {
-          final text = e.toString().replaceFirst('Bad state: ', '').trim();
-          _addToHistory(input, text);
-          return {'text': text};
-        }
+            }
+          }
+        };
       }
     }
 

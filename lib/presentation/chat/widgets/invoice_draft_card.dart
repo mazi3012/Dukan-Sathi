@@ -3,12 +3,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:http/http.dart' as http;
+import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/widgets/app_skeleton.dart';
 import '../../../core/session.dart';
 import '../../../services/invoice_pdf_generator.dart';
 import '../../billing/pages/invoice_pdf_preview_screen.dart';
+import '../../../models/cart_item.dart';
+import '../../../models/draft_approval.dart';
+import '../../../models/tax_breakdown.dart';
+import '../../../services/gst_calculator.dart';
+import '../../../data/repositories/sale_repository.dart';
+import '../../../data/repositories/product_repository.dart';
+import '../../../data/sync/sync_manager.dart';
+
 
 class InvoiceDraftCard extends StatefulWidget {
   final Map<String, dynamic>? payload;
@@ -75,43 +84,139 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
     }
   }
   String get _approvalId => (_data['approval_id'] ?? _data['approvalId'] ?? '').toString();
+  void _recalculateLocalDraft(Map<String, dynamic> updatedData) {
+    final shopConfig = UserSession().shopConfig;
+
+    // 1. Parse items into CartItem
+    final itemsList = (updatedData['proposed_items'] ?? updatedData['items'] ?? []) as List<dynamic>;
+    final List<CartItem> cartItems = itemsList.map((itemJson) {
+      final json = Map<String, dynamic>.from(itemJson as Map);
+      return CartItem(
+        productId: json['productId'] as String,
+        productName: json['productName']?.toString() ?? json['name']?.toString() ?? 'Item',
+        quantity: (json['quantity'] as num).toInt(),
+        unitPrice: (json['unitPrice'] as num).toDouble(),
+        gstRate: (json['gstRate'] as num?)?.toDouble() ?? 18.0,
+      );
+    }).toList();
+
+    // 2. Resolve GST type and customerState
+    final gstType = updatedData['gst_type'] ?? updatedData['gstType'] ?? 'CGST_SGST';
+    String customerState = shopConfig.state;
+    if (gstType == 'IGST') {
+      customerState = shopConfig.state == 'DL' ? 'MH' : 'DL'; // force inter-state
+    }
+
+    // 3. Resolve discount and apply
+    final discountType = updatedData['discount_type'] ?? updatedData['discountType'] ?? 'PERCENT';
+    final discountValue = (updatedData['discount_value'] ?? updatedData['discountValue'] ?? 0.0) as num;
+    final discountValueDouble = discountValue.toDouble();
+
+    double subtotal = 0.0;
+    for (final item in cartItems) {
+      subtotal += item.quantity * item.unitPrice;
+    }
+
+    double discountAmount = 0.0;
+    if (discountType == 'PERCENT') {
+      discountAmount = subtotal * (discountValueDouble / 100);
+    } else {
+      discountAmount = discountValueDouble;
+    }
+    discountAmount = discountAmount.clamp(0.0, subtotal);
+
+    // 4. Calculate tax
+    final taxBreakdown = GSTCalculator.calculateTax(
+      items: cartItems,
+      shopConfig: shopConfig,
+      customerState: customerState,
+      invoiceDiscount: discountAmount,
+    );
+
+    // 5. Update payment details
+    final paymentStatus = updatedData['payment_status'] ?? updatedData['paymentStatus'] ?? 'UNPAID';
+    double amountPaid = 0.0;
+    if (paymentStatus == 'PAID') {
+      amountPaid = taxBreakdown.totalAmount;
+    } else if (paymentStatus == 'PARTIAL') {
+      final amt = updatedData['amount_paid'] ?? updatedData['amountPaid'] ?? 0.0;
+      amountPaid = (amt is num) ? amt.toDouble() : 0.0;
+      amountPaid = amountPaid.clamp(0.0, taxBreakdown.totalAmount);
+    }
+
+    setState(() {
+      _data = {
+        ...updatedData,
+        'proposed_items': cartItems.map((c) => c.toJson()).toList(),
+        'gst_type': gstType,
+        'discount_type': discountType,
+        'discount_value': discountValueDouble,
+        'discount_amount': discountAmount,
+        'subtotal_before_discount': taxBreakdown.subtotal,
+        'subtotal_after_discount': taxBreakdown.taxableAmount,
+        'proposed_tax_breakdown': taxBreakdown.toJson(),
+        'proposed_total': taxBreakdown.totalAmount,
+        'payment_status': paymentStatus,
+        'amount_paid': amountPaid,
+        'due_amount': taxBreakdown.totalAmount - amountPaid,
+      };
+      
+      _discountController.text = discountValueDouble > 0 
+          ? (discountType == 'PERCENT' ? '${discountValueDouble.toStringAsFixed(0)}%' : discountValueDouble.toStringAsFixed(2))
+          : '';
+      _paidAmountController.text = amountPaid > 0 ? amountPaid.toStringAsFixed(2) : '';
+    });
+  }
+
   Future<void> _updateDraft(String type, Map<String, dynamic> extra) async {
     final aid = _approvalId;
     if (aid.isEmpty) {
       debugPrint("Warning: approvalId is empty in _data: $_data");
     }
     setState(() => _isLoading = true);
+
+    // Organic delay for premium micro-animations
+    await Future.delayed(const Duration(milliseconds: 150));
+
     try {
-      final response = await http.post(
-        Uri.parse('/api/update-draft'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'approvalId': aid,
-          'type': type,
-          ...extra,
-        }),
-      );
-      if (response.statusCode == 200) {
-        // Refresh draft data
-        final refreshResp = await http.get(
-          Uri.parse('/api/get-draft?approvalId=$aid'),
-        );
-        if (refreshResp.statusCode == 200) {
-          setState(() {
-            _data = jsonDecode(refreshResp.body);
-            _discountController.text = (_data['discount_value'] ?? 0).toString();
-            _paidAmountController.text = (_data['amount_paid'] ?? 0).toString();
-            if (type == 'payment' && (_data['payment_status'] ?? _data['paymentStatus']) == 'PARTIAL') {
-              _paidAmountFocusNode.requestFocus();
+      final updatedData = Map<String, dynamic>.from(_data);
+
+      if (type == 'edit_item') {
+        final productId = extra['productId'] as String;
+        final newQty = extra['quantity'] as int;
+        final newPrice = extra['unitPrice'] as double?;
+
+        final items = List<dynamic>.from(updatedData['proposed_items'] ?? updatedData['items'] ?? []);
+        for (int i = 0; i < items.length; i++) {
+          final item = Map<String, dynamic>.from(items[i]);
+          if (item['productId'] == productId) {
+            item['quantity'] = newQty;
+            if (newPrice != null) {
+              item['unitPrice'] = newPrice;
             }
-          });
+            items[i] = item;
+            break;
+          }
         }
-      } else {
-        final errorMsg = response.body;
-        throw Exception("Server Error ($type): $errorMsg");
+        updatedData['proposed_items'] = items;
+      } else if (type == 'gst') {
+        updatedData['gst_type'] = extra['gstType'];
+      } else if (type == 'payment') {
+        updatedData['payment_status'] = extra['paymentStatus'];
+        if (extra.containsKey('amountPaid')) {
+          updatedData['amount_paid'] = extra['amountPaid'];
+        }
+      } else if (type == 'discount') {
+        updatedData['discount_type'] = extra['discountType'];
+        updatedData['discount_value'] = extra['discountValue'];
       }
+
+      _recalculateLocalDraft(updatedData);
+
+      if (type == 'payment' && (updatedData['payment_status'] ?? updatedData['paymentStatus']) == 'PARTIAL' && !extra.containsKey('amountPaid')) {
+        _paidAmountFocusNode.requestFocus();
+      }
+
     } catch (e) {
       debugPrint("Error in _updateDraft: $e");
       if (mounted) {
@@ -127,6 +232,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
   void _showEditItemDialog(Map<String, dynamic> item) {
     final qtyCtrl = TextEditingController(text: item['quantity']?.toString());
     final priceCtrl = TextEditingController(text: item['unitPrice']?.toString());
@@ -191,11 +297,57 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       },
     );
   }
+
   Future<void> _generateAndOpenPdf(String aid, String invoiceNo) async {
     try {
-      final generatedPdf = await InvoicePdfGenerator.generateApprovedInvoicePdf(
-        approvalId: aid,
+      final session = UserSession();
+      final shopConfig = session.shopConfig;
+
+      // Construct DraftApproval model locally
+      final draftApproval = DraftApproval.fromJson({
+        'approval_id': aid,
+        'shop_id': session.shopId ?? '',
+        'customer_id': _data['customer_id'] ?? _data['customerId'],
+        'customer_name': _data['customer_name'] ?? _data['customerName'] ?? 'Walk-in Customer',
+        'customer_state': _data['customer_state'] ?? _data['customerState'] ?? shopConfig.state,
+        'proposed_items': _data['proposed_items'] ?? _data['items'] ?? [],
+        'proposed_tax_breakdown': _data['proposed_tax_breakdown'] ?? _data['taxBreakdown'] ?? {},
+        'proposed_total': _data['proposed_total'] ?? _data['proposedTotal'] ?? 0.0,
+        'subtotal_before_discount': _data['subtotal_before_discount'] ?? _data['subtotalBeforeDiscount'] ?? 0.0,
+        'subtotal_after_discount': _data['subtotal_after_discount'] ?? _data['subtotalAfterDiscount'] ?? 0.0,
+        'discount_type': _data['discount_type'] ?? _data['discountType'],
+        'discount_value': _data['discount_value'] ?? _data['discountValue'],
+        'discount_amount': _data['discount_amount'] ?? _data['discountAmount'] ?? 0.0,
+        'amount_paid': _data['amount_paid'] ?? _data['amountPaid'] ?? 0.0,
+        'payment_status': _data['payment_status'] ?? _data['paymentStatus'] ?? 'UNPAID',
+        'due_amount': _data['due_amount'] ?? _data['dueAmount'] ?? 0.0,
+        'approval_status': 'APPROVED',
+        'reviewed_by': session.userId ?? 'merchant',
+        'reviewed_at': DateTime.now().toIso8601String(),
+      });
+
+      final productDetails = <String, Map<String, dynamic>>{};
+      final itemsList = (_data['proposed_items'] ?? _data['items'] ?? []) as List<dynamic>;
+      for (final itemJson in itemsList) {
+        final json = Map<String, dynamic>.from(itemJson as Map);
+        final pId = json['productId'] as String;
+        productDetails[pId] = {
+          'name': json['productName'] ?? json['name'] ?? 'Item',
+          'hsn_sac_code': json['hsn_sac_code'] ?? json['hsnSacCode'] ?? '-',
+          'gst_rate': json['gstRate'] ?? 18.0,
+        };
+      }
+
+      final generatedPdf = await InvoicePdfGenerator.generateApprovedInvoicePdfOffline(
+        approval: draftApproval,
         invoiceNumber: invoiceNo,
+        shopName: shopConfig.name.isNotEmpty ? shopConfig.name : 'Dukan Sathi',
+        shopState: shopConfig.state,
+        gstNumber: shopConfig.gstin,
+        businessType: shopConfig.businessType,
+        customerName: draftApproval.customerName ?? 'Walk-in Customer',
+        customerPhone: null,
+        productDetails: productDetails,
       );
 
       if (mounted) {
@@ -224,10 +376,10 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
   }
 
   Future<void> _approveDraft() async {
-    // Block approval if PARTIAL with no amount paid entered
     final currentPaymentStatus = (_data['payment_status'] ?? _data['paymentStatus'] ?? 'UNPAID').toString();
     final currentAmountPaid = (_data['amount_paid'] ?? _data['amountPaid'] ?? 0.0);
     final amountPaidVal = (currentAmountPaid is num) ? currentAmountPaid.toDouble() : 0.0;
+
     if (currentPaymentStatus == 'PARTIAL' && amountPaidVal <= 0) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -240,52 +392,144 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       }
       return;
     }
-    setState(() => _isApproving = true);
-    try {
-      final userId = UserSession().userId;
-      final aid = _approvalId;
-      final response = await http.post(
-        Uri.parse('/api/approve-draft'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'approvalId': aid,
-          'userId': userId,
-        }),
-      );
-      final result = jsonDecode(response.body);
-      if (result['success'] == true) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['message'] ?? "Invoice Approved!"),
-              backgroundColor: AppColors.success,
-            ),
-          );
-          final invoiceNo = result['invoiceNumber'] as String? ?? 'INV-${aid.substring(0, 8).toUpperCase()}';
-          setState(() {
-            _data['approval_status'] = 'APPROVED';
-            _data['invoice_number'] = invoiceNo;
-          });
 
-          // Automatically generate and show PDF preview
-          await _generateAndOpenPdf(aid, invoiceNo);
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result['error'] ?? "Approval failed"),
-              backgroundColor: AppColors.error,
-            ),
+    setState(() => _isApproving = true);
+
+    try {
+      final session = UserSession();
+      final shopId = session.shopId!;
+      final shopConfig = session.shopConfig;
+      final aid = _approvalId;
+      final saleId = const Uuid().v4();
+      final draftInvoiceId = const Uuid().v4();
+
+      final invoiceNo = 'INV-${aid.substring(0, 13).replaceAll('-', '').toUpperCase()}';
+
+      // Parse items
+      final itemsList = (_data['proposed_items'] ?? _data['items'] ?? []) as List<dynamic>;
+      final List<CartItem> cartItems = itemsList.map((itemJson) {
+        final json = Map<String, dynamic>.from(itemJson as Map);
+        return CartItem(
+          productId: json['productId'] as String,
+          productName: json['productName']?.toString() ?? json['name']?.toString() ?? 'Item',
+          quantity: (json['quantity'] as num).toInt(),
+          unitPrice: (json['unitPrice'] as num).toDouble(),
+          gstRate: (json['gstRate'] as num?)?.toDouble() ?? 18.0,
+        );
+      }).toList();
+
+      final customerName = (_data['customer_name'] ?? _data['customerName'])?.toString();
+      final customerId = (_data['customer_id'] ?? _data['customerId'])?.toString();
+      final customerState = _data['customer_state'] ?? _data['customerState'] ?? shopConfig.state;
+      final proposedTotal = (_data['proposed_total'] ?? _data['proposedTotal'] ?? 0.0) as num;
+
+      final subtotalBeforeDiscount = (_data['subtotal_before_discount'] ?? _data['subtotalBeforeDiscount'] ?? proposedTotal).toDouble();
+      final subtotalAfterDiscount = (_data['subtotal_after_discount'] ?? _data['subtotalAfterDiscount'] ?? proposedTotal).toDouble();
+      final discountType = (_data['discount_type'] ?? _data['discountType'])?.toString();
+      final discountValue = (_data['discount_value'] ?? _data['discountValue'] as num?)?.toDouble();
+      final discountAmount = (_data['discount_amount'] ?? _data['discountAmount'] ?? 0.0).toDouble();
+
+      final dueAmount = proposedTotal.toDouble() - amountPaidVal;
+
+      // 1. Save locally to SQFlite sales table
+      final saleRepo = SaleRepository();
+      final saleMap = {
+        'id': saleId,
+        'invoice_number': invoiceNo,
+        'shop_id': shopId,
+        'invoice_id': draftInvoiceId,
+        'customer_id': customerId,
+        'customer_name': customerName,
+        'customer_state': customerState,
+        'amount': proposedTotal.toDouble(),
+        'amount_paid': amountPaidVal,
+        'due_amount': dueAmount,
+        'payment_status': currentPaymentStatus,
+        'discount_type': discountType,
+        'discount_value': discountValue,
+        'discount_amount': discountAmount,
+        'subtotal_before_discount': subtotalBeforeDiscount,
+        'subtotal_after_discount': subtotalAfterDiscount,
+        'timestamp': DateTime.now().toIso8601String(),
+        'payment_method': 'pending',
+        'status': 'approved',
+      };
+
+      await saleRepo.saveSale(saleMap);
+
+      // 2. Adjust local product stock
+      final productRepo = ProductRepository();
+      final allProducts = await productRepo.getProducts(shopId);
+      final syncManager = SyncManager.instance;
+
+      for (final item in cartItems) {
+        final pIndex = allProducts.indexWhere((prod) => prod.id == item.productId);
+        if (pIndex != -1) {
+          final p = allProducts[pIndex];
+          final updatedProduct = p.copyWith(
+            stockQuantity: (p.stockQuantity - item.quantity).clamp(0, 999999),
           );
+          await productRepo.updateProduct(updatedProduct);
         }
+
+        // Queue stock adjustment background sync
+        await syncManager.queueOperation(
+          tableName: 'products',
+          action: 'ADJUST_STOCK',
+          recordId: item.productId,
+          payload: {'delta': -item.quantity},
+        );
       }
-    } catch (e) {
-      debugPrint("Approve error: $e");
+
+      // 3. Queue Draft Invoice Insert in background sync
+      await syncManager.queueOperation(
+        tableName: 'draft_invoices',
+        action: 'INSERT',
+        recordId: draftInvoiceId,
+        payload: {
+          'id': draftInvoiceId,
+          'shop_id': shopId,
+          'customer_id': customerId,
+          'customer_name': customerName,
+          'items': cartItems.map((c) => c.toJson()).toList(),
+          'total_amount': proposedTotal.toDouble(),
+          'tax_breakdown': _data['proposed_tax_breakdown'],
+          'status': 'approved',
+          'draft_approval_id': aid,
+        },
+      );
+
+      // 4. Update local draft status & invoice details
+      setState(() {
+        _data['approval_status'] = 'APPROVED';
+        _data['invoice_number'] = invoiceNo;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("✅ Invoice Approved Locally! Billed to ${customerName ?? 'Walk-in Customer'}"),
+            backgroundColor: AppColors.success,
+          ),
+        );
+
+        // Automatically generate and show PDF preview offline!
+        await _generateAndOpenPdf(aid, invoiceNo);
+      }
+    } catch (e, stack) {
+      debugPrint("Approve error: $e\n$stack");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Approval error: $e"),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } finally {
-      setState(() => _isApproving = false);
+      if (mounted) {
+        setState(() => _isApproving = false);
+      }
     }
   }
   @override

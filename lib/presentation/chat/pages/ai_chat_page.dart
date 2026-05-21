@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
@@ -14,6 +15,7 @@ import '../widgets/invoice_draft_card.dart';
 import '../widgets/inventory_draft_card.dart';
 import '../widgets/ai_thinking_indicator.dart';
 import '../../../core/services/tts_service.dart';
+import '../../../core/services/connectivity_service.dart';
 
 
 class AiChatPage extends ConsumerStatefulWidget {
@@ -32,16 +34,27 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
   bool _isTranscribing = false;
   bool _isVoiceEnabled = false;
   final TtsService _ttsService = TtsService();
+  late StreamSubscription<bool> _connectivitySubscription;
+  bool _isOnline = true;
 
   @override
   void initState() {
     super.initState();
     _ttsService.init();
+    _isOnline = ConnectivityService.instance.isOnline;
+    _connectivitySubscription = ConnectivityService.instance.onConnectivityChanged.listen((online) {
+      if (mounted) {
+        setState(() {
+          _isOnline = online;
+        });
+      }
+    });
   }
 
 
   @override
   void dispose() {
+    _connectivitySubscription.cancel();
     _audioRecorder.dispose();
     _textController.dispose();
     _scrollController.dispose();
@@ -214,44 +227,124 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
           const SizedBox(width: 8),
         ],
       ),
-      body: Stack(
-        children: [
-          // Background handled by Scaffold
-          const SizedBox.expand(),
-          
-          // Chat List
-          SafeArea(
-            child: Center(
+      body: !_isOnline
+          ? Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 800),
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: EdgeInsets.all(20).copyWith(
-                    bottom: MediaQuery.of(context).viewInsets.bottom + 140,
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: GlassBox(
+                    blur: 20,
+                    opacity: 0.1,
+                    border: Border.all(color: AppColors.darkGlassBorder),
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withOpacity(0.15),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                            ),
+                            child: const Icon(
+                              Iconsax.wifi_square,
+                              size: 48,
+                              color: AppColors.error,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          const Text(
+                            "AI Assistant is Offline",
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            "Dukan Sathi AI utilizes strictly online neural processing engines to run voice recognition and billing generation. Please check your internet connection.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white70,
+                              height: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _isOnline = ConnectivityService.instance.isOnline;
+                              });
+                              if (_isOnline) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text("Connected! AI Voice Chat initialized."),
+                                    backgroundColor: AppColors.success,
+                                  ),
+                                );
+                              }
+                            },
+                            icon: const Icon(Iconsax.refresh, size: 18),
+                            label: const Text("Retry Connection"),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).primaryColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final msg = messages[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _buildMessageRow(context, msg),
-                    );
-                  },
                 ),
               ),
+            )
+          : Stack(
+              children: [
+                // Background handled by Scaffold
+                const SizedBox.expand(),
+                
+                // Chat List
+                SafeArea(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 800),
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        padding: EdgeInsets.all(20).copyWith(
+                          bottom: MediaQuery.of(context).viewInsets.bottom + 140,
+                        ),
+                        itemCount: messages.length,
+                        itemBuilder: (context, index) {
+                          final msg = messages[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: _buildMessageRow(context, msg),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Input Area
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 800),
+                    child: _buildInputArea(context),
+                  ),
+                ),
+              ],
             ),
-          ),
-          
-          // Input Area
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 800),
-              child: _buildInputArea(context),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
