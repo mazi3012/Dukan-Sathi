@@ -27,7 +27,7 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
 
   Future<void> loadHistory() async {
     final shopId = UserSession().shopId;
-    if (shopId.isEmpty) return;
+    if (shopId == null || shopId.isEmpty) return;
 
     try {
       final rows = await LocalDatabase.instance.queryAll(
@@ -68,7 +68,7 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
     if (msg.isTyping) return;
     
     final shopId = UserSession().shopId;
-    if (shopId.isEmpty) return;
+    if (shopId == null || shopId.isEmpty) return;
 
     try {
       await LocalDatabase.instance.insert('chat_messages', {

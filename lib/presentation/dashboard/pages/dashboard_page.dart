@@ -9,6 +9,7 @@ import '../../../core/widgets/skeleton.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../providers/dashboard_provider.dart';
+import '../../../core/session.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
