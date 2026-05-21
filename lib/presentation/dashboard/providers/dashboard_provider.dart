@@ -42,7 +42,7 @@ class DashboardState {
       invoiceCountToday: 0,
       totalMarketDues: 0.0,
       aiRestockItemsCount: 0,
-      aiRestockItemName: "Premium Basmati Rice (5kg)",
+      aiRestockItemName: "All Stock Normal",
       expectedRevenueTomorrow: 0.0,
       pendingApprovalsCount: 0,
       recentActivity: [],
@@ -105,9 +105,13 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         whereArgs: [shopId],
       );
       
-      double sales = 0;
+      double netRevenue = 0;
+      double grossSales = 0;
       for (var row in salesRes) {
-        sales += (row['amount'] as num).toDouble();
+        final amount = (row['amount'] as num).toDouble();
+        final beforeDiscount = (row['subtotal_before_discount'] as num?)?.toDouble() ?? amount;
+        netRevenue += amount;
+        grossSales += beforeDiscount;
       }
 
       // 2. Fetch Invoice Count locally
@@ -149,6 +153,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         whereArgs: [shopId, 5],
       );
       final lowStock = lowStockRes.length;
+      final restockItemName = lowStockRes.isNotEmpty ? lowStockRes.first['name'] as String : "All Stock Normal";
 
       // 6. Fetch Total Market Dues locally
       final duesRes = await _localDb.queryAll(
@@ -171,12 +176,11 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         limit: 6,
       );
 
-      final grossSales = sales > 0 ? sales * 1.2 : 0.0;
-      final netRevenue = sales > 0 ? sales : 0.0;
-      final gstCollected = netRevenue * 0.18;
+      final gstCollected = netRevenue * 0.18; // Keep 18% assumption if missing, or use actual
       final totalMarketDues = dues > 0 ? dues : 0.0;
       final aiRestockItemsCount = lowStock;
       final expectedRevenueTomorrow = netRevenue * 1.05; // 5% growth projection
+      final aiRestockItemName = restockItemName;
 
       state = state.copyWith(
         grossSales: grossSales,
