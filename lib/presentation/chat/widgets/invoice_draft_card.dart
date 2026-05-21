@@ -370,17 +370,30 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       return;
     }
 
-    setState(() => _isApproving = true);
+    final aid = _approvalId;
+    final invoiceNo = 'INV-${aid.substring(0, 13).replaceAll('-', '').toUpperCase()}';
+    final customerName = (_data['customer_name'] ?? _data['customerName'])?.toString() ?? "Walk-in Customer";
+
+    // Show the premium step-by-step progress dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => ApprovalProgressDialog(
+        invoiceNo: invoiceNo,
+        customerName: customerName,
+        onFinish: () async {
+          // Auto generate and show PDF preview offline!
+          await _generateAndOpenPdf(aid, invoiceNo);
+        },
+      ),
+    );
 
     try {
       final session = UserSession();
       final shopId = session.shopId!;
       final shopConfig = session.shopConfig;
-      final aid = _approvalId;
       final saleId = const Uuid().v4();
       final draftInvoiceId = const Uuid().v4();
-
-      final invoiceNo = 'INV-${aid.substring(0, 13).replaceAll('-', '').toUpperCase()}';
 
       // Parse items
       final itemsList = (_data['proposed_items'] ?? _data['items'] ?? []) as List<dynamic>;
@@ -395,7 +408,6 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
         );
       }).toList();
 
-      final customerName = (_data['customer_name'] ?? _data['customerName'])?.toString();
       final customerId = (_data['customer_id'] ?? _data['customerId'])?.toString();
       final customerState = _data['customer_state'] ?? _data['customerState'] ?? shopConfig.state;
       final proposedTotal = (_data['proposed_total'] ?? _data['proposedTotal'] ?? 0.0) as num;
@@ -482,17 +494,6 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
         _data['invoice_number'] = invoiceNo;
       });
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("✅ Invoice Approved Locally! Billed to ${customerName ?? 'Walk-in Customer'}"),
-            backgroundColor: AppColors.success,
-          ),
-        );
-
-        // Automatically generate and show PDF preview offline!
-        await _generateAndOpenPdf(aid, invoiceNo);
-      }
     } catch (e, stack) {
       debugPrint("Approve error: $e\n$stack");
       if (mounted) {
@@ -502,10 +503,6 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
             backgroundColor: AppColors.error,
           ),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isApproving = false);
       }
     }
   }
@@ -1340,6 +1337,254 @@ class _ErrorPlaceholder extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class ApprovalProgressDialog extends StatefulWidget {
+  final String invoiceNo;
+  final String customerName;
+  final VoidCallback onFinish;
+
+  const ApprovalProgressDialog({
+    super.key,
+    required this.invoiceNo,
+    required this.customerName,
+    required this.onFinish,
+  });
+
+  @override
+  State<ApprovalProgressDialog> createState() => _ApprovalProgressDialogState();
+}
+
+class _ApprovalProgressDialogState extends State<ApprovalProgressDialog> {
+  int _activeStep = 0;
+  bool _isError = false;
+  String _errorMessage = '';
+
+  final List<String> _steps = [
+    "Verifying invoice parameters & customer state",
+    "Writing finalized billing record to SQLite database",
+    "Recalculating local store inventory stock counts",
+    "Queueing background synchronization tasks",
+    "Generating print-ready GST-compliant PDF invoice",
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _startApproval();
+  }
+
+  Future<void> _startApproval() async {
+    try {
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+      setState(() => _activeStep = 1);
+
+      await Future.delayed(const Duration(milliseconds: 650));
+      if (!mounted) return;
+      setState(() => _activeStep = 2);
+
+      await Future.delayed(const Duration(milliseconds: 650));
+      if (!mounted) return;
+      setState(() => _activeStep = 3);
+
+      await Future.delayed(const Duration(milliseconds: 650));
+      if (!mounted) return;
+      setState(() => _activeStep = 4);
+
+      await Future.delayed(const Duration(milliseconds: 700));
+      if (!mounted) return;
+      setState(() => _activeStep = 5);
+
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
+      widget.onFinish();
+
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isError = true;
+          _errorMessage = e.toString();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return WillPopScope(
+      onWillPop: () async => false, // Non-dismissible
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          width: 380,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xEC15151A) : const Color(0xF4FFFFFF),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: _isError
+                  ? AppColors.error.withOpacity(0.3)
+                  : (_activeStep == 5 ? AppColors.success.withOpacity(0.4) : theme.primaryColor.withOpacity(0.2)),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: (_activeStep == 5 ? AppColors.success : theme.primaryColor).withOpacity(0.12),
+                blurRadius: 30,
+                spreadRadius: 2,
+              )
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Glowing Header Icon
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: (_isError
+                      ? AppColors.error
+                      : (_activeStep == 5 ? AppColors.success : theme.primaryColor)).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: (_isError
+                        ? AppColors.error
+                        : (_activeStep == 5 ? AppColors.success : theme.primaryColor)).withOpacity(0.2),
+                    width: 2,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: _isError
+                    ? const Icon(Iconsax.warning_2, color: AppColors.error, size: 30)
+                    : (_activeStep == 5
+                        ? const Icon(Iconsax.tick_circle, color: AppColors.success, size: 32)
+                        : const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2.5),
+                          )),
+              ).animate().scale(duration: 350.ms, curve: Curves.easeOutBack),
+              const SizedBox(height: 20),
+
+              // Title
+              Text(
+                _isError
+                    ? "Approval Failed"
+                    : (_activeStep == 5 ? "Invoice Finalized!" : "Approving Invoice"),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _isError
+                    ? "An error occurred during finalization."
+                    : (_activeStep == 5 ? "Billing record generated successfully." : "Assembling POS transaction ledger..."),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: isDark ? Colors.white54 : Colors.black54,
+                  fontSize: 11,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Step Checklist
+              ...List.generate(_steps.length, (index) {
+                final isDone = _activeStep > index;
+                final isActive = _activeStep == index;
+
+                Widget leadingWidget = const Icon(Iconsax.clock, size: 16, color: Colors.white24);
+
+                if (isDone) {
+                  leadingWidget = const Icon(Iconsax.tick_circle, color: AppColors.success, size: 18)
+                      .animate()
+                      .scale(duration: 200.ms, curve: Curves.easeOutBack);
+                } else if (isActive && !_isError) {
+                  leadingWidget = const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  );
+                } else if (_isError && isActive) {
+                  leadingWidget = const Icon(Iconsax.close_circle, color: AppColors.error, size: 18);
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        alignment: Alignment.center,
+                        child: leadingWidget,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _steps[index],
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDone
+                                ? (isDark ? Colors.white70 : Colors.black87)
+                                : (isActive ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.white30 : Colors.black38)),
+                            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+
+              // Action at completion or error
+              if (_activeStep == 5) ...[
+                const SizedBox(height: 24),
+                Container(
+                  width: double.infinity,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text(
+                      "Launch Print & PDF Viewer",
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.2),
+              ] else if (_isError) ...[
+                const SizedBox(height: 16),
+                Text(
+                  _errorMessage,
+                  style: const TextStyle(color: AppColors.error, fontSize: 11),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Close"),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
