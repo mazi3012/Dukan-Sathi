@@ -1,107 +1,77 @@
-# Dukan Sathi Pro - Genkit Backend
+# Dukan Sathi Pro - AI Retail Assistant
 
-AI retail backend built with Dart, Genkit, Google GenAI SDK, Supabase, and Telegram integration.
+An AI-powered shop companion and POS system built with Flutter, Dart, Genkit, Groq, and Supabase. Features a cutting-edge Glassmorphism UI and voice-activated intelligent billing.
 
-## Current Status
+## 🚀 Current Architecture
 
-- **Phase 4 COMPLETE:** GST compliance + human-in-loop approval (Telegram-native)
-  - All 28 Indian states + 8 UTs tax calculation support
-  - REGISTERED, UNREGISTERED, COMPOSITE GST modes
-  - Approval workflow: Draft → DraftApproval → Sale
-  - Telegram approval buttons (APPROVE/REJECT)
-  - Complete audit trail for compliance
-  - See: [PHASE4_GST_APPROVAL_COMPLETE.md](PHASE4_GST_APPROVAL_COMPLETE.md)
-- Live state and runbook: [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md)
+The application is currently operating as a cloud-first application:
+- **Frontend (Flutter):** Provides Dashboard, Inventory, Customers, Billing, and AI Chat interfaces. Currently reads/writes directly from Supabase.
+- **Backend (Dart):** Powered by `bin/genkit_server.dart`. Handles Genkit workflows, tools integration, Groq Whisper transcription, and PDF invoice generation.
+- **Database (Supabase):** PostgreSQL database managing shops, products, customers, sales, and draft invoices with multi-tenant architecture (RLS).
+- **AI Integration:** Uses Google GenAI for reasoning and Groq Whisper for fast voice transcription.
 
-## Quick Start
+## 🗺️ Scalability Roadmap (Upcoming)
 
-1. Install dependencies
+We are transitioning to a **Hybrid Offline-First** architecture to support 50,000+ active users:
 
+1. **Offline-First POS Engine:** 
+   - Local Isar/SQLite caching for products, customers, and sales.
+   - Background SyncManager to batch updates to Supabase when online.
+   - Optimistic UI updates.
+2. **Online-Only AI Lane:**
+   - AI Voice Chat remains strictly online.
+   - AI intents will return structured JSON, executing actions locally rather than server-side.
+3. **Database Hardening:**
+   - Transition to explicit `SELECT` columns (removing `SELECT *`).
+   - Implementation of Supavisor connection pooling.
+   - Robust indexing on `shop_id`, `owner_id`, `barcode`, etc.
+
+*For the complete detailed roadmap, check the `scalability_roadmap.md` artifact in the knowledge base.*
+
+## 💻 Tech Stack
+
+- **App:** Flutter, Riverpod, Google Fonts, Iconsax
+- **Backend Services:** Dart, Genkit, shelf, http
+- **AI Models:** Gemini (via Genkit), Whisper Large v3 (via Groq)
+- **Database:** Supabase (Postgres)
+- **Hosting:** Vercel (API Proxies), Render (Dart Server)
+
+## 🛠️ Quick Start
+
+### 1. Install Dependencies
 ```bash
-dart pub get
+flutter pub get
 ```
 
-2. Create `.env` (never commit this file)
+### 2. Environment Configuration
+Create a `.env` file in the root directory (never commit this file):
 
 ```env
 MODEL_ID=gemini-3.1-flash-lite-preview
 GOOGLE_API_KEY=<your-google-genai-api-key>
-TELEGRAM_BOT_TOKEN=<your-telegram-bot-token>
+GROQ_API_KEY=<your-groq-api-key>
 SUPABASE_URL=<your-supabase-url>
 SUPABASE_ANON_KEY=<your-supabase-anon-key>
-SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
 ```
 
-The onboarding flow accepts either a full Indian state name or a GST code and normalizes it before saving.
-
-3. Run Genkit dashboard
-
+### 3. Run the Backend Server
+The server handles AI requests, transcription, and admin APIs.
 ```bash
-dart run bin/genkit_ui.dart
+dart run bin/genkit_server.dart
 ```
+*(Runs on port 3100 by default)*
 
-4. Run Telegram bot
-
+### 4. Run the Flutter App
 ```bash
-dart run bin/telegram_bot.dart
+flutter run
 ```
 
-## Runtime Components
+## 🔒 Security Notes
+- Ensure `.env` and `.secrets/` are gitignored.
+- Row Level Security (RLS) is heavily used to isolate shop data.
+- Avoid committing any API keys or tokens.
 
-- `bin/genkit_ui.dart`: No-code dashboard and flow playground.
-- `bin/genkit_server.dart`: JSON API server.
-- `bin/telegram_bot.dart`: Telegram listener with tool-intent routing.
-- `lib/runtime/genkit_runtime.dart`: Google GenAI runtime + unified `MODEL_ID`.
-
-## Tools
-
-- `checkInventory`: Price/stock lookup from Supabase `products`.
-- `browseCatalogTool`: Lists available products, optional category filter.
-- `createDraftInvoice`: Creates draft invoices in `draft_invoices`.
-- `businessInsightsTool`: Revenue and invoice count analytics.
-- `checkCustomerDue` / `listCustomersDue`: Queries customer balances and un-paid invoices.
-- `recordPayment`: Records incoming payments and updates customer balance.
-- `invoiceLookup`: Searches past invoices by number, customer, or payment status.
-
-## Supabase Schema & Security
-
-Migrations in `supabase/migrations/` include:
-
-- `init_core_schema`: `products`, `draft_invoices`
-- `add_products_read_policy`: base RLS policies
-- `fix_invoice_policies`: explicit anonymous `INSERT`/`SELECT` policies for `draft_invoices`
-
-Apply migrations:
-
-```bash
-npx -y supabase@latest db push
-```
-
-## API Test
-
-```bash
-curl -X POST http://localhost:4000/api/runAction \
-  -H "Content-Type: application/json" \
-  -d '{"key":"/flow/retailAssistantFlow","input":"What item do you sell?"}'
-```
-
-## Security
-
-- `.env` is gitignored.
-- `.secrets/` is gitignored.
-- Supabase local secret variants are gitignored in `supabase/.gitignore`.
-- Do not commit tokens, API keys, service-role keys, or credential JSON files.
-
-## Troubleshooting
-
-- Port conflict on dashboard:
-
-```bash
-PORT=4010 dart run bin/genkit_ui.dart
-```
-
-- Check running listeners:
-
-```bash
-ps aux | grep "bin/telegram_bot.dart" | grep -v grep
-```
+## 🧹 Recent Updates
+- Massive repository cleanup (removed old unused docs, separate admin dashboard, and scripts).
+- Re-architected project for upcoming scalability phase.
+- Voice TTS integration using `flutter_tts`.
