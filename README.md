@@ -43,7 +43,7 @@ flowchart TB
         GeminiReason["Gemini AI Reasoning Engine"]
     end
 
-    subgraph Cloud [("☁️ Supabase Cloud (Multi-Tenant Postgres)")]
+    subgraph Cloud ["☁️ Supabase Cloud (Multi-Tenant Postgres)"]
         SConnection["Supavisor Connection Pool (Port 6543)"]
         Tables[("Database Tables (RLS Secured)")]
         Indexes["High-Load Performance Indexes"]
