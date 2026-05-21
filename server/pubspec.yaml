@@ -1,13 +1,13 @@
-# Server-only pubspec — used by Docker/Render to build the backend.
-# Does NOT include Flutter SDK or any Flutter-specific packages.
-name: dukansathi_new
-description: Dukan Sathi Pro - Backend Server
+name: dukansathi_server
+description: Dukan Sathi Pro - Backend Server (Isolated from Flutter client)
 publish_to: none
 
 environment:
   sdk: ^3.10.0
 
 dependencies:
+  dukansathi_new:
+    path: ../
   genkit: ^0.12.1
   genkit_google_genai: ^0.2.4
   genkit_openai: ^0.2.4
@@ -22,6 +22,7 @@ dependencies:
   shelf: ^1.4.1
   shelf_router: ^1.1.4
   postgres: ^3.1.2
+  schemantic: ^0.1.3
 
 dev_dependencies:
   lints: ^6.0.0

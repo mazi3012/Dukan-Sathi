@@ -1,47 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../main/pages/main_layout.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/responsive_layout.dart';
-import '../../../core/database.dart';
-import '../../../core/session.dart';
 import 'customer_details_page.dart';
-import 'package:dukansathi_new/data/repositories/customer_repository.dart';
-import 'package:dukansathi_new/data/local/local_database.dart';
+import '../providers/customers_provider.dart';
 
-
-
-class CustomersPage extends StatefulWidget {
+class CustomersPage extends ConsumerStatefulWidget {
   const CustomersPage({super.key});
 
   @override
-  State<CustomersPage> createState() => _CustomersPageState();
+  ConsumerState<CustomersPage> createState() => _CustomersPageState();
 }
 
-class _CustomersPageState extends State<CustomersPage> {
-  List<Map<String, dynamic>> _customers = [];
-  bool _isLoading = true;
-  String _filter = 'All'; // All, Dues, Cleared
-  String _searchQuery = '';
-  Map<String, dynamic>? _selectedCustomer;
-
-  int _currentPage = 0;
-  final int _pageSize = 20;
-  bool _hasMore = true;
-  bool _isLoadingMore = false;
+class _CustomersPageState extends ConsumerState<CustomersPage> {
   final ScrollController _scrollController = ScrollController();
-  final LocalDatabase _localDb = LocalDatabase.instance;
-  double _outstandingDuesSum = 0;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_scrollListener);
-    _fetchCustomers();
+    Future.microtask(() {
+      ref.read(customersProvider.notifier).fetchCustomers();
+    });
   }
 
   @override
@@ -56,94 +42,36 @@ class _CustomersPageState extends State<CustomersPage> {
     }
   }
 
-  final CustomerRepository _customerRepo = CustomerRepository();
+  CustomersState get _state => ref.watch(customersProvider);
+
+  List<Map<String, dynamic>> get _customers => _state.customers;
+  bool get _isLoading => _state.isLoading;
+  String get _filter => _state.filter;
+  String get _searchQuery => _state.searchQuery;
+  Map<String, dynamic>? get _selectedCustomer => _state.selectedCustomer;
+  
+  set _selectedCustomer(Map<String, dynamic>? val) {
+    ref.read(customersProvider.notifier).selectCustomer(val);
+  }
+
+  set _filter(String val) {
+    ref.read(customersProvider.notifier).setFilter(val);
+  }
+
+  set _searchQuery(String val) {
+    ref.read(customersProvider.notifier).setSearchQuery(val);
+  }
+
+  bool get _isLoadingMore => _state.isLoadingMore;
+  bool get _hasMore => _state.hasMore;
+  double get _outstandingDuesSum => _state.outstandingDuesSum;
 
   Future<void> _fetchCustomers() async {
-    if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _currentPage = 0;
-      _hasMore = true;
-    });
-    
-    final shopId = UserSession().shopId;
-    if (shopId == null) {
-      if (mounted) setState(() => _isLoading = false);
-      return;
-    }
-
-    try {
-      final res = await _customerRepo.getCustomers(
-        shopId,
-        limit: _pageSize,
-        offset: 0,
-      );
-      final customersMap = res.map((c) => c.toJson()).toList();
-
-      final duesRes = await _localDb.queryAll(
-        'customers',
-        where: 'shop_id = ?',
-        whereArgs: [shopId],
-      );
-      double total = 0;
-      for (var c in duesRes) {
-        total += ((c['current_balance'] as num?)?.toDouble() ?? 0);
-      }
-
-      if (mounted) {
-        setState(() {
-          _customers = customersMap;
-          _outstandingDuesSum = total;
-          _isLoading = false;
-          _hasMore = res.length == _pageSize;
-          
-          if (_selectedCustomer != null) {
-            final updatedCustomer = _customers.firstWhere(
-              (c) => c['id'] == _selectedCustomer!['id'],
-              orElse: () => _selectedCustomer!,
-            );
-            _selectedCustomer = updatedCustomer;
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint('[Customers] Fetch error: $e');
-      if (mounted) setState(() => _isLoading = false);
-    }
+    await ref.read(customersProvider.notifier).fetchCustomers();
   }
 
   Future<void> _loadMoreCustomers() async {
-    if (_isLoadingMore || !_hasMore) return;
-
-    setState(() => _isLoadingMore = true);
-
-    final shopId = UserSession().shopId;
-    if (shopId == null) {
-      if (mounted) setState(() => _isLoadingMore = false);
-      return;
-    }
-
-    try {
-      final nextOffset = (_currentPage + 1) * _pageSize;
-      final res = await _customerRepo.getCustomers(
-        shopId,
-        limit: _pageSize,
-        offset: nextOffset,
-      );
-      final customersMap = res.map((c) => c.toJson()).toList();
-
-      if (mounted) {
-        setState(() {
-          _currentPage++;
-          _customers.addAll(customersMap);
-          _hasMore = res.length == _pageSize;
-          _isLoadingMore = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('[Customers] Load more error: $e');
-      if (mounted) setState(() => _isLoadingMore = false);
-    }
+    await ref.read(customersProvider.notifier).loadMoreCustomers();
   }
 
   List<Map<String, dynamic>> get _filteredCustomers {

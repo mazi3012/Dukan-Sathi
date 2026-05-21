@@ -5,20 +5,16 @@ FROM dart:stable
 
 WORKDIR /app
 
-# Copy the server-only pubspec (no Flutter SDK deps)
-COPY pubspec_server.yaml pubspec.yaml
+# Copy workspace files
+COPY . .
 
-# Copy source code
-COPY lib/ lib/
-COPY bin/ bin/
-
-# Get dependencies using pure Dart (no Flutter SDK needed)
-RUN dart pub get
+# Get dependencies using pure Dart in the server subdirectory
+RUN cd server && dart pub get
 
 # Compile the server binary
-RUN dart compile exe bin/genkit_server.dart -o bin/server
+RUN cd server && dart compile exe bin/genkit_server.dart -o bin/server
 
 # Expose the port (Render provides PORT env var)
 EXPOSE 3100
 
-CMD ["./bin/server"]
+CMD ["./server/bin/server"]

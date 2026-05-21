@@ -145,6 +145,33 @@ class SyncManager {
           'p_delta': delta,
         });
       } else if (action == 'INSERT' || action == 'UPDATE') {
+        // Fetch existing remote record to check for newer updates (Conflict Resolution)
+        try {
+          final remoteRecord = await supabase
+              .from(tableName)
+              .select('updated_at')
+              .eq('id', recordId)
+              .maybeSingle();
+
+          if (remoteRecord != null && remoteRecord['updated_at'] != null) {
+            final serverUpdatedAt = DateTime.parse(remoteRecord['updated_at'] as String);
+
+            // Extract local updated_at timestamp from payload
+            final localTimeStr = payload['updated_at'] ?? payload['timestamp'] ?? payload['created_at'];
+            if (localTimeStr != null) {
+              final localUpdatedAt = DateTime.parse(localTimeStr as String);
+
+              if (serverUpdatedAt.isAfter(localUpdatedAt)) {
+                debugPrint('[SyncManager] Conflict resolved: Remote record is newer than offline local record for ID: $recordId on $tableName ($serverUpdatedAt vs $localUpdatedAt). Skipping local overwrite.');
+                return true; // Skipping is considered success as conflict has been resolved
+              }
+            }
+          }
+        } catch (dbErr) {
+          // If the select fails (e.g. table doesn't have updated_at column), we log and proceed with standard upsert
+          debugPrint('[SyncManager] Sync query for conflict resolution failed (possibly column missing): $dbErr. Proceeding with standard upsert.');
+        }
+
         await supabase.from(tableName).upsert(payload);
       } else if (action == 'DELETE') {
         await supabase.from(tableName).delete().eq('id', recordId);

@@ -1,45 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../main/pages/main_layout.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/responsive_layout.dart';
-import '../../../core/database.dart';
-import '../../../core/session.dart';
-import 'package:dukansathi_new/data/repositories/product_repository.dart';
 import 'package:dukansathi_new/models/product.dart';
+import '../providers/inventory_provider.dart';
 
-
-
-class InventoryPage extends StatefulWidget {
+class InventoryPage extends ConsumerStatefulWidget {
   const InventoryPage({super.key});
 
   @override
-  State<InventoryPage> createState() => _InventoryPageState();
+  ConsumerState<InventoryPage> createState() => _InventoryPageState();
 }
 
-class _InventoryPageState extends State<InventoryPage> {
-  List<Map<String, dynamic>> _products = [];
-  List<Map<String, dynamic>> _allProductsCached = [];
-  bool _isLoading = true;
-  double _totalValue = 0;
-  String _selectedCategory = 'All';
-  List<String> _categories = ['All', 'Low Stock'];
-
-  int _currentPage = 0;
-  final int _pageSize = 20;
-  bool _hasMore = true;
-  bool _isLoadingMore = false;
+class _InventoryPageState extends ConsumerState<InventoryPage> {
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_scrollListener);
-    _fetchProducts();
+    Future.microtask(() {
+      ref.read(inventoryProvider.notifier).fetchProducts();
+    });
   }
 
   @override
@@ -50,101 +38,18 @@ class _InventoryPageState extends State<InventoryPage> {
 
   void _scrollListener() {
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      _loadMoreProducts();
-    }
-  }
-
-  final ProductRepository _productRepo = ProductRepository();
-
-  void _applyFilterAndPagination({bool resetPage = false}) {
-    if (resetPage) {
-      _currentPage = 0;
-    }
-
-    final filtered = _allProductsCached.where((p) {
-      if (_selectedCategory == 'All') return true;
-      if (_selectedCategory == 'Low Stock') return (p['stock_quantity'] as int? ?? 0) < 10;
-      return p['category'] == _selectedCategory;
-    }).toList();
-
-    final nextOffset = _currentPage * _pageSize;
-    final chunk = filtered.skip(nextOffset).take(_pageSize).toList();
-
-    if (mounted) {
-      setState(() {
-        if (resetPage) {
-          _products = chunk;
-        } else {
-          _products.addAll(chunk);
-        }
-        _hasMore = filtered.length > nextOffset + chunk.length;
-      });
+      ref.read(inventoryProvider.notifier).loadMoreProducts();
     }
   }
 
   Future<void> _fetchProducts() async {
-    if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _currentPage = 0;
-      _hasMore = true;
-    });
-    
-    final shopId = UserSession().shopId;
-    if (shopId == null) {
-      if (mounted) setState(() => _isLoading = false);
-      return;
-    }
-
-    try {
-      // Offline-first: query total stock valuation & categories from local database
-      final allLocalProducts = await _productRepo.getProducts(shopId);
-      double value = 0;
-      Set<String> cats = {};
-      final List<Map<String, dynamic>> cachedList = [];
-
-      for (var p in allLocalProducts) {
-        final price = p.price;
-        final stock = p.stockQuantity;
-        value += price * stock;
-        if (p.category.isNotEmpty) {
-          cats.add(p.category);
-        }
-        cachedList.add(p.toJson());
-      }
-
-      if (mounted) {
-        setState(() {
-          _allProductsCached = cachedList;
-          _totalValue = value;
-          _categories = ['All', 'Low Stock', ...cats];
-          _isLoading = false;
-        });
-        _applyFilterAndPagination(resetPage: true);
-      }
-    } catch (e) {
-      debugPrint('[Inventory] Fetch error: $e');
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  void _loadMoreProducts() {
-    if (_isLoadingMore || !_hasMore) return;
-
-    setState(() => _isLoadingMore = true);
-
-    try {
-      _currentPage++;
-      _applyFilterAndPagination(resetPage: false);
-      setState(() => _isLoadingMore = false);
-    } catch (e) {
-      debugPrint('[Inventory] Load more error: $e');
-      setState(() => _isLoadingMore = false);
-    }
+    await ref.read(inventoryProvider.notifier).fetchProducts(forceRefresh: true);
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(inventoryProvider);
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -153,15 +58,17 @@ class _InventoryPageState extends State<InventoryPage> {
             child: Column(
               children: [
                 _buildAppBar(),
-                _isLoading ? const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: SkeletonSummaryCard()) : _buildValuationCard(),
-                if (!_isLoading && _products.isNotEmpty) _buildCategoryFilters(),
+                state.isLoading 
+                    ? const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: SkeletonSummaryCard()) 
+                    : _buildValuationCard(state.totalValue),
+                if (!state.isLoading && state.allProducts.isNotEmpty) _buildCategoryFilters(state),
                 const SizedBox(height: 10),
                 Expanded(
-                  child: _isLoading
+                  child: state.isLoading
                       ? _buildListSkeleton()
-                      : _products.isEmpty
+                      : state.displayedProducts.isEmpty
                           ? _buildEmptyState()
-                          : _buildProductList(),
+                          : _buildProductList(state),
                 ),
                 const SizedBox(height: 80), // padding for bottom bar
               ],
@@ -210,7 +117,7 @@ class _InventoryPageState extends State<InventoryPage> {
   Widget _buildEmptyState() {
     return EmptyState(
       title: "No Products Found",
-      subtitle: "Ask Sathi AI in Telegram to add products or sync your inventory.",
+      subtitle: "Ask Dukan Sathi AI to add products or sync your inventory.",
       icon: Iconsax.box_search,
       actionLabel: "Refresh Inventory",
       onAction: _fetchProducts,
@@ -225,7 +132,7 @@ class _InventoryPageState extends State<InventoryPage> {
     );
   }
 
-  Widget _buildValuationCard() {
+  Widget _buildValuationCard(double totalValue) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
@@ -248,7 +155,7 @@ class _InventoryPageState extends State<InventoryPage> {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    "₹${_totalValue.toStringAsFixed(0)}",
+                    "₹${totalValue.toStringAsFixed(0)}",
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       color: AppColors.success,
                       fontWeight: FontWeight.w900,
@@ -271,25 +178,22 @@ class _InventoryPageState extends State<InventoryPage> {
     );
   }
 
-  Widget _buildCategoryFilters() {
+  Widget _buildCategoryFilters(InventoryState state) {
     return Container(
       height: 60,
       margin: const EdgeInsets.only(top: 20),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: _categories.length,
+        itemCount: state.categories.length,
         itemBuilder: (context, index) {
-          final cat = _categories[index];
-          final isSelected = _selectedCategory == cat;
+          final cat = state.categories[index];
+          final isSelected = state.selectedCategory == cat;
           final isLowStock = cat == 'Low Stock';
           
           return GestureDetector(
             onTap: () {
-              setState(() {
-                _selectedCategory = cat;
-              });
-              _applyFilterAndPagination(resetPage: true);
+              ref.read(inventoryProvider.notifier).selectCategory(cat);
             },
             child: Container(
               margin: const EdgeInsets.only(right: 10),
@@ -328,81 +232,39 @@ class _InventoryPageState extends State<InventoryPage> {
     );
   }
 
-  Future<void> _restockProduct(Map<String, dynamic> product) async {
-    final productId = product['id'];
-    final productName = product['name'] ?? 'Unknown';
-    final price = (product['price'] as num?)?.toDouble() ?? 0;
+  Future<void> _restockProduct(Product product) async {
+    final productId = product.id;
+    final productName = product.name;
     const adjustAmount = 10;
 
-    // Save previous state for rollback
-    final previousProducts = List<Map<String, dynamic>>.from(_products.map((p) => Map<String, dynamic>.from(p)));
-    final previousAllProducts = List<Map<String, dynamic>>.from(_allProductsCached.map((p) => Map<String, dynamic>.from(p)));
-    final previousTotalValue = _totalValue;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Restocked +10 for $productName', style: const TextStyle(color: Colors.white)),
+        backgroundColor: AppColors.success,
+        duration: const Duration(seconds: 2),
+      ),
+    );
 
-    // 1. Optimistic Update (Immediate UI response)
-    if (mounted) {
-      setState(() {
-        _products = _products.map((p) {
-          if (p['id'] == productId) {
-            final updatedP = Map<String, dynamic>.from(p);
-            final currentStock = (updatedP['stock_quantity'] as int? ?? 0);
-            updatedP['stock_quantity'] = currentStock + adjustAmount;
-            return updatedP;
-          }
-          return p;
-        }).toList();
-
-        _allProductsCached = _allProductsCached.map((p) {
-          if (p['id'] == productId) {
-            final updatedP = Map<String, dynamic>.from(p);
-            final currentStock = (updatedP['stock_quantity'] as int? ?? 0);
-            updatedP['stock_quantity'] = currentStock + adjustAmount;
-            return updatedP;
-          }
-          return p;
-        }).toList();
-        
-        _totalValue += price * adjustAmount;
-      });
-      
+    try {
+      await ref.read(inventoryProvider.notifier).adjustStock(productId, adjustAmount);
+      debugPrint('[Inventory] Optimistic restock confirmed for $productName');
+    } catch (e) {
+      debugPrint('[Inventory] Optimistic restock failed: $e');
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Restocked +10 for $productName', style: const TextStyle(color: Colors.white)),
-          backgroundColor: AppColors.success,
-          duration: const Duration(seconds: 2),
+          content: Text('Failed to restock $productName.'),
+          backgroundColor: AppColors.error,
         ),
       );
     }
-
-    try {
-      // 2. Perform actual background DB/API operation
-      await _productRepo.adjustStock(productId, adjustAmount);
-      debugPrint('[Inventory] Optimistic restock confirmed for $productName');
-    } catch (e) {
-      // 3. Rollback on Failure
-      debugPrint('[Inventory] Optimistic restock failed: $e. Rolling back...');
-      if (mounted) {
-        setState(() {
-          _products = previousProducts;
-          _allProductsCached = previousAllProducts;
-          _totalValue = previousTotalValue;
-        });
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to restock $productName. Changes rolled back!'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
   }
 
-  Widget _buildProductList() {
-    if (_products.isEmpty) {
+  Widget _buildProductList(InventoryState state) {
+    if (state.displayedProducts.isEmpty) {
       return Center(
-        child: Text("No products in '$_selectedCategory'", style: const TextStyle(color: Colors.white54)),
+        child: Text("No products in '${state.selectedCategory}'", style: const TextStyle(color: Colors.white54)),
       );
     }
     
@@ -427,17 +289,17 @@ class _InventoryPageState extends State<InventoryPage> {
               mainAxisSpacing: 15,
               childAspectRatio: childAspectRatio,
             ),
-            itemCount: _products.length + (_isLoadingMore ? crossAxisCount : 0),
+            itemCount: state.displayedProducts.length + (state.isLoadingMore ? crossAxisCount : 0),
             itemBuilder: (context, index) {
-              if (index >= _products.length) {
-                if (index == _products.length + (crossAxisCount ~/ 2)) {
+              if (index >= state.displayedProducts.length) {
+                if (index == state.displayedProducts.length + (crossAxisCount ~/ 2)) {
                   return const Center(
                     child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
                   );
                 }
                 return const SizedBox.shrink();
               }
-              return _buildProductCard(_products[index], index);
+              return _buildProductCard(state.displayedProducts[index], index);
             },
           );
         },
@@ -447,9 +309,9 @@ class _InventoryPageState extends State<InventoryPage> {
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: _products.length + (_isLoadingMore ? 1 : 0),
+      itemCount: state.displayedProducts.length + (state.isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
-        if (index == _products.length) {
+        if (index == state.displayedProducts.length) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Center(
@@ -459,21 +321,21 @@ class _InventoryPageState extends State<InventoryPage> {
         }
         return Container(
           margin: const EdgeInsets.only(bottom: 15),
-          child: _buildProductCard(_products[index], index),
+          child: _buildProductCard(state.displayedProducts[index], index),
         );
       },
     );
   }
 
-  Widget _buildProductCard(Map<String, dynamic> product, int index) {
-    final name = product['name'] ?? 'Unknown';
-    final price = (product['price'] as num?)?.toDouble() ?? 0;
-    final stock = product['stock_quantity'] as int? ?? 0;
-    final category = product['category'] ?? 'General';
+  Widget _buildProductCard(Product product, int index) {
+    final name = product.name;
+    final price = product.price;
+    final stock = product.stockQuantity;
+    final category = product.category.isEmpty ? 'General' : product.category;
     final isLowStock = stock < 10;
 
     return Dismissible(
-      key: Key(product['id'].toString()),
+      key: Key(product.id),
       direction: DismissDirection.endToStart,
       background: Container(
         padding: const EdgeInsets.only(right: 20),

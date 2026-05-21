@@ -1,26 +1,39 @@
 import 'package:supabase/supabase.dart';
-import 'supabase_provider_flutter.dart';
+import 'package:dotenv/dotenv.dart';
+import 'dart:io';
 
-SupabaseClient get supabase => getSupabaseInstance();
+SupabaseClient? _supabaseInstance;
 
-/// Helper to get the shop ID for a given user identifier.
+SupabaseClient get supabase {
+  if (_supabaseInstance != null) return _supabaseInstance!;
+
+  final env = DotEnv()..load();
+  final url = Platform.environment['SUPABASE_URL'] ?? env['SUPABASE_URL'] ?? '';
+  // Prioritize service role key on server for RLS bypass
+  final serviceKey = Platform.environment['SUPABASE_SERVICE_ROLE_KEY'] ?? env['SUPABASE_SERVICE_ROLE_KEY'] ?? env['SUPABASE_ANON_KEY'] ?? '';
+
+  if (url.isEmpty || serviceKey.isEmpty) {
+    throw StateError('SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing!');
+  }
+
+  _supabaseInstance = SupabaseClient(url, serviceKey);
+  return _supabaseInstance!;
+}
+
 Future<String> getShopIdForUser(String? userIdentifier) async {
   if (userIdentifier == null || userIdentifier.isEmpty) {
     throw StateError('Missing userIdentifier');
   }
 
-  // Normalize: Strip "user-" prefix if present
   final id = userIdentifier.startsWith('user-') 
       ? userIdentifier.replaceFirst('user-', '') 
       : userIdentifier;
 
-  // 1. Direct Shop ID check (if userIdentifier is actually a shopId)
   try {
     final shopCheck = await supabase.from('shops').select('id').eq('id', id).maybeSingle();
     if (shopCheck != null) return shopCheck['id'] as String;
   } catch (_) {}
 
-  // 2. Try unified lookup (by UUID, Google ID, or Email)
   try {
     final unifiedRes = await supabase
         .from('users')
@@ -36,7 +49,6 @@ Future<String> getShopIdForUser(String? userIdentifier) async {
     // Fall through
   }
 
-  // 3. Fallback to legacy created_by lookup (backwards compatibility for Telegram)
   final legacyResponse = await supabase
       .from('shops')
       .select('id')
@@ -45,7 +57,7 @@ Future<String> getShopIdForUser(String? userIdentifier) async {
       .maybeSingle();
 
   if (legacyResponse == null) {
-    throw StateError('No active shop found for user $id. Please complete /start onboarding first.');
+    throw StateError('No active shop found for user $id. Please complete onboarding first.');
   }
 
   return legacyResponse['id'] as String;

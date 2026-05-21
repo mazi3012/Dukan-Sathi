@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
-import 'package:dukansathi_new/bootstrap.dart';
-import 'package:dukansathi_new/flows/retail_assistant.dart';
-import 'package:dukansathi_new/runtime/genkit_runtime.dart';
+import 'package:dukansathi_server/bootstrap.dart';
+import 'package:dukansathi_server/flows/retail_assistant.dart';
+import 'package:dukansathi_server/runtime/genkit_runtime.dart';
 
 Future<void> main(List<String> arguments) async {
     // Initialize all tools and flows. If credentials are missing, keep UI up

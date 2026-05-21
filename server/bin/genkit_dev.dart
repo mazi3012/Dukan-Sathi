@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'package:dukansathi_new/bootstrap.dart';
-import 'package:dukansathi_new/runtime/genkit_runtime.dart';
+import 'package:dukansathi_server/bootstrap.dart';
+import 'package:dukansathi_server/runtime/genkit_runtime.dart';
 
 void main(List<String> arguments) {
   // Initialize all tools and flows

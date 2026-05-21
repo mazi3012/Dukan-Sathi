@@ -1,4 +1,4 @@
-import 'package:dukansathi_new/core/database.dart';
+import 'package:dukansathi_server/core/database.dart';
 import 'package:teledart/model.dart' as tg;
 import 'package:uuid/uuid.dart';
 

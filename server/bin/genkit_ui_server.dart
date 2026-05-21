@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
-import 'package:dukansathi_new/bootstrap.dart';
-import 'package:dukansathi_new/flows/retail_assistant.dart';
+import 'package:dukansathi_server/bootstrap.dart';
+import 'package:dukansathi_server/flows/retail_assistant.dart';
 
 Future<void> main(List<String> arguments) async {
   // Initialize all tools and flows

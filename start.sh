@@ -73,6 +73,8 @@ start_services() {
     # Update dependencies
     log_info "📦 Syncing Flutter dependencies..."
     flutter pub get > /dev/null
+    log_info "📦 Syncing Server dependencies..."
+    (cd server && flutter pub get > /dev/null)
     
     # Utility for buffered output
     BUF_CMD=""
@@ -82,12 +84,12 @@ start_services() {
 
     # 1. Genkit UI
     log_info "📊 Starting Genkit UI (Port $GENKIT_UI_PORT)..."
-    nohup $BUF_CMD dart bin/genkit_ui.dart > genkit_dev.log 2>&1 &
+    nohup $BUF_CMD dart server/bin/genkit_ui.dart > genkit_dev.log 2>&1 &
     echo $! > genkit_dev.pid
     
     # 2. Genkit Server
     log_info "🌐 Starting API & Admin Dashboard (Port $GENKIT_SERVER_PORT)..."
-    nohup $BUF_CMD dart bin/genkit_server.dart > genkit_server.log 2>&1 &
+    nohup $BUF_CMD dart server/bin/genkit_server.dart > genkit_server.log 2>&1 &
     echo $! > genkit_server.pid
     
     # 4. Flutter Admin Dashboard

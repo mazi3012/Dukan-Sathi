@@ -1,169 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../main/pages/main_layout.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/responsive_layout.dart';
-import '../../../core/database.dart';
-import '../../../core/session.dart';
-import 'package:dukansathi_new/data/local/local_database.dart';
-import 'package:dukansathi_new/core/services/connectivity_service.dart';
+import '../providers/dashboard_provider.dart';
 
-
-class DashboardPage extends StatefulWidget {
+class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
 
   @override
-  State<DashboardPage> createState() => _DashboardPageState();
+  ConsumerState<DashboardPage> createState() => _DashboardPageState();
 }
 
-class _DashboardPageState extends State<DashboardPage> {
-  // Section 1: Top Number Cards
-  double _grossSales = 0;
-  double _netRevenue = 0;
-  double _gstCollected = 0;
-  int _invoiceCountToday = 0;
-
-  // Section 2: AI Insights
-  double _totalMarketDues = 0;
-  int _aiRestockItemsCount = 1;
-  String _aiRestockItemName = "Premium Basmati Rice (5kg)";
-  double _expectedRevenueTomorrow = 0;
-  int _pendingApprovalsCount = 0;
-
-  // Section 3: Recent Activity
-  List<Map<String, dynamic>> _recentActivity = [];
-  
-  bool _isLoading = true;
-  bool _hasError = false;
-
+class _DashboardPageState extends ConsumerState<DashboardPage> {
   @override
   void initState() {
     super.initState();
-    _fetchDashboardData();
+    Future.microtask(() {
+      ref.read(dashboardProvider.notifier).fetchDashboardData();
+    });
   }
-
-  final LocalDatabase _localDb = LocalDatabase.instance;
-  final ConnectivityService _connectivity = ConnectivityService.instance;
 
   Future<void> _fetchDashboardData() async {
-    if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-    });
+    await ref.read(dashboardProvider.notifier).fetchDashboardData();
+  }  DashboardState get _state => ref.watch(dashboardProvider);
 
-    final shopId = UserSession().shopId;
-    if (shopId == null) {
-      if (mounted) setState(() => _isLoading = false);
-      return;
-    }
-
-    try {
-      // 1. Fetch Total Sales locally
-      final salesRes = await _localDb.queryAll(
-        'sales',
-        where: 'shop_id = ?',
-        whereArgs: [shopId],
-      );
-      
-      double sales = 0;
-      for (var row in salesRes) {
-        sales += (row['amount'] as num).toDouble();
-      }
-
-      // 2. Fetch Invoice Count locally
-      final invoiceCount = salesRes.length;
-
-      // 3 & 4. Fetch Expenses and Pending Approvals (Online-only parallelized queries)
-      double expenses = 0;
-      int pendingApprovals = 0;
-      if (_connectivity.isOnline) {
-        try {
-          final results = await Future.wait([
-            supabase
-                .from('expenses')
-                .select('amount')
-                .eq('shop_id', shopId),
-            supabase
-                .from('draft_approvals')
-                .select('approval_id')
-                .eq('shop_id', shopId)
-                .eq('approval_status', 'PENDING'),
-          ]);
-
-          final expensesRes = results[0] as List<dynamic>;
-          for (var row in expensesRes) {
-            expenses += (row['amount'] as num).toDouble();
-          }
-
-          final approvalsRes = results[1] as List<dynamic>;
-          pendingApprovals = approvalsRes.length;
-        } catch (e) {
-          debugPrint('[Dashboard] Online parallel query error: $e');
-        }
-      }
-
-      // 5. Fetch Low Stock Count (< 5 units) locally
-      final lowStockRes = await _localDb.queryAll(
-        'products',
-        where: 'shop_id = ? AND stock_quantity < ?',
-        whereArgs: [shopId, 5],
-      );
-      final lowStock = lowStockRes.length;
-
-      // 6. Fetch Total Market Dues locally
-      final duesRes = await _localDb.queryAll(
-        'customers',
-        where: 'shop_id = ?',
-        whereArgs: [shopId],
-      );
-      
-      double dues = 0;
-      for (var row in duesRes) {
-        dues += (row['current_balance'] as num?)?.toDouble() ?? 0;
-      }
-
-      // 7. Fetch Recent Activity locally
-      final activityRes = await _localDb.queryAll(
-        'sales',
-        where: 'shop_id = ?',
-        whereArgs: [shopId],
-        orderBy: 'timestamp DESC',
-        limit: 6,
-      );
-
-      if (mounted) {
-        setState(() {
-          _grossSales = sales > 0 ? sales * 1.2 : 0.0;
-          _netRevenue = sales > 0 ? sales : 0.0;
-          _gstCollected = _netRevenue * 0.18;
-          _invoiceCountToday = invoiceCount;
-
-          _pendingApprovalsCount = pendingApprovals;
-          _totalMarketDues = dues > 0 ? dues : 0.0;
-          _aiRestockItemsCount = lowStock;
-          _expectedRevenueTomorrow = _netRevenue * 1.05; // 5% growth projection
-
-          _recentActivity = List<Map<String, dynamic>>.from(activityRes);
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('[Dashboard] Fetch error: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
-      }
-    }
-  }
-
-
+  bool get _isLoading => _state.isLoading;
+  bool get _hasError => _state.hasError;
+  double get _grossSales => _state.grossSales;
+  double get _netRevenue => _state.netRevenue;
+  double get _gstCollected => _state.gstCollected;
+  int get _invoiceCountToday => _state.invoiceCountToday;
+  double get _totalMarketDues => _state.totalMarketDues;
+  String get _aiRestockItemName => _state.aiRestockItemName;
+  double get _expectedRevenueTomorrow => _state.expectedRevenueTomorrow;
+  int get _pendingApprovalsCount => _state.pendingApprovalsCount;
+  List<Map<String, dynamic>> get _recentActivity => _state.recentActivity;
   String _formatTimestamp(String? timestampStr) {
     if (timestampStr == null) return '';
     try {
