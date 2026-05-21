@@ -28,7 +28,7 @@ final checkCustomerDue = ai.defineTool<Map<String, dynamic>, String>(
       
       final customerRes = await supabase
           .from('customers')
-          .select()
+          .select('id, name, current_balance')
           .eq('shop_id', shopId)
           .ilike('name', '%$customerName%')
           .maybeSingle();
@@ -48,7 +48,7 @@ final checkCustomerDue = ai.defineTool<Map<String, dynamic>, String>(
 
       final salesRes = await supabase
           .from('sales')
-          .select()
+          .select('id, invoice_number, due_amount, amount_paid, payment_status, timestamp')
           .eq('shop_id', shopId)
           .eq('customer_id', customerId)
           .gt('due_amount', 0)
@@ -110,7 +110,7 @@ final listCustomersDue = ai.defineTool<Map<String, dynamic>, String>(
       
       final customersRes = await supabase
           .from('customers')
-          .select()
+          .select('id, name, current_balance')
           .eq('shop_id', shopId)
           .gt('current_balance', 0)
           .order('current_balance', ascending: false);
@@ -179,7 +179,7 @@ final recordPayment = ai.defineTool<Map<String, dynamic>, String>(
 
       final customerRes = await supabase
           .from('customers')
-          .select()
+          .select('id, name, current_balance')
           .eq('shop_id', shopId)
           .ilike('name', '%$customerName%')
           .maybeSingle();

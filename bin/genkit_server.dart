@@ -17,6 +17,69 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:mime/mime.dart';
 
+// ─── API RATE LIMITING SYSTEM ────────────────────────────────────────────────
+class RateLimitRule {
+  final int maxRequests;
+  final Duration window;
+
+  const RateLimitRule({required this.maxRequests, required this.window});
+}
+
+class RateLimiter {
+  // Store the request timestamps: IP -> Map<PathPrefix/Category, List<DateTime>>
+  final Map<String, Map<String, List<DateTime>>> _requests = {};
+
+  // Rate limit rules for different path prefixes
+  final Map<String, RateLimitRule> _rules = {
+    '/api/transcribe': const RateLimitRule(maxRequests: 10, window: Duration(minutes: 1)),
+    '/api/chat': const RateLimitRule(maxRequests: 20, window: Duration(minutes: 1)),
+    '/api/runAction': const RateLimitRule(maxRequests: 20, window: Duration(minutes: 1)),
+    'default': const RateLimitRule(maxRequests: 60, window: Duration(minutes: 1)),
+  };
+
+  bool isAllowed(String ip, String path, DateTime now) {
+    // Find matching rule
+    final ruleKey = _rules.keys.firstWhere(
+      (prefix) => prefix != 'default' && path.startsWith(prefix),
+      orElse: () => 'default',
+    );
+    final rule = _rules[ruleKey]!;
+
+    _requests.putIfAbsent(ip, () => {});
+    final ipRequests = _requests[ip]!;
+    ipRequests.putIfAbsent(ruleKey, () => []);
+    
+    final timestamps = ipRequests[ruleKey]!;
+
+    // Clean up outdated timestamps
+    final cutoff = now.subtract(rule.window);
+    timestamps.removeWhere((t) => t.isBefore(cutoff));
+
+    if (timestamps.length >= rule.maxRequests) {
+      return false;
+    }
+
+    timestamps.add(now);
+    return true;
+  }
+
+  Duration getRetryAfter(String ip, String path, DateTime now) {
+    final ruleKey = _rules.keys.firstWhere(
+      (prefix) => prefix != 'default' && path.startsWith(prefix),
+      orElse: () => 'default',
+    );
+    final rule = _rules[ruleKey]!;
+    
+    final timestamps = _requests[ip]?[ruleKey] ?? [];
+    if (timestamps.isEmpty) return Duration.zero;
+
+    final oldest = timestamps.first;
+    final nextAvailable = oldest.add(rule.window);
+    final diff = nextAvailable.difference(now);
+    return diff.isNegative ? Duration.zero : diff;
+  }
+}
+
 Future<void> main(List<String> arguments) async {
   print('--- Genkit Server Initializing ---');
   try {
@@ -68,6 +131,9 @@ Future<void> main(List<String> arguments) async {
 
   // ─── WEB CHAT SESSION (mirrors Telegram Chat class) ─────────────────────
   final Map<String, WebChatSession> webSessions = {};
+  
+  // Rate limiter instance
+  final rateLimiter = RateLimiter();
 
   // Handle incoming HTTP requests
   server.listen((HttpRequest request) async {
@@ -79,6 +145,26 @@ Future<void> main(List<String> arguments) async {
     if (request.method == 'OPTIONS') {
       request.response
         ..statusCode = 200
+        ..close();
+      return;
+    }
+
+    // Apply Rate Limiting
+    final ip = request.connectionInfo?.remoteAddress.address ?? 'unknown';
+    final path = request.uri.path;
+    final now = DateTime.now();
+
+    if (!rateLimiter.isAllowed(ip, path, now)) {
+      final retryAfter = rateLimiter.getRetryAfter(ip, path, now).inSeconds;
+      request.response
+        ..statusCode = 429
+        ..headers.contentType = ContentType.json
+        ..headers.add('Retry-After', retryAfter.toString())
+        ..write(jsonEncode({
+          'error': 'Too Many Requests',
+          'message': 'Rate limit exceeded. Please try again in $retryAfter seconds.',
+          'retry_after_seconds': retryAfter
+        }))
         ..close();
       return;
     }

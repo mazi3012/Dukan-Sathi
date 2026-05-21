@@ -35,7 +35,7 @@ final invoiceLookup = ai.defineTool<Map<String, dynamic>, String>(
       final customerName = input['customerName'] as String?;
       final paymentStatus = input['paymentStatus'] as String?;
       
-      var query = supabase.from('sales').select().eq('shop_id', shopId);
+      var query = supabase.from('sales').select('id, invoice_number, customer_name, amount, payment_status, timestamp, due_amount').eq('shop_id', shopId);
       
       if (invoiceNumber != null && invoiceNumber.isNotEmpty) {
         query = query.ilike('invoice_number', '%$invoiceNumber%');

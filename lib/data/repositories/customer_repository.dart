@@ -12,13 +12,20 @@ class CustomerRepository {
   final SyncManager _syncManager = SyncManager.instance;
 
   /// Retrieves customers from the local cache. If online, schedules a background cloud sync.
-  Future<List<Customer>> getCustomers(String shopId, {bool forceRefresh = false}) async {
+  Future<List<Customer>> getCustomers(
+    String shopId, {
+    bool forceRefresh = false,
+    int? limit,
+    int? offset,
+  }) async {
     // 1. Instantly return local cached customers
     final localMaps = await _localDb.queryAll(
       'customers',
       where: 'shop_id = ?',
       whereArgs: [shopId],
       orderBy: 'name ASC',
+      limit: limit,
+      offset: offset,
     );
     
     final localCustomers = localMaps.map((m) => Customer.fromJson(m)).toList();

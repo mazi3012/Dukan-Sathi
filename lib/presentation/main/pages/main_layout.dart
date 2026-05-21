@@ -15,6 +15,8 @@ import '../../customers/pages/customers_page.dart';
 import '../../chat/pages/ai_chat_page.dart';
 import '../../auth/pages/welcome_auth_flow.dart';
 
+import '../../../core/widgets/connectivity_banner.dart';
+
 final GlobalKey<ScaffoldState> mainScaffoldKey = GlobalKey<ScaffoldState>();
 
 class MainLayout extends ConsumerStatefulWidget {
@@ -43,7 +45,12 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
         key: mainScaffoldKey,
         extendBody: true,
         drawer: _buildDrawer(),
-        body: _pages[_currentIndex],
+        body: Column(
+          children: [
+            const ConnectivityBanner(),
+            Expanded(child: _pages[_currentIndex]),
+          ],
+        ),
         bottomNavigationBar: _buildBottomBar(),
       ),
       tablet: Scaffold(
@@ -58,7 +65,12 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
               onToggleCollapse: () {}, // No-op on tablet
             ),
             Expanded(
-              child: _pages[_currentIndex],
+              child: Column(
+                children: [
+                  const ConnectivityBanner(),
+                  Expanded(child: _pages[_currentIndex]),
+                ],
+              ),
             ),
           ],
         ),
@@ -77,7 +89,12 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
               },
             ),
             Expanded(
-              child: _pages[_currentIndex],
+              child: Column(
+                children: [
+                  const ConnectivityBanner(),
+                  Expanded(child: _pages[_currentIndex]),
+                ],
+              ),
             ),
           ],
         ),

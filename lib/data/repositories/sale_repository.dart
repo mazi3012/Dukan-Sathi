@@ -11,13 +11,20 @@ class SaleRepository {
   final SyncManager _syncManager = SyncManager.instance;
 
   /// Fetch sales from local SQLite first, triggers background cloud sync if online.
-  Future<List<Map<String, dynamic>>> getSales(String shopId, {bool forceRefresh = false}) async {
+  Future<List<Map<String, dynamic>>> getSales(
+    String shopId, {
+    bool forceRefresh = false,
+    int? limit,
+    int? offset,
+  }) async {
     // 1. Instantly return local cached sales
     final localSales = await _localDb.queryAll(
       'sales',
       where: 'shop_id = ?',
       whereArgs: [shopId],
       orderBy: 'timestamp DESC',
+      limit: limit,
+      offset: offset,
     );
 
     // 2. Trigger background sync if online

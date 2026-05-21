@@ -52,7 +52,7 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
     try {
       final res = await supabase
           .from('sales')
-          .select()
+          .select('id, amount, amount_paid, payment_status, timestamp, invoice_number')
           .eq('customer_id', widget.customer['id'])
           .order('timestamp', ascending: false); // Newest first
 

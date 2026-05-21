@@ -6,6 +6,9 @@ import 'supabase_provider_stub.dart'
 
 SupabaseClient get supabase => getSupabaseInstance();
 
+/// Global connection pooler for direct raw SQL access (server-side only)
+dynamic get dbPool => getDatabasePool();
+
 /// Helper to get the shop ID for a given user identifier.
 Future<String> getShopIdForUser(String? userIdentifier) async {
   if (userIdentifier == null || userIdentifier.isEmpty) {

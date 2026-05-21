@@ -28,16 +28,40 @@ class _InventoryPageState extends State<InventoryPage> {
   String _selectedCategory = 'All';
   List<String> _categories = ['All', 'Low Stock'];
 
+  int _currentPage = 0;
+  final int _pageSize = 20;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_scrollListener);
     _fetchProducts();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollListener() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreProducts();
+    }
   }
 
   final ProductRepository _productRepo = ProductRepository();
 
   Future<void> _fetchProducts() async {
-    setState(() => _isLoading = true);
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _currentPage = 0;
+      _hasMore = true;
+    });
     
     final shopId = UserSession().shopId;
     if (shopId == null) {
@@ -46,32 +70,73 @@ class _InventoryPageState extends State<InventoryPage> {
     }
 
     try {
-      final res = await _productRepo.getProducts(shopId);
+      // Offline-first: query total stock valuation & categories from local database
+      final allLocalProducts = await _productRepo.getProducts(shopId);
+      double value = 0;
+      Set<String> cats = {};
+      for (var p in allLocalProducts) {
+        final price = p.price;
+        final stock = p.stockQuantity;
+        value += price * stock;
+        if (p.category.isNotEmpty) {
+          cats.add(p.category);
+        }
+      }
+
+      // Fetch paginated chunk for the UI list
+      final res = await _productRepo.getProducts(
+        shopId,
+        limit: _pageSize,
+        offset: 0,
+      );
       final productsMap = res.map((p) => p.toJson()).toList();
       
       if (mounted) {
-        double value = 0;
-        Set<String> cats = {};
-        for (var p in productsMap) {
-          final price = (p['price'] as num?)?.toDouble() ?? 0;
-          final stock = (p['stock_quantity'] as int?) ?? 0;
-          value += price * stock;
-          final cat = p['category'];
-          if (cat != null && cat.toString().isNotEmpty) {
-            cats.add(cat.toString());
-          }
-        }
-
         setState(() {
           _products = productsMap;
           _totalValue = value;
           _categories = ['All', 'Low Stock', ...cats];
           _isLoading = false;
+          _hasMore = res.length == _pageSize;
         });
       }
     } catch (e) {
       debugPrint('[Inventory] Fetch error: $e');
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadMoreProducts() async {
+    if (_isLoadingMore || !_hasMore) return;
+
+    setState(() => _isLoadingMore = true);
+
+    final shopId = UserSession().shopId;
+    if (shopId == null) {
+      if (mounted) setState(() => _isLoadingMore = false);
+      return;
+    }
+
+    try {
+      final nextOffset = (_currentPage + 1) * _pageSize;
+      final res = await _productRepo.getProducts(
+        shopId,
+        limit: _pageSize,
+        offset: nextOffset,
+      );
+      final productsMap = res.map((p) => p.toJson()).toList();
+
+      if (mounted) {
+        setState(() {
+          _currentPage++;
+          _products.addAll(productsMap);
+          _hasMore = res.length == _pageSize;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[Inventory] Load more error: $e');
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -256,12 +321,61 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   Future<void> _restockProduct(Map<String, dynamic> product) async {
+    final productId = product['id'];
+    final productName = product['name'] ?? 'Unknown';
+    final price = (product['price'] as num?)?.toDouble() ?? 0;
+    const adjustAmount = 10;
+
+    // Save previous state for rollback
+    final previousProducts = List<Map<String, dynamic>>.from(_products.map((p) => Map<String, dynamic>.from(p)));
+    final previousTotalValue = _totalValue;
+
+    // 1. Optimistic Update (Immediate UI response)
+    if (mounted) {
+      setState(() {
+        _products = _products.map((p) {
+          if (p['id'] == productId) {
+            final updatedP = Map<String, dynamic>.from(p);
+            final currentStock = (updatedP['stock_quantity'] as int? ?? 0);
+            updatedP['stock_quantity'] = currentStock + adjustAmount;
+            return updatedP;
+          }
+          return p;
+        }).toList();
+        
+        _totalValue += price * adjustAmount;
+      });
+      
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Restocked +10 for $productName', style: const TextStyle(color: Colors.white)),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+
     try {
-      await _productRepo.adjustStock(product['id'], 10);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Restocked +10 for ${product['name']}', style: const TextStyle(color: Colors.white)), backgroundColor: AppColors.success));
-      _fetchProducts();
+      // 2. Perform actual background DB/API operation
+      await _productRepo.adjustStock(productId, adjustAmount);
+      debugPrint('[Inventory] Optimistic restock confirmed for $productName');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to restock: $e'), backgroundColor: AppColors.error));
+      // 3. Rollback on Failure
+      debugPrint('[Inventory] Optimistic restock failed: $e. Rolling back...');
+      if (mounted) {
+        setState(() {
+          _products = previousProducts;
+          _totalValue = previousTotalValue;
+        });
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to restock $productName. Changes rolled back!'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -291,6 +405,7 @@ class _InventoryPageState extends State<InventoryPage> {
           final double childAspectRatio = cardWidth / cardHeight;
 
           return GridView.builder(
+            controller: _scrollController,
             padding: const EdgeInsets.symmetric(horizontal: 20),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: crossAxisCount,
@@ -298,8 +413,16 @@ class _InventoryPageState extends State<InventoryPage> {
               mainAxisSpacing: 15,
               childAspectRatio: childAspectRatio,
             ),
-            itemCount: filtered.length,
+            itemCount: filtered.length + (_isLoadingMore ? crossAxisCount : 0),
             itemBuilder: (context, index) {
+              if (index >= filtered.length) {
+                if (index == filtered.length + (crossAxisCount ~/ 2)) {
+                  return const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                  );
+                }
+                return const SizedBox.shrink();
+              }
               return _buildProductCard(filtered[index], index);
             },
           );
@@ -308,9 +431,18 @@ class _InventoryPageState extends State<InventoryPage> {
     }
 
     return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: filtered.length,
+      itemCount: filtered.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
+        if (index == filtered.length) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+            ),
+          );
+        }
         return Container(
           margin: const EdgeInsets.only(bottom: 15),
           child: _buildProductCard(filtered[index], index),

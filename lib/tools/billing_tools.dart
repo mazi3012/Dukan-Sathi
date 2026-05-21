@@ -442,7 +442,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
     // Fallback keeps draft creation working on databases that have not yet applied
     // the latest billing/customer columns.
     try {
-      await supabase.from('draft_approvals').insert(draftApprovalPayload).select();
+      await supabase.from('draft_approvals').insert(draftApprovalPayload).select('approval_id');
     } catch (e) {
       if (!_isMissingColumnError(e)) {
         rethrow;
@@ -470,7 +470,7 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
         'approval_status': 'PENDING',
       };
 
-      await supabase.from('draft_approvals').insert(legacyPayload).select();
+      await supabase.from('draft_approvals').insert(legacyPayload).select('approval_id');
     }
 
     // Return response showing approval pending + tax breakdown

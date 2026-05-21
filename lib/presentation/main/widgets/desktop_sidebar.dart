@@ -7,6 +7,7 @@ import '../../../core/theme/theme_provider.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/session.dart';
 import '../../auth/pages/welcome_auth_flow.dart';
+import '../../../data/sync/sync_manager.dart';
 
 class DesktopSidebar extends ConsumerWidget {
   final int currentIndex;
@@ -44,12 +45,150 @@ class DesktopSidebar extends ConsumerWidget {
               _buildSidebarHeader(context),
               const SizedBox(height: 30),
               Expanded(child: _buildNavigationItems(context)),
+              _buildSyncStatusIndicator(context),
               const Divider(color: Colors.white10),
               _buildBottomActions(context, ref, isDark),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSyncStatusIndicator(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: SyncManager.instance.pendingCountNotifier,
+      builder: (context, pendingCount, _) {
+        return ValueListenableBuilder<bool>(
+          valueListenable: SyncManager.instance.syncingNotifier,
+          builder: (context, isSyncing, _) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            if (isCollapsed) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Center(
+                  child: Tooltip(
+                    message: isSyncing 
+                        ? 'Syncing changes...' 
+                        : (pendingCount > 0 ? '$pendingCount offline changes pending' : 'Fully synced with cloud'),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isSyncing 
+                            ? AppColors.primary.withOpacity(0.1) 
+                            : (pendingCount > 0 ? Colors.amber.withOpacity(0.1) : Colors.green.withOpacity(0.1)),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSyncing 
+                              ? AppColors.primary.withOpacity(0.3) 
+                              : (pendingCount > 0 ? Colors.amber.withOpacity(0.3) : Colors.green.withOpacity(0.3)),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Center(
+                        child: isSyncing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                ),
+                              )
+                            : Icon(
+                                pendingCount > 0 ? Iconsax.cloud_notif : Iconsax.cloud_change,
+                                color: pendingCount > 0 ? Colors.amber : Colors.green,
+                                size: 20,
+                              ).animate(onPlay: (controller) => controller.repeat(reverse: true))
+                               .scale(duration: 1000.ms, begin: const Offset(0.9, 0.9), end: const Offset(1.1, 1.1)),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            // Expanded Mode
+            return Container(
+              margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withOpacity(0.03) : Colors.black.withOpacity(0.02),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? Colors.white10 : Colors.black12,
+                ),
+              ),
+              child: Row(
+                children: [
+                  if (isSyncing)
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
+                    )
+                  else
+                    Icon(
+                      pendingCount > 0 ? Iconsax.cloud_notif : Iconsax.cloud_change,
+                      color: pendingCount > 0 ? Colors.amber : Colors.green,
+                      size: 22,
+                    ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          isSyncing 
+                              ? 'Synchronizing...' 
+                              : (pendingCount > 0 ? 'Local Queue' : 'Cloud Status'),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isSyncing 
+                              ? 'Uploading to cloud' 
+                              : (pendingCount > 0 ? '$pendingCount changes pending' : 'Fully synchronized'),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isDark ? Colors.white38 : Colors.black45,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (pendingCount > 0 && !isSyncing)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.amber.withOpacity(0.4), width: 1),
+                      ),
+                      child: Text(
+                        '$pendingCount',
+                        style: const TextStyle(
+                          color: Colors.amber,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

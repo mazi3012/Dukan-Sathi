@@ -287,7 +287,7 @@ class UserSession extends ChangeNotifier {
         'gst_mode': gstMode,
         'upi_id': upiId,
         'onboarding_completed': true,
-      }).select().single();
+      }).select('id, name, state, gst_mode, gst_registration_number, business_type').single();
 
       _shopId = result['id'] as String?;
       _shopName = result['name'] as String?;

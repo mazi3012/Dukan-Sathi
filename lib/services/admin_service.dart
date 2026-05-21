@@ -18,7 +18,7 @@ class AdminService {
     int offset = 0,
   }) async {
     try {
-      var query = supabase.from('admin_users').select('*');
+      var query = supabase.from('admin_users').select('id, email, password_hash, full_name, phone, is_active, role_id, shop_id, last_login, created_at, updated_at');
 
       if (roleId != null) {
         query = query.eq('role_id', roleId);
@@ -42,7 +42,7 @@ class AdminService {
     try {
       final response = await supabase
           .from('admin_users')
-          .select('*')
+          .select('id, email, password_hash, full_name, phone, is_active, role_id, shop_id, last_login, created_at, updated_at')
           .eq('id', userId)
           .single();
       return response;
@@ -56,7 +56,7 @@ class AdminService {
     try {
       final response = await supabase
           .from('admin_users')
-          .select('*')
+          .select('id, email, password_hash, full_name, phone, is_active, role_id, shop_id, last_login, created_at, updated_at')
           .eq('email', email)
           .single();
       return response;
@@ -89,7 +89,7 @@ class AdminService {
         'role_id': roleId,
         'shop_id': shopId,
         'is_active': true,
-      }).select().single();
+      }).select('id, email, password_hash, full_name, phone, is_active, role_id, shop_id, last_login, created_at, updated_at').single();
 
       return response;
     } catch (e) {
@@ -118,7 +118,7 @@ class AdminService {
           .from('admin_users')
           .update(updates)
           .eq('id', userId)
-          .select()
+          .select('id, email, password_hash, full_name, phone, is_active, role_id, shop_id, last_login, created_at, updated_at')
           .single();
 
       // Log audit
@@ -160,7 +160,7 @@ class AdminService {
   Future<List<Map<String, dynamic>>> getRoles() async {
     try {
       final response =
-          await supabase.from('admin_roles').select('*').order('role_name');
+          await supabase.from('admin_roles').select('id, role_name, description, created_at, updated_at').order('role_name');
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       throw Exception('Failed to fetch roles: $e');
@@ -172,7 +172,7 @@ class AdminService {
     try {
       final response = await supabase
           .from('role_permissions')
-          .select('admin_permissions(*)')
+          .select('admin_permissions(id, permission_name, description, resource, action, created_at)')
           .eq('role_id', roleId);
 
       return response
@@ -189,7 +189,7 @@ class AdminService {
     try {
       final response = await supabase
           .from('admin_permissions')
-          .select('*')
+          .select('id, permission_name, description, resource, action, created_at')
           .order('resource');
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
@@ -242,7 +242,7 @@ class AdminService {
         'ip_address': ipAddress,
         'user_agent': userAgent,
         'expires_at': expiresAt.toIso8601String(),
-      }).select().single();
+      }).select('id, user_id, token_hash, ip_address, user_agent, expires_at, created_at').single();
 
       return response;
     } catch (e) {
@@ -255,7 +255,7 @@ class AdminService {
     try {
       final response = await supabase
           .from('admin_sessions')
-          .select('*, admin_users(*)')
+          .select('id, user_id, token_hash, ip_address, user_agent, expires_at, created_at, admin_users(id, email, password_hash, full_name, phone, is_active, role_id, shop_id, last_login, created_at, updated_at)')
           .eq('token_hash', tokenHash)
           .gt('expires_at', DateTime.now().toIso8601String())
           .single();
@@ -332,7 +332,7 @@ class AdminService {
     int offset = 0,
   }) async {
     try {
-      var query = supabase.from('admin_audit_log').select('*');
+      var query = supabase.from('admin_audit_log').select('id, user_id, action, resource, resource_id, changes, ip_address, status, error_message, created_at');
 
       if (userId != null) {
         query = query.eq('user_id', userId);

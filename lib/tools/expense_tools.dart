@@ -72,7 +72,7 @@ final getExpenses = ai.defineTool<Map<String, dynamic>, String>(
       final shopId = (context.context?['shopId'] as String?) ?? await getShopIdForUser(userIdentifier);
       final category = input['category'] as String?;
       
-      var queryBuilder = supabase.from('expenses').select().eq('shop_id', shopId);
+      var queryBuilder = supabase.from('expenses').select('id, amount, category, description, timestamp').eq('shop_id', shopId);
       
       if (category != null && category.isNotEmpty) {
         queryBuilder = queryBuilder.ilike('category', '%$category%');

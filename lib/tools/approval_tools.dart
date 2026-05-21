@@ -204,7 +204,7 @@ Future<Map<String, dynamic>> updateDraftPaymentStatus({
   try {
     final approvalRows = await supabase
         .from('draft_approvals')
-        .select()
+        .select('approval_id, draft_invoice_id, shop_id, customer_id, customer_name, customer_state, proposed_items, proposed_tax_breakdown, proposed_total, approval_status, reviewed_by, reviewed_at, approval_notes, sale_id, created_at, updated_at, original_items, payment_status, amount_paid, due_amount, discount_type, discount_value, discount_amount, subtotal_before_discount, subtotal_after_discount')
         .eq('approval_id', approvalId)
         .eq('approval_status', 'PENDING')
         .single();
@@ -262,7 +262,7 @@ Future<Map<String, dynamic>> updateDraftItem({
   try {
     final approvalRows = await supabase
         .from('draft_approvals')
-        .select()
+        .select('approval_id, draft_invoice_id, shop_id, customer_id, customer_name, customer_state, proposed_items, proposed_tax_breakdown, proposed_total, approval_status, reviewed_by, reviewed_at, approval_notes, sale_id, created_at, updated_at, original_items, payment_status, amount_paid, due_amount, discount_type, discount_value, discount_amount, subtotal_before_discount, subtotal_after_discount')
         .eq('approval_id', approvalId)
         .eq('approval_status', 'PENDING')
         .single();
@@ -404,7 +404,7 @@ Future<Map<String, dynamic>> updateDraftDiscount({
   try {
     final approvalRows = await supabase
         .from('draft_approvals')
-        .select()
+        .select('approval_id, draft_invoice_id, shop_id, customer_id, customer_name, customer_state, proposed_items, proposed_tax_breakdown, proposed_total, approval_status, reviewed_by, reviewed_at, approval_notes, sale_id, created_at, updated_at, original_items, payment_status, amount_paid, due_amount, discount_type, discount_value, discount_amount, subtotal_before_discount, subtotal_after_discount')
         .eq('approval_id', approvalId)
         .eq('approval_status', 'PENDING')
         .single();
@@ -535,7 +535,7 @@ Future<Map<String, dynamic>> approveDraftInvoice({
     // Fetch the pending draft approval
     final approvalRows = await supabase
         .from('draft_approvals')
-        .select()
+        .select('approval_id, draft_invoice_id, shop_id, customer_id, customer_name, customer_state, proposed_items, proposed_tax_breakdown, proposed_total, approval_status, reviewed_by, reviewed_at, approval_notes, sale_id, created_at, updated_at, original_items, payment_status, amount_paid, due_amount, discount_type, discount_value, discount_amount, subtotal_before_discount, subtotal_after_discount')
         .eq('approval_id', approvalId)
         .eq('approval_status', 'PENDING')
         .single();
@@ -723,7 +723,7 @@ Future<Map<String, dynamic>> switchGstType({
   try {
     final approvalRows = await supabase
         .from('draft_approvals')
-        .select()
+        .select('approval_id, draft_invoice_id, shop_id, customer_id, customer_name, customer_state, proposed_items, proposed_tax_breakdown, proposed_total, approval_status, reviewed_by, reviewed_at, approval_notes, sale_id, created_at, updated_at, original_items, payment_status, amount_paid, due_amount, discount_type, discount_value, discount_amount, subtotal_before_discount, subtotal_after_discount')
         .eq('approval_id', approvalId)
         .eq('approval_status', 'PENDING')
         .single();
@@ -833,7 +833,7 @@ Future<Map<String, dynamic>?> getApprovalDetails(String approvalId) async {
   try {
     final result = await supabase
         .from('draft_approvals')
-        .select()
+        .select('approval_id, draft_invoice_id, shop_id, customer_id, customer_name, customer_state, proposed_items, proposed_tax_breakdown, proposed_total, approval_status, reviewed_by, reviewed_at, approval_notes, sale_id, created_at, updated_at, original_items, payment_status, amount_paid, due_amount, discount_type, discount_value, discount_amount, subtotal_before_discount, subtotal_after_discount')
         .eq('approval_id', approvalId)
         .single();
     return Map<String, dynamic>.from(result as Map);
@@ -850,7 +850,7 @@ Future<Map<String, dynamic>> approveProductDeletion({
   try {
     final requestRows = await supabase
         .from('draft_product_deletions')
-        .select()
+        .select('id, shop_id, products, status, created_at, updated_at, reviewed_by, reviewed_at, approval_notes, deleted_at')
         .eq('id', requestId)
         .eq('status', 'PENDING')
         .single();
@@ -933,7 +933,7 @@ Future<Map<String, dynamic>?> getProductDeletionRequestDetails(String requestId)
   try {
     final result = await supabase
         .from('draft_product_deletions')
-        .select()
+        .select('id, shop_id, products, status, created_at, updated_at, reviewed_by, reviewed_at, approval_notes, deleted_at')
         .eq('id', requestId)
         .single();
     return Map<String, dynamic>.from(result as Map);
@@ -950,7 +950,7 @@ Future<Map<String, dynamic>> approveProductBatch({
   try {
     final batchRows = await supabase
         .from('draft_product_batches')
-        .select()
+        .select('id, shop_id, proposed_products, status, created_at, updated_at, reviewed_by, reviewed_at')
         .eq('id', batchId)
         .eq('status', 'PENDING')
         .single();
@@ -1027,7 +1027,7 @@ Future<Map<String, dynamic>?> getProductBatchDetails(String batchId) async {
   try {
     final result = await supabase
         .from('draft_product_batches')
-        .select()
+        .select('id, shop_id, proposed_products, status, created_at, updated_at, reviewed_by, reviewed_at')
         .eq('id', batchId)
         .single();
     return Map<String, dynamic>.from(result as Map);

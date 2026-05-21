@@ -16,6 +16,7 @@ import '../widgets/inventory_draft_card.dart';
 import '../widgets/ai_thinking_indicator.dart';
 import '../../../core/services/tts_service.dart';
 import '../../../core/services/connectivity_service.dart';
+import '../../../core/widgets/barcode_scanner_dialog.dart';
 
 
 class AiChatPage extends ConsumerStatefulWidget {
@@ -129,6 +130,19 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
       _textController.clear();
       _scrollToBottom();
     }
+  }
+
+  void _openBarcodeScanner(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.6),
+      builder: (context) => BarcodeScannerDialog(
+        onProductScanned: (product) {
+          _textController.text = "Add ${product.name} to my bill";
+          _sendMessage();
+        },
+      ),
+    );
   }
 
   void _scrollToBottom() {
@@ -453,7 +467,10 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                       hintText: _isTranscribing ? "Transcribing..." : "Ask Dukan Sathi...",
                       hintStyle: Theme.of(context).textTheme.bodySmall,
                       border: InputBorder.none,
-                      icon: Icon(Iconsax.camera, color: Theme.of(context).iconTheme.color?.withOpacity(0.5)),
+                      icon: IconButton(
+                        icon: const Icon(Iconsax.scan, color: AppColors.primary),
+                        onPressed: () => _openBarcodeScanner(context),
+                      ),
                       suffixIcon: _isTranscribing
                           ? const SizedBox(
                               width: 20,

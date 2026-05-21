@@ -11,6 +11,8 @@ import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/database.dart';
 import '../../../core/session.dart';
 import 'package:dukansathi_new/data/repositories/sale_repository.dart';
+import 'package:dukansathi_new/data/local/local_database.dart';
+import '../widgets/pos_checkout_dialog.dart';
 
 
 
@@ -27,16 +29,41 @@ class _BillingPageState extends State<BillingPage> {
   double _todayRevenue = 0;
   int? _selectedSaleIndex;
 
+  int _currentPage = 0;
+  final int _pageSize = 20;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
+  final ScrollController _scrollController = ScrollController();
+  final LocalDatabase _localDb = LocalDatabase.instance;
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_scrollListener);
     _fetchSales();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollListener() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreSales();
+    }
   }
 
   final SaleRepository _saleRepo = SaleRepository();
 
   Future<void> _fetchSales() async {
-    setState(() => _isLoading = true);
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _currentPage = 0;
+      _hasMore = true;
+    });
     
     final shopId = UserSession().shopId;
     if (shopId == null) {
@@ -45,26 +72,29 @@ class _BillingPageState extends State<BillingPage> {
     }
 
     try {
-      final res = await _saleRepo.getSales(shopId);
+      final res = await _saleRepo.getSales(
+        shopId,
+        limit: _pageSize,
+        offset: 0,
+      );
 
-      
       if (mounted) {
+        final todayStart = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).toIso8601String();
+        final todayRes = await _localDb.queryAll(
+          'sales',
+          where: 'shop_id = ? AND timestamp >= ?',
+          whereArgs: [shopId, todayStart],
+        );
         double today = 0;
-        final now = DateTime.now();
-        for (var s in res) {
-          final tsStr = s['timestamp'] as String?;
-          if (tsStr != null) {
-            final ts = DateTime.tryParse(tsStr);
-            if (ts != null && ts.year == now.year && ts.month == now.month && ts.day == now.day) {
-              today += ((s['amount_paid'] as num?)?.toDouble() ?? 0);
-            }
-          }
+        for (var s in todayRes) {
+          today += ((s['amount_paid'] as num?)?.toDouble() ?? 0);
         }
 
         setState(() {
           _sales = List<Map<String, dynamic>>.from(res);
           _todayRevenue = today;
           _isLoading = false;
+          _hasMore = res.length == _pageSize;
           if (_sales.isNotEmpty && _selectedSaleIndex == null) {
             _selectedSaleIndex = 0;
           }
@@ -73,6 +103,39 @@ class _BillingPageState extends State<BillingPage> {
     } catch (e) {
       debugPrint('[Billing] Fetch error: $e');
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadMoreSales() async {
+    if (_isLoadingMore || !_hasMore) return;
+
+    setState(() => _isLoadingMore = true);
+
+    final shopId = UserSession().shopId;
+    if (shopId == null) {
+      if (mounted) setState(() => _isLoadingMore = false);
+      return;
+    }
+
+    try {
+      final nextOffset = (_currentPage + 1) * _pageSize;
+      final res = await _saleRepo.getSales(
+        shopId,
+        limit: _pageSize,
+        offset: nextOffset,
+      );
+
+      if (mounted) {
+        setState(() {
+          _currentPage++;
+          _sales.addAll(List<Map<String, dynamic>>.from(res));
+          _hasMore = res.length == _pageSize;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[Billing] Load more error: $e');
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -128,9 +191,11 @@ class _BillingPageState extends State<BillingPage> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Opening AI Invoice Generator...')),
-          );
+          showDialog(
+            context: context,
+            barrierColor: Colors.black.withOpacity(0.55),
+            builder: (context) => const POSCheckoutDialog(),
+          ).then((_) => _fetchSales()); // Refresh sales list when closed!
         },
         backgroundColor: AppColors.primary,
         icon: const Icon(Iconsax.add, color: Colors.white),
@@ -304,9 +369,18 @@ class _BillingPageState extends State<BillingPage> {
 
   Widget _buildSalesList({required bool isDesktop}) {
     return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: _sales.length,
+      itemCount: _sales.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
+        if (index == _sales.length) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+            ),
+          );
+        }
         final sale = _sales[index];
         final invNum = sale['invoice_number'] ?? 'N/A';
         final customer = sale['customer_name'] ?? 'Walk-in Customer';

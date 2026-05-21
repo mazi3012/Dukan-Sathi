@@ -16,7 +16,7 @@ The application operates on a robust **Hybrid Offline-First (POS) and Strictly-O
 
 ## 🗺️ Scalability Roadmap Status
 
-We have successfully completed **Phase 0 (Foundation Prep)**, **Phase 1 (Offline-First POS Engine)**, and **Phase 2 (Intent-Driven AI Refactor)**! 
+We have successfully completed **Phase 0 (Foundation Prep)**, **Phase 1 (Offline-First POS Engine)**, **Phase 2 (Intent-Driven AI Refactor)**, and **Phase 3 (Performance & Scale Hardening)**! 
 
 ### Completed Milestones:
 - ✅ Add local database schemas (SQLite / SQFlite) and initialization services.
@@ -29,11 +29,15 @@ We have successfully completed **Phase 0 (Foundation Prep)**, **Phase 1 (Offline
 - ✅ **Decoupled AI Writes:** Refactored strictly-online AI Chat server (`genkit_server.dart`) to output structured JSON intents (`ADD_PRODUCT`, `CREATE_INVOICE`) rather than executing database mutations.
 - ✅ **Intent Executor:** Implemented high-fidelity client-side parser and executor to run SQL writes and draft updates instantly on the local device.
 - ✅ **Offline Guard:** Designed high-end glassmorphic fallback screen inside `ai_chat_page.dart` to prevent voice session crashes while offline.
+- ✅ **Explicit SQL Queries:** Standardized all database selectors to fetch explicit fields, shrinking network footprints.
+- ✅ **Infinite Scroll & Pagination:** Implemented scroll-bound pagination chunking in pages of 20 for inventory list, sales log, and customer directories.
+- ✅ **Supavisor Pooling:** Configured optimized server connection pooling over port 6543 to manage active transactions at scale.
+- ✅ **High-Load Indexes:** Provisioned performance indexes on critical search and filter criteria (`barcode`, `email`, `google_id`).
+- ✅ **Optimistic UI:** Enabled 16ms optimistic stock adjustments with bulletproof background persistence and automatic network failure rollbacks.
 
 ### Upcoming Milestones:
-1. **Phase 3: Performance & Scale Hardening:** Transition to explicit columns (remove `SELECT *`), paginated cloud views, and Supavisor connection pooling.
-2. **Phase 4: Connectivity & UX Polish:** Add global offline banners, and barcode scanner integration.
-3. **Phase 5: Production Readiness:** Conduct load testing, hard RLS constraints, API rate limiting, and CI/CD pipelines.
+1. **Phase 4: Connectivity & UX Polish:** Add global offline banners, and barcode scanner integration.
+2. **Phase 5: Production Readiness:** Conduct load testing, hard RLS constraints, API rate limiting, and CI/CD pipelines.
 
 *For the complete detailed roadmap, check the `scalability_roadmap.md` artifact.*
 

@@ -183,7 +183,7 @@ class InvoicePdfGenerator {
   static Future<DraftApproval> _fetchApproval(String approvalId) async {
     final approvalRows = await supabase
         .from('draft_approvals')
-        .select()
+        .select('approval_id, draft_invoice_id, shop_id, customer_id, created_at, proposed_items, proposed_tax_breakdown, proposed_total, approval_status, reviewed_by, reviewed_at, approval_notes, sale_id, updated_at')
         .eq('approval_id', approvalId)
         .single();
     return DraftApproval.fromJson(Map<String, dynamic>.from(approvalRows as Map));
@@ -192,7 +192,7 @@ class InvoicePdfGenerator {
   static Future<Map<String, dynamic>> _fetchApprovalData(String approvalId) async {
     final approvalRows = await supabase
         .from('draft_approvals')
-        .select()
+        .select('approval_id, draft_invoice_id, shop_id, customer_id, created_at, proposed_items, proposed_tax_breakdown, proposed_total, approval_status, reviewed_by, reviewed_at, approval_notes, sale_id, updated_at')
         .eq('approval_id', approvalId)
         .single();
     return Map<String, dynamic>.from(approvalRows as Map);

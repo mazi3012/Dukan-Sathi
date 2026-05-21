@@ -9,3 +9,5 @@ SupabaseClient getSupabaseInstance() {
     rethrow;
   }
 }
+
+dynamic getDatabasePool() => throw UnsupportedError('Database connection pool is server-only (dart:io)');

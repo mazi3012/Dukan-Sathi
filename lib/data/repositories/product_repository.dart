@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../../core/database.dart';
 import '../../core/services/connectivity_service.dart';
@@ -11,19 +12,37 @@ class ProductRepository {
   final SyncManager _syncManager = SyncManager.instance;
 
   /// Retrieves products from the local database. If online, triggers a background cloud sync.
-  Future<List<Product>> getProducts(String shopId, {bool forceRefresh = false}) async {
+  Future<List<Product>> getProducts(
+    String shopId, {
+    bool forceRefresh = false,
+    int? limit,
+    int? offset,
+  }) async {
     // 1. Instantly return local cached products
     final localMaps = await _localDb.queryAll(
       'products',
       where: 'shop_id = ?',
       whereArgs: [shopId],
       orderBy: 'name ASC',
+      limit: limit,
+      offset: offset,
     );
     
     final localProducts = localMaps.map((m) {
       // Map integer from SQLite to boolean
       final map = Map<String, dynamic>.from(m);
       map['is_service'] = map['is_service'] == 1;
+      
+      // Parse metadata text back to map
+      final metadataStr = map['metadata'] as String? ?? '{}';
+      final metadataMap = jsonDecode(metadataStr) as Map<String, dynamic>;
+      map['metadata'] = metadataMap;
+      
+      // Populate barcode field from metadata
+      if (metadataMap.containsKey('barcode')) {
+        map['barcode'] = metadataMap['barcode'];
+      }
+      
       return Product.fromJson(map);
     }).toList();
 
@@ -41,7 +60,7 @@ class ProductRepository {
     try {
       final cloudProducts = await supabase
           .from('products')
-          .select('id, shop_id, name, price, stock_quantity, category, description, is_service, gst_rate, hsn_sac_code, cost_price, metadata')
+          .select('id, shop_id, name, price, stock_quantity, category, description, is_service, gst_rate, hsn_sac_code, barcode, cost_price, metadata')
           .eq('shop_id', shopId);
 
       await _localDb.executeInTransaction((txn) async {
@@ -49,6 +68,15 @@ class ProductRepository {
           final mapped = Map<String, dynamic>.from(p);
           mapped['is_service'] = (mapped['is_service'] == true) ? 1 : 0;
           
+          // Inject barcode into the local metadata json block for SQLite storage
+          final metadataMap = Map<String, dynamic>.from(mapped['metadata'] ?? {});
+          if (mapped['barcode'] != null) {
+            metadataMap['barcode'] = mapped['barcode'];
+          }
+          
+          mapped['metadata'] = jsonEncode(metadataMap);
+          mapped.remove('barcode');
+
           await txn.insert(
             'products',
             mapped,
@@ -62,10 +90,77 @@ class ProductRepository {
     }
   }
 
+  /// Fetches a product instantly by barcode, utilizing local cache or cloud
+  Future<Product?> getProductByBarcode(String shopId, String barcode) async {
+    // 1. Check local DB first by looking inside metadata JSON text
+    final localMaps = await _localDb.queryAll(
+      'products',
+      where: "shop_id = ? AND metadata LIKE ?",
+      whereArgs: [shopId, '%"barcode":"$barcode"%'],
+      limit: 1,
+    );
+    
+    if (localMaps.isNotEmpty) {
+      final map = Map<String, dynamic>.from(localMaps.first);
+      map['is_service'] = map['is_service'] == 1;
+      
+      final metadataStr = map['metadata'] as String? ?? '{}';
+      final metadataMap = jsonDecode(metadataStr) as Map<String, dynamic>;
+      map['metadata'] = metadataMap;
+      
+      if (metadataMap.containsKey('barcode')) {
+        map['barcode'] = metadataMap['barcode'];
+      }
+      
+      return Product.fromJson(map);
+    }
+    
+    // 2. Fallback to direct cloud database scan (high performance via idx_products_barcode)
+    if (_connectivity.isOnline) {
+      try {
+        final cloudMatch = await supabase
+            .from('products')
+            .select('id, shop_id, name, price, stock_quantity, category, description, is_service, gst_rate, hsn_sac_code, barcode, cost_price, metadata')
+            .eq('shop_id', shopId)
+            .eq('barcode', barcode)
+            .maybeSingle();
+            
+        if (cloudMatch != null) {
+          final mapped = Map<String, dynamic>.from(cloudMatch);
+          mapped['is_service'] = (mapped['is_service'] == true) ? 1 : 0;
+          
+          final metadataMap = Map<String, dynamic>.from(mapped['metadata'] ?? {});
+          if (mapped['barcode'] != null) {
+            metadataMap['barcode'] = mapped['barcode'];
+          }
+          mapped['metadata'] = jsonEncode(metadataMap);
+          
+          // Cache the found product locally
+          final sqliteMapped = Map<String, dynamic>.from(mapped);
+          sqliteMapped.remove('barcode');
+          await _localDb.insert('products', sqliteMapped);
+          
+          return Product.fromJson(mapped);
+        }
+      } catch (e) {
+        debugPrint('[ProductRepository] Barcode cloud lookup failed: $e');
+      }
+    }
+    return null;
+  }
+
   /// Instantly saves product locally and queues background sync
   Future<void> saveProduct(Product product) async {
     final map = product.toJson();
     map['is_service'] = product.isService ? 1 : 0;
+    
+    // Inject barcode from high level field into metadata map for SQLite storage
+    final metadataMap = Map<String, dynamic>.from(map['metadata'] ?? {});
+    if (product.barcode != null) {
+      metadataMap['barcode'] = product.barcode;
+    }
+    map['metadata'] = jsonEncode(metadataMap);
+    map.remove('barcode');
 
     // 1. Write locally
     await _localDb.insert('products', map);
@@ -83,6 +178,14 @@ class ProductRepository {
   Future<void> updateProduct(Product product) async {
     final map = product.toJson();
     map['is_service'] = product.isService ? 1 : 0;
+    
+    // Inject barcode from high level field into metadata map for SQLite storage
+    final metadataMap = Map<String, dynamic>.from(map['metadata'] ?? {});
+    if (product.barcode != null) {
+      metadataMap['barcode'] = product.barcode;
+    }
+    map['metadata'] = jsonEncode(metadataMap);
+    map.remove('barcode');
 
     // 1. Write locally
     await _localDb.update(

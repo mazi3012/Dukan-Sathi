@@ -28,16 +28,42 @@ class _CustomersPageState extends State<CustomersPage> {
   String _searchQuery = '';
   Map<String, dynamic>? _selectedCustomer;
 
+  int _currentPage = 0;
+  final int _pageSize = 20;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
+  final ScrollController _scrollController = ScrollController();
+  final LocalDatabase _localDb = LocalDatabase.instance;
+  double _outstandingDuesSum = 0;
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_scrollListener);
     _fetchCustomers();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollListener() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreCustomers();
+    }
   }
 
   final CustomerRepository _customerRepo = CustomerRepository();
 
   Future<void> _fetchCustomers() async {
-    setState(() => _isLoading = true);
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _currentPage = 0;
+      _hasMore = true;
+    });
     
     final shopId = UserSession().shopId;
     if (shopId == null) {
@@ -46,16 +72,30 @@ class _CustomersPageState extends State<CustomersPage> {
     }
 
     try {
-      final res = await _customerRepo.getCustomers(shopId);
+      final res = await _customerRepo.getCustomers(
+        shopId,
+        limit: _pageSize,
+        offset: 0,
+      );
       final customersMap = res.map((c) => c.toJson()).toList();
 
-      
+      final duesRes = await _localDb.queryAll(
+        'customers',
+        where: 'shop_id = ?',
+        whereArgs: [shopId],
+      );
+      double total = 0;
+      for (var c in duesRes) {
+        total += ((c['current_balance'] as num?)?.toDouble() ?? 0);
+      }
+
       if (mounted) {
         setState(() {
           _customers = customersMap;
+          _outstandingDuesSum = total;
           _isLoading = false;
+          _hasMore = res.length == _pageSize;
           
-          // Re-sync selected customer if it exists to fetch new balances
           if (_selectedCustomer != null) {
             final updatedCustomer = _customers.firstWhere(
               (c) => c['id'] == _selectedCustomer!['id'],
@@ -68,6 +108,40 @@ class _CustomersPageState extends State<CustomersPage> {
     } catch (e) {
       debugPrint('[Customers] Fetch error: $e');
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadMoreCustomers() async {
+    if (_isLoadingMore || !_hasMore) return;
+
+    setState(() => _isLoadingMore = true);
+
+    final shopId = UserSession().shopId;
+    if (shopId == null) {
+      if (mounted) setState(() => _isLoadingMore = false);
+      return;
+    }
+
+    try {
+      final nextOffset = (_currentPage + 1) * _pageSize;
+      final res = await _customerRepo.getCustomers(
+        shopId,
+        limit: _pageSize,
+        offset: nextOffset,
+      );
+      final customersMap = res.map((c) => c.toJson()).toList();
+
+      if (mounted) {
+        setState(() {
+          _currentPage++;
+          _customers.addAll(customersMap);
+          _hasMore = res.length == _pageSize;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[Customers] Load more error: $e');
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -86,7 +160,7 @@ class _CustomersPageState extends State<CustomersPage> {
   }
 
   double get _totalOutstanding {
-    return _customers.fold(0, (sum, c) => sum + ((c['current_balance'] as num?)?.toDouble() ?? 0));
+    return _outstandingDuesSum;
   }
 
   @override
@@ -347,9 +421,18 @@ class _CustomersPageState extends State<CustomersPage> {
 
   Widget _buildCustomerList({required bool isDesktop}) {
     return ListView.builder(
+      controller: _scrollController,
       padding: EdgeInsets.fromLTRB(20, 10, 20, isDesktop ? 20 : 100),
-      itemCount: _filteredCustomers.length,
+      itemCount: _filteredCustomers.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
+        if (index == _filteredCustomers.length) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+            ),
+          );
+        }
         final customer = _filteredCustomers[index];
         final name = customer['name'] ?? 'Unknown';
         final phone = customer['phone'] ?? '';
