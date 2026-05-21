@@ -176,9 +176,9 @@ class _POSCheckoutDialogState extends ConsumerState<POSCheckoutDialog> {
       final generatedPdf = await InvoicePdfGenerator.generateApprovedInvoicePdfOffline(
         approval: draftApproval,
         invoiceNumber: invoice.invoiceNumber ?? 'INV-POS-DRAFT',
-        shopName: shopConfig.name.isNotEmpty ? shopConfig.name : 'Dukan Sathi',
+        shopName: (session.shopName != null && session.shopName!.isNotEmpty) ? session.shopName! : 'Dukan Sathi',
         shopState: shopConfig.state,
-        gstNumber: shopConfig.gstin,
+        gstNumber: shopConfig.gstRegistrationNumber,
         businessType: shopConfig.businessType,
         customerName: invoice.customerName,
         customerPhone: null,
@@ -421,7 +421,7 @@ class _POSCheckoutDialogState extends ConsumerState<POSCheckoutDialog> {
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                item.productName,
+                                                item.productName ?? 'Product',
                                                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
                                               ),
                                               const SizedBox(height: 4),

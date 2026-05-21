@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:sqflite/sqflite.dart';
 import '../../core/database.dart';
 import '../../core/services/connectivity_service.dart';
 import '../../models/product.dart';

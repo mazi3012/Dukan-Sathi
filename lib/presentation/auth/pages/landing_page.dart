@@ -416,7 +416,7 @@ class _LandingPageState extends State<LandingPage> {
           child: Text(
             name,
             style: TextStyle(
-              color: isDark ? Colors.white80 : AppColors.lightOnSurface,
+              color: isDark ? Colors.white.withOpacity(0.8) : AppColors.lightOnSurface,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
@@ -492,7 +492,7 @@ class _LandingPageState extends State<LandingPage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(name, style: TextStyle(color: isDark ? Colors.white80 : AppColors.lightOnSurface, fontSize: 12, fontWeight: FontWeight.bold)),
+            Text(name, style: TextStyle(color: isDark ? Colors.white.withOpacity(0.8) : AppColors.lightOnSurface, fontSize: 12, fontWeight: FontWeight.bold)),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
@@ -515,7 +515,7 @@ class _LandingPageState extends State<LandingPage> {
                 child: LinearProgressIndicator(
                   value: percentage,
                   minHeight: 6,
-                  backgroundColor: isDark ? Colors.white10 : Colors.black10,
+                  backgroundColor: isDark ? Colors.white10 : Colors.black.withOpacity(0.1),
                   valueColor: AlwaysStoppedAnimation<Color>(color),
                 ),
               ),

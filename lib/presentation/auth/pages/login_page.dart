@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -450,7 +451,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
               hintStyle: TextStyle(color: isDark ? Colors.white30 : Colors.black38),
               prefixIcon: Icon(Iconsax.sms, color: isDark ? Colors.white60 : AppColors.lightOnSurface.withOpacity(0.7), size: 18),
               filled: true,
-              fillColor: isDark ? Colors.black24 : Colors.black.withOpacity(0.02),
+              fillColor: isDark ? Colors.black.withOpacity(0.24) : Colors.black.withOpacity(0.02),
               contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),

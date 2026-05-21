@@ -311,7 +311,7 @@ class POSNotifier extends StateNotifier<POSInvoiceState> {
     state = state.copyWith(
       discountAmount: discountAmount,
       subtotalBeforeDiscount: taxBreakdown.subtotal,
-      subtotalAfterDiscount: taxBreakdown.taxableAmount,
+      subtotalAfterDiscount: taxBreakdown.subtotal,
       taxBreakdown: taxBreakdown.toJson(),
       totalAmount: finalTotal,
       amountPaid: paid,

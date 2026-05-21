@@ -13,7 +13,7 @@ class ConnectivityBanner extends StatefulWidget {
 }
 
 class _ConnectivityBannerState extends State<ConnectivityBanner> {
-  final ConnectivityService _connectivityService = ConnectivityService();
+  final ConnectivityService _connectivityService = ConnectivityService.instance;
   StreamSubscription<bool>? _subscription;
   bool _isOnline = true;
   bool _shouldShow = false;
@@ -23,7 +23,7 @@ class _ConnectivityBannerState extends State<ConnectivityBanner> {
   void initState() {
     super.initState();
     _checkInitialState();
-    _subscription = _connectivityService.connectivityStream.listen((isOnline) {
+    _subscription = _connectivityService.onConnectivityChanged.listen((isOnline) {
       if (mounted) {
         setState(() {
           _isOnline = isOnline;
@@ -48,15 +48,13 @@ class _ConnectivityBannerState extends State<ConnectivityBanner> {
     });
   }
 
-  Future<void> _checkInitialState() async {
-    final online = await _connectivityService.checkConnectivity();
-    if (mounted) {
-      setState(() {
-        _isOnline = online;
-        _shouldShow = !online;
-        if (!online) _wasOffline = true;
-      });
-    }
+  void _checkInitialState() {
+    final online = _connectivityService.isOnline;
+    setState(() {
+      _isOnline = online;
+      _shouldShow = !online;
+      if (!online) _wasOffline = true;
+    });
   }
 
   @override

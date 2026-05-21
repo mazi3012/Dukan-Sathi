@@ -274,7 +274,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> with Single
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        height: 46,
+                        minimumSize: const Size(54, 46),
                       ),
                       child: const Icon(Icons.arrow_forward),
                     ),
@@ -317,7 +317,7 @@ class _BarcodeScannerDialogState extends State<BarcodeScannerDialog> with Single
                               const SizedBox(width: 6),
                               Text(
                                 preset['name']!,
-                                style: const TextStyle(color: Colors.white80, fontSize: 11, fontWeight: FontWeight.bold),
+                                style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11, fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
