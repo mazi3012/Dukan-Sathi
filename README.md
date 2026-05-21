@@ -4,29 +4,36 @@ An AI-powered shop companion and POS system built with Flutter, Dart, Genkit, Gr
 
 ## 🚀 Current Architecture
 
-The application is currently operating as a cloud-first application:
-- **Frontend (Flutter):** Provides Dashboard, Inventory, Customers, Billing, and AI Chat interfaces. Currently reads/writes directly from Supabase.
+The application operates on a robust **Hybrid Offline-First (POS) and Strictly-Online (Voice AI)** architecture to support 50,000+ active users:
+- **Offline-First POS Engine (Flutter & SQFlite):** All client-side product lookups, customer profiles, sales, and dashboard metrics operate completely offline-first using a local database cache with background auto-sync to Supabase.
+- **Strictly-Online Voice AI (Genkit & Groq):** AI Chat features remain strictly online, hitting the backend server to transcribe audio (Groq Whisper) and reason through actions.
+- **Automatic Sync Manager (`SyncManager`):** Tracks local database operations, queues mutations (INSERT, UPDATE, DELETE, ADJUST_STOCK), and flushes them to the cloud automatically in batches when network becomes available.
+- **Initial Cache Warmup:** Seamlessly warms up the local SQFlite database with primary shop details right after login, signup, or app boot-up.
+- **Conflict Policy:** Utilizes relative adjustments (`stock_quantity = stock_quantity + delta`) in background syncs and cloud RPCs instead of absolute updates to prevent overriding modifications from other terminals or voice commands.
 - **Backend (Dart):** Powered by `bin/genkit_server.dart`. Handles Genkit workflows, tools integration, Groq Whisper transcription, and PDF invoice generation.
 - **Database (Supabase):** PostgreSQL database managing shops, products, customers, sales, and draft invoices with multi-tenant architecture (RLS).
 - **AI Integration:** Uses Google GenAI for reasoning and Groq Whisper for fast voice transcription.
 
-## 🗺️ Scalability Roadmap (Upcoming)
+## 🗺️ Scalability Roadmap Status
 
-We are transitioning to a **Hybrid Offline-First** architecture to support 50,000+ active users:
+We have successfully completed **Phase 0 (Foundation Prep)** and **Phase 1 (Offline-First POS Engine)**! 
 
-1. **Offline-First POS Engine:** 
-   - Local Isar/SQLite caching for products, customers, and sales.
-   - Background SyncManager to batch updates to Supabase when online.
-   - Optimistic UI updates.
-2. **Online-Only AI Lane:**
-   - AI Voice Chat remains strictly online.
-   - AI intents will return structured JSON, executing actions locally rather than server-side.
-3. **Database Hardening:**
-   - Transition to explicit `SELECT` columns (removing `SELECT *`).
-   - Implementation of Supavisor connection pooling.
-   - Robust indexing on `shop_id`, `owner_id`, `barcode`, etc.
+### Completed Milestones:
+- ✅ Add local database schemas (SQLite / SQFlite) and initialization services.
+- ✅ Implement global connectivity monitor (`ConnectivityService`).
+- ✅ Build dynamic background queue sync service (`SyncManager`).
+- ✅ Refactor Products, Sales, and Customers repositories to run offline-first.
+- ✅ Refactor Dashboard page to use instant local SQL aggregations.
+- ✅ Build initial cache warmup on login & onboarding.
+- ✅ Enforce relative conflict-free updates for inventory stock level changes.
 
-*For the complete detailed roadmap, check the `scalability_roadmap.md` artifact in the knowledge base.*
+### Upcoming Milestones:
+1. **Phase 2: Intent-Driven AI Refactor:** Decouple Genkit backend writes by outputting structured JSON intents which Flutter parses and executes locally.
+2. **Phase 3: Performance & Scale Hardening:** Transition to explicit columns (remove `SELECT *`), paginated cloud views, and Supavisor connection pooling.
+3. **Phase 4: Connectivity & UX Polish:** Add global offline banners, fallback error screens, and barcode scanner integration.
+4. **Phase 5: Production Readiness:** Conduct load testing, hard RLS constraints, API rate limiting, and CI/CD pipelines.
+
+*For the complete detailed roadmap, check the `scalability_roadmap.md` artifact.*
 
 ## 💻 Tech Stack
 
