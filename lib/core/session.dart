@@ -3,6 +3,10 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'database.dart'; // Import supabase client
+import 'package:dukansathi_new/data/repositories/product_repository.dart';
+import 'package:dukansathi_new/data/repositories/customer_repository.dart';
+import 'package:dukansathi_new/data/repositories/sale_repository.dart';
+
 
 class UserSession extends ChangeNotifier {
   static final UserSession _instance = UserSession._();
@@ -97,6 +101,9 @@ class UserSession extends ChangeNotifier {
         
         if (_shopId == null) {
           await _fetchAndPersistShop(_userId!);
+        }
+        if (_shopId != null) {
+          triggerCacheWarmup();
         }
       } else if (_userId != null) {
         // We have local data but no Supabase session - this is an invalid state
@@ -193,6 +200,10 @@ class UserSession extends ChangeNotifier {
       if (_shopId != null) await prefs.setString(_shopIdKey, _shopId!);
       if (_shopName != null) await prefs.setString(_shopNameKey, _shopName!);
 
+      if (_shopId != null) {
+        triggerCacheWarmup();
+      }
+
       notifyListeners();
       return {'success': true};
     } catch (e, stack) {
@@ -241,6 +252,10 @@ class UserSession extends ChangeNotifier {
         }
       }
 
+      if (_shopId != null) {
+        triggerCacheWarmup();
+      }
+
       notifyListeners();
       return {'success': true};
     } catch (e) {
@@ -275,6 +290,23 @@ class UserSession extends ChangeNotifier {
   void markEmailVerified() {
     _emailVerified = true;
     notifyListeners();
+  }
+
+  /// Triggers a background cache warmup from Supabase to SQFlite for products, customers, and sales.
+  void triggerCacheWarmup() {
+    if (_shopId != null) {
+      Future.microtask(() async {
+        try {
+          debugPrint('[CacheWarmup] Warming up caches for shop $_shopId...');
+          await ProductRepository().syncProductsFromCloud(_shopId!);
+          await CustomerRepository().syncCustomersFromCloud(_shopId!);
+          await SaleRepository().syncSalesFromCloud(_shopId!);
+          debugPrint('[CacheWarmup] Caches warmed successfully!');
+        } catch (e) {
+          debugPrint('[CacheWarmup] Warmup failed: $e');
+        }
+      });
+    }
   }
 }
 

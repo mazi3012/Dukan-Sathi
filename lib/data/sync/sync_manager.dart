@@ -116,7 +116,13 @@ class SyncManager {
     Map<String, dynamic> payload,
   ) async {
     try {
-      if (action == 'INSERT' || action == 'UPDATE') {
+      if (action == 'ADJUST_STOCK') {
+        final delta = payload['delta'] as int;
+        await supabase.rpc('adjust_product_stock', params: {
+          'p_id': recordId,
+          'p_delta': delta,
+        });
+      } else if (action == 'INSERT' || action == 'UPDATE') {
         await supabase.from(tableName).upsert(payload);
       } else if (action == 'DELETE') {
         await supabase.from(tableName).delete().eq('id', recordId);

@@ -256,10 +256,8 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   Future<void> _restockProduct(Map<String, dynamic> product) async {
-    final newStock = (product['stock_quantity'] as int? ?? 0) + 10;
     try {
-      final updatedProduct = Product.fromJson({...product, 'stock_quantity': newStock});
-      await _productRepo.updateProduct(updatedProduct);
+      await _productRepo.adjustStock(product['id'], 10);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Restocked +10 for ${product['name']}', style: const TextStyle(color: Colors.white)), backgroundColor: AppColors.success));
       _fetchProducts();
     } catch (e) {

@@ -118,4 +118,21 @@ class ProductRepository {
       payload: {},
     );
   }
+
+  /// Relatively adjusts a product's stock levels locally and queues it for background sync
+  Future<void> adjustStock(String id, int delta) async {
+    // 1. Update SQLite locally first
+    await _localDb.rawUpdate(
+      'UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?',
+      [delta, id],
+    );
+
+    // 2. Queue for background sync
+    await _syncManager.queueOperation(
+      tableName: 'products',
+      action: 'ADJUST_STOCK',
+      recordId: id,
+      payload: {'id': id, 'delta': delta},
+    );
+  }
 }

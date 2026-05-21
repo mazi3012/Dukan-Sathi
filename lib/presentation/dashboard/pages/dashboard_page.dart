@@ -9,6 +9,9 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/database.dart';
 import '../../../core/session.dart';
+import 'package:dukansathi_new/data/local/local_database.dart';
+import 'package:dukansathi_new/core/services/connectivity_service.dart';
+
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -43,6 +46,9 @@ class _DashboardPageState extends State<DashboardPage> {
     _fetchDashboardData();
   }
 
+  final LocalDatabase _localDb = LocalDatabase.instance;
+  final ConnectivityService _connectivity = ConnectivityService.instance;
+
   Future<void> _fetchDashboardData() async {
     if (!mounted) return;
     setState(() {
@@ -57,80 +63,79 @@ class _DashboardPageState extends State<DashboardPage> {
     }
 
     try {
-      // 1. Fetch Total Sales
-      final salesRes = await supabase
-          .from('sales')
-          .select('amount')
-          .eq('shop_id', shopId);
+      // 1. Fetch Total Sales locally
+      final salesRes = await _localDb.queryAll(
+        'sales',
+        where: 'shop_id = ?',
+        whereArgs: [shopId],
+      );
       
       double sales = 0;
       for (var row in salesRes) {
         sales += (row['amount'] as num).toDouble();
       }
 
-      // 2. Fetch Invoice Count
-      final invoicesRes = await supabase
-          .from('sales')
-          .select('id')
-          .eq('shop_id', shopId);
-      final invoiceCount = invoicesRes.length;
+      // 2. Fetch Invoice Count locally
+      final invoiceCount = salesRes.length;
 
-      // 3. Fetch Expenses
-      final expensesRes = await supabase
-          .from('expenses')
-          .select('amount')
-          .eq('shop_id', shopId);
-      
+      // 3. Fetch Expenses (Online-only with safety fallback)
       double expenses = 0;
-      for (var row in expensesRes) {
-        expenses += (row['amount'] as num).toDouble();
+      if (_connectivity.isOnline) {
+        try {
+          final expensesRes = await supabase
+              .from('expenses')
+              .select('amount')
+              .eq('shop_id', shopId);
+          for (var row in expensesRes) {
+            expenses += (row['amount'] as num).toDouble();
+          }
+        } catch (_) {}
       }
 
-      // 4. Fetch Product Count
-      final productsRes = await supabase
-          .from('products')
-          .select('id')
-          .eq('shop_id', shopId);
-      final productCount = productsRes.length;
+      // 4. Fetch Pending Approvals Count (Online-only with safety fallback)
+      int pendingApprovals = 0;
+      if (_connectivity.isOnline) {
+        try {
+          final approvalsRes = await supabase
+              .from('draft_approvals')
+              .select('approval_id')
+              .eq('shop_id', shopId)
+              .eq('approval_status', 'PENDING');
+          pendingApprovals = approvalsRes.length;
+        } catch (_) {}
+      }
 
-      // 5. Fetch Recent Activity
-      final activityRes = await supabase
-          .from('sales')
-          .select('invoice_number, customer_name, amount, timestamp, payment_status')
-          .eq('shop_id', shopId)
-          .order('timestamp', ascending: false)
-          .limit(6);
-
-      // 6. Fetch Pending Approvals Count
-      final approvalsRes = await supabase
-          .from('draft_approvals')
-          .select('approval_id')
-          .eq('shop_id', shopId)
-          .eq('approval_status', 'PENDING');
-      final pendingApprovals = approvalsRes.length;
-
-      // 7. Fetch Low Stock Count (< 5 units)
-      final lowStockRes = await supabase
-          .from('products')
-          .select('id')
-          .eq('shop_id', shopId)
-          .lt('stock_quantity', 5);
+      // 5. Fetch Low Stock Count (< 5 units) locally
+      final lowStockRes = await _localDb.queryAll(
+        'products',
+        where: 'shop_id = ? AND stock_quantity < ?',
+        whereArgs: [shopId, 5],
+      );
       final lowStock = lowStockRes.length;
 
-      // 8. Fetch Total Market Dues
-      final duesRes = await supabase
-          .from('customers')
-          .select('current_balance')
-          .eq('shop_id', shopId);
+      // 6. Fetch Total Market Dues locally
+      final duesRes = await _localDb.queryAll(
+        'customers',
+        where: 'shop_id = ?',
+        whereArgs: [shopId],
+      );
       
       double dues = 0;
       for (var row in duesRes) {
         dues += (row['current_balance'] as num?)?.toDouble() ?? 0;
       }
 
+      // 7. Fetch Recent Activity locally
+      final activityRes = await _localDb.queryAll(
+        'sales',
+        where: 'shop_id = ?',
+        whereArgs: [shopId],
+        orderBy: 'timestamp DESC',
+        limit: 6,
+      );
+
       if (mounted) {
         setState(() {
-          // Dummy data for now so Gross Sales > Net Revenue
           _grossSales = sales > 0 ? sales * 1.2 : 25000;
           _netRevenue = sales > 0 ? sales : 21000;
           _gstCollected = _netRevenue * 0.18;
@@ -155,6 +160,7 @@ class _DashboardPageState extends State<DashboardPage> {
       }
     }
   }
+
 
   String _formatTimestamp(String? timestampStr) {
     if (timestampStr == null) return '';
