@@ -4,10 +4,7 @@ services:
     env: docker
     plan: free
     region: singapore # Change as needed
-    dockerCommand: ./server/bin/server
     envVars:
-      - key: PORT
-        value: 3100
       - key: SUPABASE_URL
         sync: true
       - key: SUPABASE_ANON_KEY
