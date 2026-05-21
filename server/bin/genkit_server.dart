@@ -682,11 +682,11 @@ class WebChatSession {
   // ─── INTENT DETECTION ──────────────────────────────────────────────────
   bool _isTimeIntent(String n) => n.contains('what time') || n.contains('current time') || n.contains('time now');
   bool _isDateIntent(String n) => n.contains('what is the date') || n.contains('today\'s date') || n.contains('current date') || n.contains('what day');
-  bool _isCatalogIntent(String n) => n.contains('what item') || n.contains('what items') || n.contains('catalog') || n.contains('list product') ||
+  bool _isCatalogIntent(String n) => n.contains('what item') || n.contains('what items') || n.contains('catalog') || n.contains('catelog') || n.contains('list product') ||
       n.contains('show product') || n.contains('show item') || n.contains('what do you have') || n.contains('what do we have') ||
       n.contains('items do we have') || n.contains('items do you have') || n.contains('our product') || n.contains('our inventory') ||
       n.contains('show inventory') || n.contains('view product') || n.contains('what do you sell') || n.contains('what do we sell') ||
-      n.contains('browse');
+      n.contains('browse') || n.contains('product list') || n.contains('item list') || n.contains('all products') || n.contains('all items');
   bool _isAddProductIntent(String n) => n.contains('add product') || n.contains('add a product') || n.contains('add a new product') || 
       n.contains('add item') || n.contains('add a new item') || n.contains('new product') ||
       n.contains('new item') || n.contains('create product') || n.contains('add service') ||
@@ -980,9 +980,9 @@ class WebChatSession {
 
     // Simple intent routing to avoid overloading Groq with unnecessary tools
     List<String> selectedTools = [];
-    if (n.contains('inventory') || n.contains('stock') || n.contains('price') || n.contains('atta') || n.contains('dal') || n.contains('oil') || n.contains('item')) {
+    if (_isCatalogIntent(n) || n.contains('inventory') || n.contains('stock') || n.contains('price') || n.contains('atta') || n.contains('dal') || n.contains('oil') || n.contains('item')) {
       selectedTools = ['checkInventory', 'browseCatalogTool'];
-    } else if (n.contains('revenue') || n.contains('analytics') || n.contains('orders') || n.contains('sales') || n.contains('sale') || n.contains('profit') || n.contains('earned') || n.contains('money')) {
+    } else if (_isAnalyticsIntent(n) || n.contains('revenue') || n.contains('analytics') || n.contains('orders') || n.contains('sales') || n.contains('sale') || n.contains('profit') || n.contains('earned') || n.contains('money')) {
       selectedTools = ['businessInsightsTool'];
     } else if (n.contains('add') || n.contains('new') || n.contains('create') || n.contains('import') || n.contains('upload')) {
       // Add can be products or expenses
@@ -993,7 +993,7 @@ class WebChatSession {
       selectedTools = ['getWeather'];
     } else if (n.contains('remind') || n.contains('reminder')) {
       selectedTools = ['setReminder'];
-    } else if (n.contains('expense') || n.contains('rent') || n.contains('bill') || n.contains('pay') || n.contains('spent') || n.contains('party') || n.contains('tea')) {
+    } else if (_isExpenseIntent(n) || n.contains('expense') || n.contains('rent') || n.contains('bill') || n.contains('pay') || n.contains('spent') || n.contains('party') || n.contains('tea')) {
       selectedTools = ['logExpense', 'getExpenses'];
     }
 
