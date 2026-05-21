@@ -35,10 +35,21 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
   final TextEditingController _discountController = TextEditingController();
   final TextEditingController _paidAmountController = TextEditingController();
   final FocusNode _paidAmountFocusNode = FocusNode();
+  Map<String, dynamic> _normalizePayload(Map<String, dynamic>? raw) {
+    if (raw == null) return {};
+    try {
+      // Deep serialize nested models (e.g. CartItem, TaxBreakdown) to pure Map/List
+      return jsonDecode(jsonEncode(raw)) as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint("Error normalizing payload: $e");
+      return raw;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _data = widget.payload ?? {};
+    _data = _normalizePayload(widget.payload);
     _discountController.text = (_data['discount_value'] ?? _data['discountValue'] ?? _data['discount']?['discountValue'] ?? 0).toString();
     _paidAmountController.text = (_data['amount_paid'] ?? _data['amountPaid'] ?? _data['payment']?['amountPaid'] ?? 0).toString();
   }
@@ -54,7 +65,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
     super.didUpdateWidget(oldWidget);
     if (widget.payload != oldWidget.payload && widget.payload != null) {
       setState(() {
-        _data = widget.payload!;
+        _data = _normalizePayload(widget.payload);
         _discountController.text = (_data['discount_value'] ?? _data['discountValue'] ?? _data['discount']?['discountValue'] ?? 0).toString();
         _paidAmountController.text = (_data['amount_paid'] ?? _data['amountPaid'] ?? _data['payment']?['amountPaid'] ?? 0).toString();
       });
