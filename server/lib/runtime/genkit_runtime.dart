@@ -29,31 +29,21 @@ Genkit _createGenkit() {
 	}
 
 	final groqApiKey = _envValue('GROQ_API_KEY');
-	if (groqApiKey != null && groqApiKey.isNotEmpty) {
-		final defaultModel = _envValue('MODEL_ID') ?? 'meta-llama/llama-4-scout-17b-16e-instruct';
-		return Genkit(
-			plugins: [
-				openAI(
-					apiKey: groqApiKey,
-					baseUrl: 'https://api.groq.com/openai/v1',
-					models: [CustomModelDefinition(name: defaultModel)],
-				),
-			],
-		);
-	}
-
-	final apiKey = _envValue('GOOGLE_API_KEY') ?? _envValue('GEMINI_API_KEY');
-	if (apiKey == null || apiKey.isEmpty) {
-		throw StateError(
-			'Missing required API key. Please set GROQ_API_KEY, GOOGLE_API_KEY or GEMINI_API_KEY.',
-		);
-	}
-
-	return Genkit(
-		plugins: [
-			googleAI(apiKey: apiKey),
-		],
-	);
+if (groqApiKey == null || groqApiKey.isEmpty) {
+  throw StateError(
+    'Missing required GROQ API key. Please set GROQ_API_KEY in the environment.',
+  );
+}
+final defaultModel = _envValue('MODEL_ID') ?? 'meta-llama/llama-4-scout-17b-16e-instruct';
+return Genkit(
+  plugins: [
+    openAI(
+      apiKey: groqApiKey,
+      baseUrl: 'https://api.groq.com/openai/v1',
+      models: [CustomModelDefinition(name: defaultModel)],
+    ),
+  ],
+);
 }
 
 final Genkit ai = _createGenkit();

@@ -9,13 +9,15 @@ services:
       - key: PORT
         value: 3100
       - key: SUPABASE_URL
-        sync: false
+        sync: true
       - key: SUPABASE_ANON_KEY
-        sync: false
+        sync: true
       - key: TELEGRAM_BOT_TOKEN
-        sync: false
+        sync: true
       - key: GROQ_API_KEY
-        sync: false
+        sync: true
+        value: your-groq-api-key-here
       - key: MODEL_ID
+        sync: true
         value: llama-3.3-70b-versatile
     autoDeploy: true
