@@ -1,38 +1,29 @@
 import 'package:flutter/foundation.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'database.dart'; // Import supabase client
-import 'package:dukansathi_new/data/repositories/product_repository.dart';
-import 'package:dukansathi_new/data/repositories/customer_repository.dart';
-import 'package:dukansathi_new/data/repositories/sale_repository.dart';
 import 'package:dukansathi_new/models/shop_config.dart';
+
+import 'session/session_storage.dart';
+import 'session/auth_service.dart';
+import 'session/shop_service.dart';
+import 'session/cache_warmup_service.dart';
 
 class UserSession extends ChangeNotifier {
   static final UserSession _instance = UserSession._();
   factory UserSession() => _instance;
+  
   UserSession._() {
-    _googleSignIn = GoogleSignIn(
-      clientId: kIsWeb ? '648987320349-asplif3bmr9ai0k3lkp9ulth5gne9eru.apps.googleusercontent.com' : null,
-      scopes: [
-        'email',
-        'https://www.googleapis.com/auth/userinfo.profile',
-      ],
-    );
+    _storage = SessionStorage();
+    _auth = AuthService();
+    _shop = ShopService();
+    _cache = CacheWarmupService();
   }
 
-  static const String _baseUrl = String.fromEnvironment('API_URL', defaultValue: '');
-  static const String _userIdKey = 'ds_user_id';
-  static const String _userNameKey = 'ds_user_name';
-  static const String _shopIdKey = 'ds_shop_id';
-  static const String _shopNameKey = 'ds_shop_name';
-  static const String _shopStateKey = 'ds_shop_state';
-  static const String _shopGstModeKey = 'ds_shop_gst_mode';
-  static const String _shopGstNumKey = 'ds_shop_gst_num';
-  static const String _shopBusinessTypeKey = 'ds_shop_business_type';
-
-  // Google Sign-In client
-  late GoogleSignIn _googleSignIn;
+  late final SessionStorage _storage;
+  late final AuthService _auth;
+  late final ShopService _shop;
+  late final CacheWarmupService _cache;
 
   String? _userId;
   String? _userName;
@@ -42,7 +33,7 @@ class UserSession extends ChangeNotifier {
   String? _shopGstMode;
   String? _shopGstNum;
   String? _shopBusinessType;
-  bool _emailVerified = true; // default true if not using email verification
+  bool _emailVerified = true;
   bool _isLoading = true;
 
   String? get userId => _userId;
@@ -76,14 +67,7 @@ class UserSession extends ChangeNotifier {
 
   Future<void> _fetchAndPersistShop(String userId) async {
     try {
-      // Accept ANY shop, regardless of onboarding_completed status
-      // This allows both Telegram-onboarded and form-onboarded users to proceed
-      final shopResult = await supabase
-          .from('shops')
-          .select('id, name, state, gst_mode, gst_registration_number, business_type')
-          .eq('owner_id', userId)
-          .maybeSingle();
-
+      final shopResult = await _shop.fetchShop(userId);
       if (shopResult != null) {
         _shopId = shopResult['id'] as String?;
         _shopName = shopResult['name'] as String?;
@@ -92,16 +76,17 @@ class UserSession extends ChangeNotifier {
         _shopGstNum = shopResult['gst_registration_number'] as String?;
         _shopBusinessType = shopResult['business_type'] as String?;
 
-        final prefs = await SharedPreferences.getInstance();
-        if (_shopId != null) await prefs.setString(_shopIdKey, _shopId!);
-        if (_shopName != null) await prefs.setString(_shopNameKey, _shopName!);
-        if (_shopState != null) await prefs.setString(_shopStateKey, _shopState!);
-        if (_shopGstMode != null) await prefs.setString(_shopGstModeKey, _shopGstMode!);
-        if (_shopGstNum != null) await prefs.setString(_shopGstNumKey, _shopGstNum!);
-        if (_shopBusinessType != null) await prefs.setString(_shopBusinessTypeKey, _shopBusinessType!);
+        await _storage.saveShop(
+          id: _shopId!,
+          name: _shopName ?? 'My Shop',
+          state: _shopState ?? 'DL',
+          gstMode: _shopGstMode ?? 'UNREGISTERED',
+          gstNum: _shopGstNum,
+          businessType: _shopBusinessType ?? 'Retail',
+        );
       }
     } catch (e) {
-      debugPrint('[Session] Fetch shop error: $e');
+      debugPrint('[UserSession] Fetch shop error: $e');
     }
   }
 
@@ -111,31 +96,27 @@ class UserSession extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // On web, wait a brief moment for Supabase to recover the session from the URL fragment/cookie
       if (kIsWeb) {
         await Future.delayed(const Duration(milliseconds: 500));
       }
       
       final prefs = await SharedPreferences.getInstance();
-      _userId = prefs.getString(_userIdKey);
-      _userName = prefs.getString(_userNameKey);
-      _shopId = prefs.getString(_shopIdKey);
-      _shopName = prefs.getString(_shopNameKey);
-      _shopState = prefs.getString(_shopStateKey);
-      _shopGstMode = prefs.getString(_shopGstModeKey);
-      _shopGstNum = prefs.getString(_shopGstNumKey);
-      _shopBusinessType = prefs.getString(_shopBusinessTypeKey);
+      _userId = prefs.getString(SessionStorage.userIdKey);
+      _userName = prefs.getString(SessionStorage.userNameKey);
+      _shopId = prefs.getString(SessionStorage.shopIdKey);
+      _shopName = prefs.getString(SessionStorage.shopNameKey);
+      _shopState = prefs.getString(SessionStorage.shopStateKey);
+      _shopGstMode = prefs.getString(SessionStorage.shopGstModeKey);
+      _shopGstNum = prefs.getString(SessionStorage.shopGstNumKey);
+      _shopBusinessType = prefs.getString(SessionStorage.shopBusinessTypeKey);
 
       final currentSupabaseUser = supabase.auth.currentUser;
       
       if (currentSupabaseUser != null) {
-        // We have a valid Supabase session (possibly just recovered from OAuth redirect)
         _userId = currentSupabaseUser.id;
         _userName = currentSupabaseUser.userMetadata?['full_name'] ?? currentSupabaseUser.email;
         
-        // Ensure local storage is in sync
-        await prefs.setString(_userIdKey, _userId!);
-        if (_userName != null) await prefs.setString(_userNameKey, _userName!);
+        await _storage.saveUser(_userId!, _userName ?? '');
         
         if (_shopId == null) {
           await _fetchAndPersistShop(_userId!);
@@ -144,11 +125,10 @@ class UserSession extends ChangeNotifier {
           triggerCacheWarmup();
         }
       } else if (_userId != null) {
-        // We have local data but no Supabase session - this is an invalid state
         await _clearLocal();
       }
     } catch (e) {
-      debugPrint('[Session] init error: $e');
+      debugPrint('[UserSession] init error: $e');
     }
 
     _isLoading = false;
@@ -156,112 +136,44 @@ class UserSession extends ChangeNotifier {
   }
 
   /// Login with Google OAuth using Supabase integration.
-  /// On web: Not yet fully supported - returning error message
-  /// On mobile: Uses google_sign_in package with ID tokens
   Future<Map<String, dynamic>> loginWithGoogle() async {
-    try {
-      debugPrint('[Session] Starting Google Sign-In flow (isWeb: $kIsWeb)');
-      
+    final result = await _auth.loginWithGoogle();
+    if (result['success'] == true) {
       if (kIsWeb) {
-        debugPrint('[Session] Web platform detected - using signInWithOAuth redirect');
-        
-        // Use the current origin for redirect back to ensure it works on localhost or production
-        final String redirectTo = Uri.base.origin;
-        debugPrint('[Session] Web redirect URL: $redirectTo');
+        return result;
+      }
+      _userId = result['userId'] as String?;
+      _userName = result['userName'] as String?;
+      _emailVerified = result['emailConfirmed'] as bool? ?? true;
 
-        await supabase.auth.signInWithOAuth(
-          OAuthProvider.google,
-          redirectTo: redirectTo,
+      await _storage.saveUser(_userId!, _userName ?? '');
+
+      final shopResult = await _shop.fetchShop(_userId!);
+      if (shopResult != null) {
+        _shopId = shopResult['id'] as String?;
+        _shopName = shopResult['name'] as String?;
+        _shopState = shopResult['state'] as String?;
+        _shopGstMode = shopResult['gst_mode'] as String?;
+        _shopGstNum = shopResult['gst_registration_number'] as String?;
+        _shopBusinessType = shopResult['business_type'] as String?;
+
+        await _storage.saveShop(
+          id: _shopId!,
+          name: _shopName ?? 'My Shop',
+          state: _shopState ?? 'DL',
+          gstMode: _shopGstMode ?? 'UNREGISTERED',
+          gstNum: _shopGstNum,
+          businessType: _shopBusinessType ?? 'Retail',
         );
-        
-        // The page will redirect, so we return success.
-        return {'success': true, 'note': 'Redirecting to Google...'};
       }
-
-      // Mobile platform: Use google_sign_in package with tokens
-      await _googleSignIn.signOut();
-      final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        debugPrint('[Session] Google sign-in cancelled by user');
-        return {'success': false, 'error': 'Google sign-in cancelled'};
-      }
-
-      final googleAuth = await googleUser.authentication;
-      final idToken = googleAuth.idToken;
-      
-      if (idToken == null || idToken.isEmpty) {
-        return {'success': false, 'error': 'Failed to get Google authentication tokens'};
-      }
-
-      // Sign in with Supabase using Google provider (mobile only)
-      final response = await supabase.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: idToken,
-      );
-
-      final respUser = response.user;
-      debugPrint('[Session] supabase response.user: ${respUser?.id}');
-      if (respUser == null) {
-        debugPrint('[Session] Supabase response.user is null');
-        return {'success': false, 'error': 'Failed to authenticate with Supabase'};
-      }
-
-      final userId = respUser.id;
-      final userEmail = respUser.email ?? googleUser.email;
-      final userName = googleUser.displayName ?? googleUser.email;
-
-      // Upsert user record in public users table with full_name
-      await supabase.from('users').upsert({
-        'id': userId,
-        'email': userEmail,
-        'full_name': userName,
-        'updated_at': DateTime.now().toIso8601String(),
-      });
-
-      // Fetch user's shop if exists
-      final shopResult = await supabase
-          .from('shops')
-          .select('id, name, state, gst_mode, gst_registration_number, business_type')
-          .eq('owner_id', userId)
-          .maybeSingle();
-
-      _userId = userId;
-      _userName = userName;
-      _shopId = shopResult?['id'] as String?;
-      _shopName = shopResult?['name'] as String?;
-      _shopState = shopResult?['state'] as String?;
-      _shopGstMode = shopResult?['gst_mode'] as String?;
-      _shopGstNum = shopResult?['gst_registration_number'] as String?;
-      _shopBusinessType = shopResult?['business_type'] as String?;
-      _emailVerified = respUser.emailConfirmedAt != null || true; // Google users are pre-verified
-
-      // Persist to local storage
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_userIdKey, userId);
-      await prefs.setString(_userNameKey, userName);
-      if (_shopId != null) await prefs.setString(_shopIdKey, _shopId!);
-      if (_shopName != null) await prefs.setString(_shopNameKey, _shopName!);
-      if (_shopState != null) await prefs.setString(_shopStateKey, _shopState!);
-      if (_shopGstMode != null) await prefs.setString(_shopGstModeKey, _shopGstMode!);
-      if (_shopGstNum != null) await prefs.setString(_shopGstNumKey, _shopGstNum!);
-      if (_shopBusinessType != null) await prefs.setString(_shopBusinessTypeKey, _shopBusinessType!);
 
       if (_shopId != null) {
         triggerCacheWarmup();
       }
 
       notifyListeners();
-      return {'success': true};
-    } catch (e, stack) {
-      debugPrint('[Session] Google login error: $e\n$stack');
-      String msg = e.toString();
-      if (msg.contains('PlatformException')) {
-        msg = 'Failed to sign in with Google. Please try again.';
-      } else {
-        msg = msg.replaceAll('Exception: ', '');
-      }
-      return {'success': false, 'error': msg};
     }
+    return result;
   }
 
   /// Create a new shop for the user
@@ -276,16 +188,15 @@ class UserSession extends ChangeNotifier {
     if (_userId == null) return {'success': false, 'error': 'No user logged in'};
 
     try {
-      final result = await supabase.from('shops').insert({
-        'owner_id': _userId,
-        'name': name,
-        'state': state,
-        'business_type': businessType,
-        'gst_registration_number': gstNumber,
-        'gst_mode': gstMode,
-        'upi_id': upiId,
-        'onboarding_completed': true,
-      }).select('id, name, state, gst_mode, gst_registration_number, business_type').single();
+      final result = await _shop.createShop(
+        ownerId: _userId!,
+        name: name,
+        state: state,
+        businessType: businessType,
+        gstNumber: gstNumber,
+        gstMode: gstMode,
+        upiId: upiId,
+      );
 
       _shopId = result['id'] as String?;
       _shopName = result['name'] as String?;
@@ -295,30 +206,28 @@ class UserSession extends ChangeNotifier {
       _shopBusinessType = result['business_type'] as String?;
 
       if (_shopId != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_shopIdKey, _shopId!);
-        if (_shopName != null) await prefs.setString(_shopNameKey, _shopName!);
-        if (_shopState != null) await prefs.setString(_shopStateKey, _shopState!);
-        if (_shopGstMode != null) await prefs.setString(_shopGstModeKey, _shopGstMode!);
-        if (_shopGstNum != null) await prefs.setString(_shopGstNumKey, _shopGstNum!);
-        if (_shopBusinessType != null) await prefs.setString(_shopBusinessTypeKey, _shopBusinessType!);
-      }
-
-      if (_shopId != null) {
+        await _storage.saveShop(
+          id: _shopId!,
+          name: _shopName ?? 'My Shop',
+          state: _shopState ?? 'DL',
+          gstMode: _shopGstMode ?? 'UNREGISTERED',
+          gstNum: _shopGstNum,
+          businessType: _shopBusinessType ?? 'Retail',
+        );
         triggerCacheWarmup();
       }
 
       notifyListeners();
       return {'success': true};
     } catch (e) {
-      debugPrint('[Session] createShop error: $e');
+      debugPrint('[UserSession] createShop error: $e');
       return {'success': false, 'error': e.toString().replaceAll('Exception: ', '')};
     }
   }
 
   /// Logout and clear session.
   Future<void> logout() async {
-    await supabase.auth.signOut();
+    await _auth.logout();
     await _clearLocal();
     notifyListeners();
   }
@@ -333,42 +242,19 @@ class UserSession extends ChangeNotifier {
     _shopGstNum = null;
     _shopBusinessType = null;
     _emailVerified = true;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_userIdKey);
-    await prefs.remove(_userNameKey);
-    await prefs.remove(_shopIdKey);
-    await prefs.remove(_shopNameKey);
-    await prefs.remove(_shopStateKey);
-    await prefs.remove(_shopGstModeKey);
-    await prefs.remove(_shopGstNumKey);
-    await prefs.remove(_shopBusinessTypeKey);
+    await _storage.clear();
   }
 
   /// Mark the current user's email as verified and notify listeners.
-  /// Use this when handling deep-link callbacks from verification emails.
   void markEmailVerified() {
     _emailVerified = true;
     notifyListeners();
   }
 
-  /// Triggers a background cache warmup from Supabase to SQFlite for products, customers, and sales.
+  /// Triggers a background cache warmup from Supabase to SQFlite.
   void triggerCacheWarmup() {
     if (_shopId != null) {
-      Future.microtask(() async {
-        try {
-          debugPrint('[CacheWarmup] Warming up caches for shop $_shopId...');
-          await Future.wait([
-            ProductRepository().syncProductsFromCloud(_shopId!),
-            CustomerRepository().syncCustomersFromCloud(_shopId!),
-            SaleRepository().syncSalesFromCloud(_shopId!),
-          ]);
-          debugPrint('[CacheWarmup] Caches warmed successfully!');
-        } catch (e) {
-          debugPrint('[CacheWarmup] Warmup failed: $e');
-        }
-      });
+      _cache.triggerWarmup(_shopId!);
     }
   }
 }
-
-
