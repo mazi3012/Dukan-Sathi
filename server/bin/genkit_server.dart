@@ -136,7 +136,7 @@ Future<void> main(List<String> arguments) async {
   print('');
 
 
-  // ─── WEB CHAT SESSION (mirrors Telegram Chat class) ─────────────────────
+  // ─── WEB CHAT SESSION ──────────────────────────────────────────────────
   final Map<String, WebChatSession> webSessions = {};
   
   // Rate limiter instance
@@ -308,7 +308,7 @@ Future<void> main(List<String> arguments) async {
             ..close();
         }
       } else if (request.method == 'POST' && request.uri.path == '/api/chat') {
-        // ─── SMART CHAT ENDPOINT (mirrors Telegram bot capabilities) ─────
+        // ─── SMART CHAT ENDPOINT ────────────────────────────────────────
         var body = await utf8.decodeStream(request);
         try {
           final data = jsonDecode(body) as Map<String, dynamic>;
@@ -646,7 +646,7 @@ Future<void> main(List<String> arguments) async {
 }
 
 // ─── WEB CHAT SESSION ──────────────────────────────────────────────────────────
-// Mirrors the Telegram bot's Chat class for feature parity.
+// Web chat session handler.
 
 const String _webSystemPrompt =
   "You are Dukan Sathi Pro, a premium AI retail shop assistant. CRITICAL RULES: "
@@ -679,7 +679,7 @@ class WebChatSession {
   String get userIdentifier => _currentUserId ?? 'web-user';
   String? get shopId => _currentShopId;
 
-  // ─── INTENT DETECTION (same as Telegram bot) ───────────────────────────
+  // ─── INTENT DETECTION ──────────────────────────────────────────────────
   bool _isTimeIntent(String n) => n.contains('what time') || n.contains('current time') || n.contains('time now');
   bool _isDateIntent(String n) => n.contains('what is the date') || n.contains('today\'s date') || n.contains('current date') || n.contains('what day');
   bool _isCatalogIntent(String n) => n.contains('what item') || n.contains('what items') || n.contains('catalog') || n.contains('list product') ||

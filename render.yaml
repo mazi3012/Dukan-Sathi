@@ -14,8 +14,6 @@ services:
         sync: false
       - key: MODEL_ID
         value: llama-3.3-70b-versatile
-      - key: TELEGRAM_BOT_TOKEN
-        sync: false
       - key: PORT
         value: "3100"
     autoDeploy: true
