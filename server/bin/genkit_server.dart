@@ -935,6 +935,14 @@ class WebChatSession {
     }
 
     try {
+      final selectedTools = isSimpleGreeting ? <String>[] : _getRelevantTools(input);
+      print('[AI Request] Initializing generation...');
+      print('[AI Request] Model: ${modelId} (Provider: ${aiProvider})');
+      print('[AI Request] Tools: $selectedTools');
+      print('[AI Request] Messages count in payload: ${_history.length}');
+      print('[AI Request] Shop ID: $_currentShopId | User ID: $_currentUserId');
+
+      final stopwatch = Stopwatch()..start();
       final response = await ai.generate(
         model: appModel(),
         messages: [
@@ -944,7 +952,7 @@ class WebChatSession {
           ..._history,
         ],
         // Skip tools for simple greetings to avoid Groq schema validation issues
-        toolNames: isSimpleGreeting ? [] : _getRelevantTools(input),
+        toolNames: selectedTools,
         context: {
           'userIdentifier': userIdentifier,
           'shopId': _currentShopId,
@@ -953,6 +961,8 @@ class WebChatSession {
         const Duration(seconds: 40),
         onTimeout: () => throw TimeoutException('AI generation timed out after 40 seconds'),
       );
+
+      print('[AI Response] Generated successfully in ${stopwatch.elapsedMilliseconds}ms');
 
       // Log tool calls for observability and parse executed cards
       Map<String, dynamic>? executedCard;
