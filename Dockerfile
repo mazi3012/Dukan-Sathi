@@ -2,6 +2,9 @@ FROM dart:stable
 
 WORKDIR /app
 
+# Bust Docker cache on every deploy
+ARG CACHEBUST=1
+
 # Copy the server directory
 COPY server/ server/
 

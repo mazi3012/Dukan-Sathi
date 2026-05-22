@@ -59,7 +59,7 @@ Genkit _createGenkit() {
   final rawModel = _envValue('MODEL_ID') ?? _envValue('OPENROUTER_MODEL_ID');
   final defaultModel = (rawModel != null && rawModel.isNotEmpty && !rawModel.contains('llama-4-scout'))
       ? rawModel
-      : (isOpenRouter ? 'qwen/qwen3-next-80b-a3b-instruct:free' : 'llama-3.3-70b-versatile');
+      : (isOpenRouter ? 'deepseek/deepseek-v4-flash:free' : 'llama-3.3-70b-versatile');
 
   final baseUrl = isOpenRouter 
       ? 'https://openrouter.ai/api/v1' 
@@ -72,9 +72,9 @@ Genkit _createGenkit() {
         baseUrl: baseUrl,
         models: [
           CustomModelDefinition(
-            name: 'qwen/qwen3-next-80b-a3b-instruct:free',
+            name: 'deepseek/deepseek-v4-flash:free',
             info: ModelInfo(
-              label: 'Qwen3 Next 80B Instruct (Free)',
+              label: 'DeepSeek V4 Flash (Free)',
               supports: {'multiturn': true, 'tools': true, 'systemRole': true},
             ),
           ),
@@ -94,7 +94,7 @@ Genkit _createGenkit() {
           ),
           if (defaultModel != 'llama-3.3-70b-versatile' && 
               defaultModel != 'llama-3.1-8b-instant' && 
-              defaultModel != 'qwen/qwen3-next-80b-a3b-instruct:free')
+              defaultModel != 'deepseek/deepseek-v4-flash:free')
             CustomModelDefinition(
               name: defaultModel,
               info: ModelInfo(
@@ -125,7 +125,7 @@ String get modelId {
   if (raw != null && raw.isNotEmpty && !raw.contains('llama-4-scout')) {
     return raw;
   }
-  return isOpenRouter ? 'qwen/qwen3-next-80b-a3b-instruct:free' : (isGroq ? 'llama-3.3-70b-versatile' : 'gemini-1.5-flash');
+  return isOpenRouter ? 'deepseek/deepseek-v4-flash:free' : (isGroq ? 'llama-3.3-70b-versatile' : 'gemini-1.5-flash');
 }
 
 String get aiProvider {
