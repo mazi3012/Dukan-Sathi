@@ -42,8 +42,10 @@ Genkit _createGenkit() {
     );
   }
 
-  final defaultModel =
-      _envValue('MODEL_ID') ?? 'llama-3.3-70b-versatile';
+  final rawModel = _envValue('MODEL_ID');
+  final defaultModel = (rawModel != null && rawModel.isNotEmpty && !rawModel.contains('llama-4-scout'))
+      ? rawModel
+      : 'llama-3.3-70b-versatile';
 
   return Genkit(
     plugins: [
@@ -52,16 +54,27 @@ Genkit _createGenkit() {
         baseUrl: 'https://api.groq.com/openai/v1',
         models: [
           CustomModelDefinition(
-            name: defaultModel,
+            name: 'llama-3.3-70b-versatile',
             info: ModelInfo(
-              label: 'Groq Custom Model',
-              supports: {
-                'multiturn': true,
-                'tools': true,
-                'systemRole': true,
-              },
+              label: 'Llama 3.3 70B',
+              supports: {'multiturn': true, 'tools': true, 'systemRole': true},
             ),
           ),
+          CustomModelDefinition(
+            name: 'llama-3.1-8b-instant',
+            info: ModelInfo(
+              label: 'Llama 3.1 8B',
+              supports: {'multiturn': true, 'tools': true, 'systemRole': true},
+            ),
+          ),
+          if (defaultModel != 'llama-3.3-70b-versatile' && defaultModel != 'llama-3.1-8b-instant')
+            CustomModelDefinition(
+              name: defaultModel,
+              info: ModelInfo(
+                label: 'Groq Custom Model',
+                supports: {'multiturn': true, 'tools': true, 'systemRole': true},
+              ),
+            ),
         ],
       ),
     ],
@@ -82,11 +95,13 @@ Genkit get ai {
 
 bool get isGroq => _envValue('GROQ_API_KEY') != null;
 
-String get modelId =>
-    _envValue('MODEL_ID') ??
-    (isGroq
-        ? 'llama-3.3-70b-versatile'
-        : 'gemini-1.5-flash');
+String get modelId {
+  final raw = _envValue('MODEL_ID');
+  if (raw != null && raw.isNotEmpty && !raw.contains('llama-4-scout')) {
+    return raw;
+  }
+  return isGroq ? 'llama-3.3-70b-versatile' : 'gemini-1.5-flash';
+}
 
 String get aiProvider => isGroq ? 'Groq via OpenAI Plugin' : 'Google GenAI SDK';
 
