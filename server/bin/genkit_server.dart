@@ -946,7 +946,7 @@ class WebChatSession {
       print('[AI Request] Shop ID: $_currentShopId | User ID: $_currentUserId');
 
       final stopwatch = Stopwatch()..start();
-      response = await ai.generate(
+      final response = await ai.generate(
         model: appModel(),
         messages: [
           Message(role: Role.system, content: [
