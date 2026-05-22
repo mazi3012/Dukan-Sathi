@@ -946,7 +946,7 @@ class WebChatSession {
       print('[AI Request] Shop ID: $_currentShopId | User ID: $_currentUserId');
 
       final stopwatch = Stopwatch()..start();
-      final response = await ai.generate(
+      response = await ai.generate(
         model: appModel(),
         messages: [
           Message(role: Role.system, content: [
@@ -954,15 +954,14 @@ class WebChatSession {
           ]),
           ..._history,
         ],
-        // Skip tools for simple greetings to avoid Groq schema validation issues
         toolNames: selectedTools,
         context: {
           'userIdentifier': userIdentifier,
           'shopId': _currentShopId,
         },
       ).timeout(
-        const Duration(seconds: 40),
-        onTimeout: () => throw TimeoutException('AI generation timed out after 40 seconds'),
+        const Duration(seconds: 45),
+        onTimeout: () => throw TimeoutException('AI generation timed out after 45 seconds'),
       );
 
       print('[AI Response] Generated successfully in ${stopwatch.elapsedMilliseconds}ms');

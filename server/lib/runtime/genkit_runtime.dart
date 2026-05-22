@@ -29,30 +29,55 @@ String? _envValue(String key) {
 
 String? getEnv(String key) => _envValue(key);
 
+String? _getApiKey() {
+  return _envValue('OPENROUTER_API_KEY') ?? _envValue('GROQ_API_KEY');
+}
+
+bool get isOpenRouter {
+  final key = _getApiKey() ?? '';
+  return key.startsWith('sk-or-');
+}
+
+bool get isGroq {
+  final key = _getApiKey() ?? '';
+  return key.isNotEmpty && !key.startsWith('sk-or-');
+}
+
 // ─── Lazy initialization — avoids top-level crash before main() runs ─────────
 Genkit? _genkitInstance;
 
 Genkit _createGenkit() {
   _loadDotEnv();
 
-  final groqApiKey = _envValue('GROQ_API_KEY');
-  if (groqApiKey == null || groqApiKey.isEmpty) {
+  final apiKey = _getApiKey();
+  if (apiKey == null || apiKey.isEmpty) {
     throw StateError(
-      'Missing required GROQ API key. Please set GROQ_API_KEY in the environment.',
+      'Missing required API key. Please set GROQ_API_KEY or OPENROUTER_API_KEY in the environment.',
     );
   }
 
-  final rawModel = _envValue('MODEL_ID');
+  final rawModel = _envValue('MODEL_ID') ?? _envValue('OPENROUTER_MODEL_ID');
   final defaultModel = (rawModel != null && rawModel.isNotEmpty && !rawModel.contains('llama-4-scout'))
       ? rawModel
-      : 'llama-3.3-70b-versatile';
+      : (isOpenRouter ? 'qwen/qwen3-next-80b-a3b-instruct:free' : 'llama-3.3-70b-versatile');
+
+  final baseUrl = isOpenRouter 
+      ? 'https://openrouter.ai/api/v1' 
+      : 'https://api.groq.com/openai/v1';
 
   return Genkit(
     plugins: [
       openAI(
-        apiKey: groqApiKey,
-        baseUrl: 'https://api.groq.com/openai/v1',
+        apiKey: apiKey,
+        baseUrl: baseUrl,
         models: [
+          CustomModelDefinition(
+            name: 'qwen/qwen3-next-80b-a3b-instruct:free',
+            info: ModelInfo(
+              label: 'Qwen3 Next 80B Instruct (Free)',
+              supports: {'multiturn': true, 'tools': true, 'systemRole': true},
+            ),
+          ),
           CustomModelDefinition(
             name: 'llama-3.3-70b-versatile',
             info: ModelInfo(
@@ -67,11 +92,13 @@ Genkit _createGenkit() {
               supports: {'multiturn': true, 'tools': true, 'systemRole': true},
             ),
           ),
-          if (defaultModel != 'llama-3.3-70b-versatile' && defaultModel != 'llama-3.1-8b-instant')
+          if (defaultModel != 'llama-3.3-70b-versatile' && 
+              defaultModel != 'llama-3.1-8b-instant' && 
+              defaultModel != 'qwen/qwen3-next-80b-a3b-instruct:free')
             CustomModelDefinition(
               name: defaultModel,
               info: ModelInfo(
-                label: 'Groq Custom Model',
+                label: 'Custom OpenAI Model',
                 supports: {'multiturn': true, 'tools': true, 'systemRole': true},
               ),
             ),
@@ -93,22 +120,23 @@ Genkit get ai {
   return _genkitInstance!;
 }
 
-bool get isGroq => _envValue('GROQ_API_KEY') != null;
-
 String get modelId {
-  final raw = _envValue('MODEL_ID');
+  final raw = _envValue('MODEL_ID') ?? _envValue('OPENROUTER_MODEL_ID');
   if (raw != null && raw.isNotEmpty && !raw.contains('llama-4-scout')) {
     return raw;
   }
-  return isGroq ? 'llama-3.3-70b-versatile' : 'gemini-1.5-flash';
+  return isOpenRouter ? 'qwen/qwen3-next-80b-a3b-instruct:free' : (isGroq ? 'llama-3.3-70b-versatile' : 'gemini-1.5-flash');
 }
 
-String get aiProvider => isGroq ? 'Groq via OpenAI Plugin' : 'Google GenAI SDK';
+String get aiProvider {
+  if (isOpenRouter) return 'OpenRouter via OpenAI Plugin';
+  return isGroq ? 'Groq via OpenAI Plugin' : 'Google GenAI SDK';
+}
 
 dynamic appModel([String? override]) {
   final String mId =
       (override == null || override.trim().isEmpty) ? modelId : override.trim();
-  if (isGroq) {
+  if (isOpenRouter || isGroq) {
     return openAI.model(mId);
   }
   return googleAI.gemini(mId);
