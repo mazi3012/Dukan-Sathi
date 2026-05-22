@@ -85,8 +85,8 @@ bool get isGroq => _envValue('GROQ_API_KEY') != null;
 String get modelId =>
     _envValue('MODEL_ID') ??
     (isGroq
-        ? 'meta-llama/llama-4-scout-17b-16e-instruct'
-        : 'gemini-3.1-flash-lite-preview');
+        ? 'llama-3.3-70b-versatile'
+        : 'gemini-1.5-flash');
 
 String get aiProvider => isGroq ? 'Groq via OpenAI Plugin' : 'Google GenAI SDK';
 
