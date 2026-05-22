@@ -925,6 +925,9 @@ class WebChatSession {
     final _greetings = RegExp(r'^(hi|hello|hey|hii|hiii|namaste|hola|good\s*(morning|evening|afternoon|night)|salam|howdy|yo|sup|kya\s*hal|kaise\s*ho)\b', caseSensitive: false);
     final isSimpleGreeting = _greetings.hasMatch(n) && n.split(' ').length <= 4;
 
+    // Save history backup to allow a complete transaction-like rollback if generation fails or times out
+    final historyBackup = List<Message>.from(_history);
+
     // All other intents → let the AI pick the right tool
     final userMessage = Message(role: Role.user, content: [TextPart(text: input)]);
     _history.add(userMessage);
@@ -1042,10 +1045,9 @@ class WebChatSession {
       };
     } catch (e) {
       print('[processMessage] Error: $e');
-      // Rollback the last user message on failure to prevent consecutive user messages which corrupt the history sequence
-      if (_history.isNotEmpty && _history.last == userMessage) {
-        _history.removeLast();
-      }
+      // Full transaction-like rollback: Restore the pristine history backup to prevent corrupted roles sequence
+      _history.clear();
+      _history.addAll(historyBackup);
       return {'text': 'Sorry, something went wrong: ${e.toString().split('\n').first}'};
     }
   }

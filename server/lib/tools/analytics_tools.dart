@@ -157,12 +157,15 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
       'Get comprehensive business analytics including revenue, profit, approval status, and date-range insights in IST. Supports: overview, revenue, profit, approval_status, and time_period.',
   inputSchema: businessInsightsInputSchema,
   fn: (input, context) async {
-    print("Tool Context: \${context.context}");
+    print('[Tool:businessInsightsTool] Started. Context: ${context.context}');
     final rawShopId = input['shopId'] as String?;
     final shopId = (isValidUuid(rawShopId) ? rawShopId : null) ?? 
                    (context.context?['shopId'] as String?) ?? 
                    await getShopIdForUser(context.context?['userIdentifier'] as String?);
+    
+    print('[Tool:businessInsightsTool] Resolved shopId: $shopId');
     if (shopId.isEmpty) {
+      print('[Tool:businessInsightsTool] Error: No shop found');
       return {
         'status': 'error',
         'message': 'No shop found for user',
@@ -176,7 +179,9 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
       final range = _resolveDateRange(input);
       final from = range?['from'];
       final to = range?['to'];
+      print('[Tool:businessInsightsTool] Date Range resolved: from=$from to=$to | Metric: $metric');
 
+      final swApprovals = Stopwatch()..start();
       var approvalsQuery = supabase
           .from('draft_approvals')
           .select('approval_id, proposed_total, approval_status, created_at, reviewed_at, sale_id, shop_id')
@@ -190,10 +195,13 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
       }
 
       final approvals = await approvalsQuery.order('created_at', ascending: false);
+      print('[Tool:businessInsightsTool] Approvals query completed in ${swApprovals.elapsedMilliseconds}ms. Count: ${(approvals as List).length}');
+      
       final approvalRecords = (approvals as List<dynamic>)
           .map((record) => Map<String, dynamic>.from(record as Map))
           .toList();
 
+      final swSales = Stopwatch()..start();
       var salesQuery = supabase
           .from('sales')
           .select('id, invoice_id, shop_id, amount, subtotal_after_discount, timestamp, status, payment_method, customer_id, customer_name')
@@ -207,6 +215,8 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
       }
 
       final sales = await salesQuery.order('timestamp', ascending: false);
+      print('[Tool:businessInsightsTool] Sales query completed in ${swSales.elapsedMilliseconds}ms. Count: ${(sales as List).length}');
+      
       final saleRecords = (sales as List<dynamic>)
           .map((record) => Map<String, dynamic>.from(record as Map))
           .toList();
