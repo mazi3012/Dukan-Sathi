@@ -200,7 +200,7 @@ final SchemanticType<Map<String, dynamic>> createDraftInvoiceInputSchema =
       'amountPaid': {'type': 'number'},
       'requestedItems': {
         'type': 'object',
-        'additionalProperties': {'type': 'integer'},
+        'description': 'A map of product names to integer quantities. e.g. {"Atta 5kg": 2}',
       },
       'userPrompt': {'type': 'string'},
     },

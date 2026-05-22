@@ -147,7 +147,6 @@ final SchemanticType<Map<String, dynamic>> businessInsightsInputSchema =
       'fromDate': {'type': 'string'},
       'toDate': {'type': 'string'},
     },
-    'required': [],
   },
   parse: (json) => Map<String, dynamic>.from(json as Map),
 );
