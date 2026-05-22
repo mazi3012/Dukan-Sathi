@@ -25,12 +25,12 @@ class DukanSathiLogo extends StatelessWidget {
     // that fits perfectly without any overflow clipping.
     final bool isSmall = size <= 48;
 
-    Widget logoWidget = SvgPicture.asset(
-      'assets/logo.svg', // We just use one SVG for both now, the solid/non-solid logic is obsolete for vector
+    Widget logoWidget = Image.asset(
+      'assets/logo.png',
       width: isSmall ? size * 0.65 : size,
       height: isSmall ? size * 0.65 : size,
       fit: BoxFit.contain,
-      colorFilter: isDark ? const ColorFilter.mode(Colors.white, BlendMode.srcIn) : null,
+      color: isDark ? Colors.white : null,
     );
 
     if (isSmall) {
@@ -96,15 +96,27 @@ class DukanSathiHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    // Left spacing and ratio calculations
-    final double calculatedWidth = height * 4.0; // horizontal text aspect ratio is 4:1
 
-    Widget headerWidget = SvgPicture.asset(
-      'assets/logo_full.svg',
-      width: calculatedWidth,
-      height: height,
-      fit: BoxFit.contain,
-      colorFilter: isDark ? const ColorFilter.mode(Colors.white, BlendMode.srcIn) : null,
+    Widget headerWidget = Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        DukanSathiLogo(
+          size: height,
+          showGlow: showGlow,
+          animate: false, // Handle animation at the row level
+        ),
+        const SizedBox(width: 12),
+        Text(
+          'Dukan Sathi',
+          style: TextStyle(
+            color: isDark ? Colors.white : const Color(0xFF004D40),
+            fontSize: height * 0.7, // Scale text relative to height
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+          ),
+        ),
+      ],
     );
 
     if (animate) {
