@@ -85,6 +85,47 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
     }
   }
 
+  Future<void> clearChat() async {
+    final shopId = UserSession().shopId;
+    if (shopId == null || shopId.isEmpty) return;
+
+    // 1. Clear local SQLite database
+    try {
+      await LocalDatabase.instance.delete(
+        'chat_messages',
+        where: 'shop_id = ?',
+        whereArgs: [shopId],
+      );
+    } catch (e) {
+      debugPrint('[ChatController] Failed to delete local messages: $e');
+    }
+
+    // 2. Reset Riverpod state to greeting
+    state = [
+      ChatMessage(
+        id: const Uuid().v4(),
+        text: "Hi! I'm Dukan Sathi. How can I help you manage your shop today?",
+        type: MessageType.aiText,
+      ),
+    ];
+
+    // 3. Notify the Genkit backend to wipe in-memory session history
+    try {
+      await http.post(
+        _getApiUri('/api/chat'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'clearHistory': true,
+          'sessionId': _sessionId,
+        }),
+      );
+    } catch (e) {
+      debugPrint('[ChatController] Failed to clear remote server history: $e');
+    }
+  }
+
   Future<void> sendMessage(String text) async {
     if (text.trim().isEmpty) return;
 

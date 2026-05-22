@@ -156,6 +156,55 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
     );
   }
 
+  void _confirmClearChat(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.6),
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Iconsax.trash, color: AppColors.error),
+            const SizedBox(width: 8),
+            Text(
+              "Clear Conversation?",
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Text(
+          "Are you sure you want to delete all messages? This will also reset the AI assistant's short-term memory.",
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.white60)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              ref.read(chatControllerProvider.notifier).clearChat();
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Chat cleared and AI memory reset!"),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text("Clear"),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
@@ -228,6 +277,10 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: Icon(Iconsax.trash, color: Theme.of(context).iconTheme.color),
+            onPressed: () => _confirmClearChat(context),
+          ),
           IconButton(
             icon: Icon(
               _isVoiceEnabled ? Iconsax.volume_high : Iconsax.volume_cross,
