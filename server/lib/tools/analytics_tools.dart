@@ -177,34 +177,38 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
       final from = range?['from'];
       final to = range?['to'];
 
-      final approvals = await supabase
+      var approvalsQuery = supabase
           .from('draft_approvals')
           .select('approval_id, proposed_total, approval_status, created_at, reviewed_at, sale_id, shop_id')
-          .eq('shop_id', shopId)
-          .order('created_at', ascending: false);
+          .eq('shop_id', shopId);
 
+      if (from != null) {
+        approvalsQuery = approvalsQuery.gte('created_at', from.toIso8601String());
+      }
+      if (to != null) {
+        approvalsQuery = approvalsQuery.lte('created_at', to.toIso8601String());
+      }
+
+      final approvals = await approvalsQuery.order('created_at', ascending: false);
       final approvalRecords = (approvals as List<dynamic>)
           .map((record) => Map<String, dynamic>.from(record as Map))
-          .where((record) {
-            if (from == null || to == null) return true;
-            final createdAt = _parseTimestamp(record['created_at']);
-            return createdAt != null && _withinRange(createdAt, from, to);
-          })
           .toList();
 
-      final sales = await supabase
+      var salesQuery = supabase
           .from('sales')
           .select('id, invoice_id, shop_id, amount, subtotal_after_discount, timestamp, status, payment_method, customer_id, customer_name')
-          .eq('shop_id', shopId)
-          .order('timestamp', ascending: false);
+          .eq('shop_id', shopId);
 
+      if (from != null) {
+        salesQuery = salesQuery.gte('timestamp', from.toIso8601String());
+      }
+      if (to != null) {
+        salesQuery = salesQuery.lte('timestamp', to.toIso8601String());
+      }
+
+      final sales = await salesQuery.order('timestamp', ascending: false);
       final saleRecords = (sales as List<dynamic>)
           .map((record) => Map<String, dynamic>.from(record as Map))
-          .where((record) {
-            if (from == null || to == null) return true;
-            final timestamp = _parseTimestamp(record['timestamp']);
-            return timestamp != null && _withinRange(timestamp, from, to);
-          })
           .toList();
 
       final invoiceIds = saleRecords
