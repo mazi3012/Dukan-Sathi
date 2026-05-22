@@ -135,7 +135,7 @@ class AnalyticsSummaryCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 12.0,
                           fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white80 : AppColors.lightOnSurface,
+                          color: isDark ? Colors.white70 : AppColors.lightOnSurface,
                         ),
                       ),
                     ),

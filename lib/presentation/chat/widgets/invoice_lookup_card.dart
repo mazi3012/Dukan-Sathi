@@ -89,7 +89,7 @@ class InvoiceLookupCard extends StatelessWidget {
                 separatorBuilder: (_, __) => const SizedBox(height: 8.0),
                 itemBuilder: (context, index) {
                   final inv = Map<String, dynamic>.from(invoices[index] as Map);
-                  final num = inv['invoiceNumber'] as String? ?? 'INV-?';
+                  final invoiceNumber = inv['invoiceNumber'] as String? ?? 'INV-?';
                   final customer = inv['customerName'] as String? ?? 'Unknown';
                   final total = (inv['total'] as num?)?.toDouble() ?? 0.0;
                   final status = inv['paymentStatus'] as String? ?? 'UNPAID';
@@ -114,7 +114,7 @@ class InvoiceLookupCard extends StatelessWidget {
                               Row(
                                 children: [
                                   Text(
-                                    num,
+                                    invoiceNumber,
                                     style: TextStyle(
                                       fontSize: 13.0,
                                       fontWeight: FontWeight.bold,
