@@ -337,8 +337,19 @@ Future<void> main(List<String> arguments) async {
         var body = await utf8.decodeStream(request);
         try {
           final data = jsonDecode(body) as Map<String, dynamic>;
-          final input = (data['input'] as String?)?.trim() ?? '';
           final sessionId = (data['sessionId'] as String?) ?? 'default';
+
+          if (data['clearHistory'] == true) {
+            webSessions.remove(sessionId);
+            request.response
+              ..statusCode = 200
+              ..headers.contentType = ContentType.json
+              ..write(jsonEncode({'text': 'Chat history cleared successfully', 'cleared': true}))
+              ..close();
+            return;
+          }
+
+          final input = (data['input'] as String?)?.trim() ?? '';
           final shopId = (data['shopId'] as String?);
           final userId = (data['userId'] as String?);
 
@@ -914,7 +925,14 @@ class WebChatSession {
     final _greetings = RegExp(r'^(hi|hello|hey|hii|hiii|namaste|hola|good\s*(morning|evening|afternoon|night)|salam|howdy|yo|sup|kya\s*hal|kaise\s*ho)\b', caseSensitive: false);
     final isSimpleGreeting = _greetings.hasMatch(n) && n.split(' ').length <= 4;
 
-    _history.add(Message(role: Role.user, content: [TextPart(text: input)]));
+    // All other intents → let the AI pick the right tool
+    final userMessage = Message(role: Role.user, content: [TextPart(text: input)]);
+    _history.add(userMessage);
+
+    // Keep history lean (limit to last 12 messages / 6 turns) to ensure fast responses and prevent API bottlenecks
+    if (_history.length > 12) {
+      _history.removeRange(0, _history.length - 12);
+    }
 
     try {
       final response = await ai.generate(
@@ -932,8 +950,8 @@ class WebChatSession {
           'shopId': _currentShopId,
         },
       ).timeout(
-        const Duration(seconds: 55),
-        onTimeout: () => throw TimeoutException('AI generation timed out after 55 seconds'),
+        const Duration(seconds: 40),
+        onTimeout: () => throw TimeoutException('AI generation timed out after 40 seconds'),
       );
 
       // Log tool calls for observability and parse executed cards
@@ -1014,6 +1032,10 @@ class WebChatSession {
       };
     } catch (e) {
       print('[processMessage] Error: $e');
+      // Rollback the last user message on failure to prevent consecutive user messages which corrupt the history sequence
+      if (_history.isNotEmpty && _history.last == userMessage) {
+        _history.removeLast();
+      }
       return {'text': 'Sorry, something went wrong: ${e.toString().split('\n').first}'};
     }
   }
