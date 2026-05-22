@@ -50,3 +50,5 @@ flutter:
     - assets/logo.png
     - assets/logo_solid.png
     - assets/logo_full.png
+    - assets/logo.svg
+    - assets/logo_full.svg
