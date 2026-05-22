@@ -205,7 +205,7 @@ class DesktopSidebar extends ConsumerWidget {
               ),
             )
           : const DukanSathiHeader(
-              height: 80,
+              height: 40,
               showGlow: false,
               animate: true,
             ),

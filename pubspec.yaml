@@ -8,6 +8,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_svg: ^2.0.10
   google_fonts: ^6.1.0
   flutter_animate: ^4.5.0
   flutter_riverpod: ^2.4.9

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_colors.dart';
 
 class DukanSathiLogo extends StatelessWidget {
@@ -24,12 +25,12 @@ class DukanSathiLogo extends StatelessWidget {
     // that fits perfectly without any overflow clipping.
     final bool isSmall = size <= 48;
 
-    Widget logoWidget = Image.asset(
-      useSolidBg ? 'assets/logo_solid.png' : 'assets/logo.png',
+    Widget logoWidget = SvgPicture.asset(
+      'assets/logo.svg', // We just use one SVG for both now, the solid/non-solid logic is obsolete for vector
       width: isSmall ? size * 0.65 : size,
       height: isSmall ? size * 0.65 : size,
       fit: BoxFit.contain,
-      color: isDark ? Colors.white : null,
+      colorFilter: isDark ? const ColorFilter.mode(Colors.white, BlendMode.srcIn) : null,
     );
 
     if (isSmall) {
@@ -96,14 +97,14 @@ class DukanSathiHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     // Left spacing and ratio calculations
-    final double calculatedWidth = height; // horizontal text aspect ratio is now 1:1
+    final double calculatedWidth = height * 4.0; // horizontal text aspect ratio is 4:1
 
-    Widget headerWidget = Image.asset(
-      'assets/logo_full.png',
+    Widget headerWidget = SvgPicture.asset(
+      'assets/logo_full.svg',
       width: calculatedWidth,
       height: height,
       fit: BoxFit.contain,
-      color: isDark ? Colors.white : null,
+      colorFilter: isDark ? const ColorFilter.mode(Colors.white, BlendMode.srcIn) : null,
     );
 
     if (animate) {
