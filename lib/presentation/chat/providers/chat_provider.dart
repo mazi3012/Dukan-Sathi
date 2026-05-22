@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../models/chat_message.dart';
@@ -110,9 +110,9 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
     ];
 
     try {
-      // 3. Use the SMART /api/chat endpoint (same capabilities as Telegram bot)
+      // 3. Use the SMART chat endpoint (same capabilities as Telegram bot)
       final response = await http.post(
-        Uri.parse('/api/chat'),
+        _getApiUri('/api/chat'),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -227,3 +227,15 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
     }
   }
 }
+
+Uri _getApiUri(String path) {
+  if (kIsWeb) {
+    return Uri.base.resolve(path);
+  }
+  const baseUrl = String.fromEnvironment(
+    'API_URL',
+    defaultValue: 'https://dukan-sathi-pro.onrender.com',
+  );
+  return Uri.parse(baseUrl).resolve(path);
+}
+

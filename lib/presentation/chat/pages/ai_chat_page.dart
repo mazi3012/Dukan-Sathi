@@ -6,6 +6,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:record/record.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../main/pages/main_layout.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
@@ -114,7 +115,7 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
       final bytes = response.bodyBytes;
 
       final transResponse = await http.post(
-        Uri.parse('/api/transcribe'),
+        _getApiUri('/api/transcribe'),
         body: bytes,
       );
 
@@ -576,4 +577,15 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
       ),
     );
   }
+}
+
+Uri _getApiUri(String path) {
+  if (kIsWeb) {
+    return Uri.base.resolve(path);
+  }
+  const baseUrl = String.fromEnvironment(
+    'API_URL',
+    defaultValue: 'https://dukan-sathi-pro.onrender.com',
+  );
+  return Uri.parse(baseUrl).resolve(path);
 }
