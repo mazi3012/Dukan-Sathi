@@ -49,7 +49,7 @@ final logExpense = ai.defineTool<Map<String, dynamic>, String>(
   },
 );
 
-final getExpenses = ai.defineTool<Map<String, dynamic>, String>(
+final getExpenses = ai.defineTool<Map<String, dynamic>, Map<String, dynamic>>(
   name: 'getExpenses',
   description: 'Retrieve a summary and list of expenses. Can filter by category or time period.',
   inputSchema: SchemanticType.from<Map<String, dynamic>>(
@@ -67,7 +67,9 @@ final getExpenses = ai.defineTool<Map<String, dynamic>, String>(
   fn: (input, context) async {
     try {
       final userIdentifier = context.context?['userIdentifier'] as String?;
-      if (userIdentifier == null) return 'Error: User context missing.';
+      if (userIdentifier == null) {
+        return {'status': 'error', 'message': 'User context missing.'};
+      }
       
       final shopId = (context.context?['shopId'] as String?) ?? await getShopIdForUser(userIdentifier);
       final category = input['category'] as String?;
@@ -77,31 +79,45 @@ final getExpenses = ai.defineTool<Map<String, dynamic>, String>(
       if (category != null && category.isNotEmpty) {
         queryBuilder = queryBuilder.ilike('category', '%$category%');
       }
-
+ 
       final response = await queryBuilder.order('timestamp', ascending: false);
       final expenses = response as List<dynamic>;
-
+ 
       if (expenses.isEmpty) {
-        return 'No expenses found${category != null ? ' for category "$category".' : '.'}';
+        return {
+          'status': 'no_expenses',
+          'expenses': [],
+          'total': 0.0,
+          'category': category,
+          'message': 'No expenses found${category != null ? ' for category "$category".' : '.'}',
+        };
       }
-
-      double total = 0;
-      final buffer = StringBuffer();
-      buffer.writeln('📋 *Expense Report${category != null ? " ($category)" : ""}*');
-      
-      for (final expRow in expenses) {
+ 
+      final expenseList = expenses.map((expRow) {
         final exp = Map<String, dynamic>.from(expRow as Map);
         final amount = (exp['amount'] as num).toDouble();
-        total += amount;
         final date = DateTime.parse(exp['timestamp'].toString()).toLocal();
         final dateStr = '${date.day}/${date.month}/${date.year}';
-        buffer.writeln('• ${exp['category']}: ₹$amount - ${exp['description']} ($dateStr)');
-      }
-      
-      buffer.writeln('\n💰 *Total: ₹$total*');
-      return buffer.toString();
+        return {
+          'id': exp['id'],
+          'amount': amount,
+          'category': exp['category'],
+          'description': exp['description'],
+          'date': dateStr,
+        };
+      }).toList();
+
+      final total = expenseList.fold<double>(0.0, (sum, e) => sum + (e['amount'] as double));
+ 
+      return {
+        'status': 'success',
+        'expenses': expenseList,
+        'total': total,
+        'category': category,
+        'message': '📋 Expense Report${category != null ? " ($category)" : ""}\nTotal: ₹$total',
+      };
     } catch (e) {
-      return 'Error retrieving expenses: $e';
+      return {'status': 'error', 'message': 'Error retrieving expenses: $e'};
     }
   },
 );

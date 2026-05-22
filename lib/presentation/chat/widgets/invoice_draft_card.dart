@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/widgets/app_skeleton.dart';
 import '../../../core/session.dart';
+import '../../../core/database.dart';
 import '../../../services/invoice_pdf_generator.dart';
 import '../../billing/pages/invoice_pdf_preview_screen.dart';
 import '../../../models/cart_item.dart';
@@ -16,7 +17,9 @@ import '../../../models/tax_breakdown.dart';
 import '../../../services/gst_calculator.dart';
 import '../../../data/repositories/sale_repository.dart';
 import '../../../data/repositories/product_repository.dart';
+import '../../../data/repositories/customer_repository.dart';
 import '../../../data/sync/sync_manager.dart';
+import '../../../models/customer.dart';
 
 
 class InvoiceDraftCard extends StatefulWidget {
@@ -421,8 +424,23 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
         );
       }).toList();
 
-      final customerId = (_data['customer_id'] ?? _data['customerId'])?.toString();
+      String? customerId = (_data['customer_id'] ?? _data['customerId'])?.toString();
       final customerState = _data['customer_state'] ?? _data['customerState'] ?? shopConfig.state;
+      
+      // Auto-save new customer if needed
+      if (customerId == null && customerName != 'Walk-in Customer' && customerName.trim().isNotEmpty) {
+        final newCustId = const Uuid().v4();
+        final customerRepo = CustomerRepository();
+        await customerRepo.saveCustomer(Customer(
+          id: newCustId,
+          shopId: shopId,
+          name: customerName.trim(),
+          phone: '',
+          currentBalance: 0.0,
+        ));
+        customerId = newCustId;
+      }
+
       final proposedTotal = (_data['proposed_total'] ?? _data['proposedTotal'] ?? 0.0) as num;
 
       final subtotalBeforeDiscount = (_data['subtotal_before_discount'] ?? _data['subtotalBeforeDiscount'] ?? proposedTotal).toDouble();
@@ -432,8 +450,34 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       final discountAmount = (_data['discount_amount'] ?? _data['discountAmount'] ?? 0.0).toDouble();
 
       final dueAmount = proposedTotal.toDouble() - amountPaidVal;
+      
+      final syncManager = SyncManager.instance;
 
-      // 1. Save locally to SQFlite sales table
+      // 1. Insert Draft Invoice record — direct on web, queued on mobile/desktop
+      // This is necessary because sales table has a foreign key referencing draft_invoices
+      final draftInvoicePayload = {
+        'id': draftInvoiceId,
+        'shop_id': shopId,
+        'customer_id': customerId,
+        'customer_name': customerName,
+        'items': cartItems.map((c) => c.toJson()).toList(),
+        'total_amount': proposedTotal.toDouble(),
+        'tax_breakdown': _data['proposed_tax_breakdown'],
+        'status': 'approved',
+        'draft_approval_id': null, // avoid foreign key violation as there is no draft approval record in supabase
+      };
+      if (kIsWeb) {
+        await supabase.from('draft_invoices').insert(draftInvoicePayload);
+      } else {
+        await syncManager.queueOperation(
+          tableName: 'draft_invoices',
+          action: 'INSERT',
+          recordId: draftInvoiceId,
+          payload: draftInvoicePayload,
+        );
+      }
+
+      // 2. Save locally to SQFlite sales table
       final saleRepo = SaleRepository();
       final saleMap = {
         'id': saleId,
@@ -459,47 +503,13 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
 
       await saleRepo.saveSale(saleMap);
 
-      // 2. Adjust local product stock
+      // 3. Adjust product stock — web-aware (adjustStock handles kIsWeb internally)
       final productRepo = ProductRepository();
-      final allProducts = await productRepo.getProducts(shopId);
-      final syncManager = SyncManager.instance;
 
       for (final item in cartItems) {
-        final pIndex = allProducts.indexWhere((prod) => prod.id == item.productId);
-        if (pIndex != -1) {
-          final p = allProducts[pIndex];
-          final updatedProduct = p.copyWith(
-            stockQuantity: (p.stockQuantity - item.quantity).clamp(0, 999999),
-          );
-          await productRepo.updateProduct(updatedProduct);
-        }
-
-        // Queue stock adjustment background sync
-        await syncManager.queueOperation(
-          tableName: 'products',
-          action: 'ADJUST_STOCK',
-          recordId: item.productId,
-          payload: {'delta': -item.quantity},
-        );
+        // adjustStock is web-aware: uses Supabase RPC on web, local queue on mobile
+        await productRepo.adjustStock(item.productId, -item.quantity);
       }
-
-      // 3. Queue Draft Invoice Insert in background sync
-      await syncManager.queueOperation(
-        tableName: 'draft_invoices',
-        action: 'INSERT',
-        recordId: draftInvoiceId,
-        payload: {
-          'id': draftInvoiceId,
-          'shop_id': shopId,
-          'customer_id': customerId,
-          'customer_name': customerName,
-          'items': cartItems.map((c) => c.toJson()).toList(),
-          'total_amount': proposedTotal.toDouble(),
-          'tax_breakdown': _data['proposed_tax_breakdown'],
-          'status': 'approved',
-          'draft_approval_id': aid,
-        },
-      );
 
       // 4. Update local draft status & invoice details
       setState(() {

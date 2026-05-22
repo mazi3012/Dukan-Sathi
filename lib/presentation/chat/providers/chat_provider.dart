@@ -160,6 +160,27 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
             // Normalize: server may wrap under 'draft', 'payload', or directly in card
             final nested = card['draft'] ?? card['payload'] ?? card['data'];
             cardPayload = (nested is Map<String, dynamic>) ? nested : card;
+          } else if (type == 'analytics_summary') {
+            cardType = MessageType.aiAnalyticsSummary;
+            cardPayload = card['data'] as Map<String, dynamic>?;
+          } else if (type == 'customer_dues_list') {
+            cardType = MessageType.aiCustomerDuesList;
+            cardPayload = card['data'] as Map<String, dynamic>?;
+          } else if (type == 'customer_due_detail') {
+            cardType = MessageType.aiCustomerDueDetail;
+            cardPayload = card['data'] as Map<String, dynamic>?;
+          } else if (type == 'expense_report') {
+            cardType = MessageType.aiExpenseReport;
+            cardPayload = card['data'] as Map<String, dynamic>?;
+          } else if (type == 'invoice_lookup') {
+            cardType = MessageType.aiInvoiceLookup;
+            cardPayload = card['data'] as Map<String, dynamic>?;
+          } else if (type == 'product_catalog') {
+            cardType = MessageType.aiProductCatalog;
+            cardPayload = card['data'] as Map<String, dynamic>?;
+          } else if (type == 'payment_confirmation') {
+            cardType = MessageType.aiPaymentConfirmation;
+            cardPayload = card['data'] as Map<String, dynamic>?;
           }
         }
 

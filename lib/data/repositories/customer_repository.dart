@@ -61,8 +61,15 @@ class CustomerRepository {
     }
   }
 
-  /// Instantly saves a customer locally and queues background sync
+  /// Instantly saves a customer locally and queues background sync.
+  /// On web, writes directly to Supabase to avoid AI stale-data issues.
   Future<void> saveCustomer(Customer customer) async {
+    // Web fast-path: skip local queue, write directly to Supabase
+    if (kIsWeb) {
+      await supabase.from('customers').upsert(customer.toJson());
+      return;
+    }
+
     // 1. Write locally
     await _localDb.insert('customers', customer.toJson());
 
@@ -75,8 +82,15 @@ class CustomerRepository {
     );
   }
 
-  /// Instantly updates a customer locally and queues background sync
+  /// Instantly updates a customer locally and queues background sync.
+  /// On web, writes directly to Supabase to avoid AI stale-data issues.
   Future<void> updateCustomer(Customer customer) async {
+    // Web fast-path: skip local queue, write directly to Supabase
+    if (kIsWeb) {
+      await supabase.from('customers').upsert(customer.toJson());
+      return;
+    }
+
     // 1. Write locally
     await _localDb.update(
       'customers',
@@ -94,8 +108,15 @@ class CustomerRepository {
     );
   }
 
-  /// Instantly deletes a customer locally and queues background sync
+  /// Instantly deletes a customer locally and queues background sync.
+  /// On web, deletes directly from Supabase to avoid AI stale-data issues.
   Future<void> deleteCustomer(String id) async {
+    // Web fast-path: skip local queue, delete directly from Supabase
+    if (kIsWeb) {
+      await supabase.from('customers').delete().eq('id', id);
+      return;
+    }
+
     // 1. Delete locally
     await _localDb.delete(
       'customers',

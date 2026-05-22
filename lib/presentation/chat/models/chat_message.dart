@@ -1,4 +1,17 @@
-enum MessageType { user, aiText, aiDraftInvoice, aiDraftExpense, aiDraftInventory }
+enum MessageType {
+  user,
+  aiText,
+  aiDraftInvoice,
+  aiDraftExpense,
+  aiDraftInventory,
+  aiAnalyticsSummary,
+  aiCustomerDuesList,
+  aiCustomerDueDetail,
+  aiExpenseReport,
+  aiInvoiceLookup,
+  aiProductCatalog,
+  aiPaymentConfirmation,
+}
 
 class ChatMessage {
   final String id;

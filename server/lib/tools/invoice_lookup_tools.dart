@@ -2,7 +2,7 @@ import 'package:schemantic/schemantic.dart';
 import '../core/database.dart';
 import '../runtime/genkit_runtime.dart';
 
-final invoiceLookup = ai.defineTool<Map<String, dynamic>, String>(
+final invoiceLookup = ai.defineTool<Map<String, dynamic>, Map<String, dynamic>>(
   name: 'invoiceLookup',
   description: 'Look up past invoices by invoice number, customer name, or payment status (e.g., unpaid).',
   inputSchema: SchemanticType.from<Map<String, dynamic>>(
@@ -28,7 +28,9 @@ final invoiceLookup = ai.defineTool<Map<String, dynamic>, String>(
   fn: (input, context) async {
     try {
       final userIdentifier = context.context?['userIdentifier'] as String?;
-      if (userIdentifier == null) return 'Error: User context missing.';
+      if (userIdentifier == null) {
+        return {'status': 'error', 'message': 'User context missing.'};
+      }
       
       final shopId = (context.context?['shopId'] as String?) ?? await getShopIdForUser(userIdentifier);
       final invoiceNumber = input['invoiceNumber'] as String?;
@@ -51,34 +53,35 @@ final invoiceLookup = ai.defineTool<Map<String, dynamic>, String>(
       final sales = res as List<dynamic>;
 
       if (sales.isEmpty) {
-        return 'No invoices found matching your criteria.';
+        return {
+          'status': 'no_invoices',
+          'invoices': [],
+          'message': 'No invoices found matching your criteria.',
+        };
       }
 
-      final buffer = StringBuffer();
-      buffer.writeln('🧾 Invoice Lookup Results:\n');
-      
-      for (final row in sales) {
+      final invoiceList = sales.map((row) {
         final sale = Map<String, dynamic>.from(row as Map);
-        final invNum = sale['invoice_number'] as String;
-        final cName = sale['customer_name'] as String? ?? 'Unknown';
-        final total = (sale['amount'] as num).toDouble();
-        final status = sale['payment_status'] as String;
         final date = DateTime.parse(sale['timestamp'].toString()).toLocal();
         final dateStr = '${date.day}/${date.month}/${date.year}';
-        
-        buffer.writeln('• $invNum ($dateStr)');
-        buffer.writeln('  Customer: $cName');
-        buffer.writeln('  Total: ₹$total | Status: $status');
-        if (status == 'PARTIAL' || status == 'UNPAID') {
-           final due = (sale['due_amount'] as num).toDouble();
-           buffer.writeln('  Due: ₹$due');
-        }
-        buffer.writeln('');
-      }
+        return {
+          'id': sale['id'],
+          'invoiceNumber': sale['invoice_number'] as String,
+          'customerName': sale['customer_name'] as String? ?? 'Unknown',
+          'total': (sale['amount'] as num).toDouble(),
+          'paymentStatus': sale['payment_status'] as String,
+          'dueAmount': (sale['due_amount'] as num?)?.toDouble() ?? 0.0,
+          'date': dateStr,
+        };
+      }).toList();
 
-      return buffer.toString().trim();
+      return {
+        'status': 'success',
+        'invoices': invoiceList,
+        'message': '🧾 Found ${invoiceList.length} invoices matching criteria.',
+      };
     } catch (e) {
-      return 'Error looking up invoices: $e';
+      return {'status': 'error', 'message': 'Error looking up invoices: $e'};
     }
   },
 );

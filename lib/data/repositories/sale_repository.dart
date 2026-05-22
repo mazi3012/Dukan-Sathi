@@ -59,8 +59,15 @@ class SaleRepository {
     }
   }
 
-  /// Saves sales record locally and queues background sync
+  /// Saves sales record locally and queues background sync.
+  /// On web, writes directly to Supabase to avoid AI stale-data issues.
   Future<void> saveSale(Map<String, dynamic> sale) async {
+    // Web fast-path: skip local queue, write directly to Supabase
+    if (kIsWeb) {
+      await supabase.from('sales').upsert(sale);
+      return;
+    }
+
     // 1. Save locally
     await _localDb.insert('sales', sale);
 

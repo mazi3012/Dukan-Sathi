@@ -1,12 +1,16 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/session.dart';
+import '../../../core/database.dart';
 import '../../../models/cart_item.dart';
 import '../../../models/draft_approval.dart';
 import '../../../services/gst_calculator.dart';
 import '../../../data/repositories/sale_repository.dart';
 import '../../../data/repositories/product_repository.dart';
+import '../../../data/repositories/customer_repository.dart';
 import '../../../data/sync/sync_manager.dart';
+import '../../../models/customer.dart';
 
 class POSInvoiceState {
   final String approvalId;
@@ -329,14 +333,56 @@ class POSNotifier extends StateNotifier<POSInvoiceState> {
     final invoiceNo = 'INV-${state.approvalId.substring(0, 13).replaceAll('-', '').toUpperCase()}';
 
     try {
-      // 1. Save local transaction log in SQFlite database
+      String? finalCustomerId = state.customerId;
+      
+      // Auto-save new customer if needed
+      if (finalCustomerId == null && state.customerName != 'Walk-in Customer' && state.customerName.trim().isNotEmpty) {
+        final newCustId = const Uuid().v4();
+        final customerRepo = CustomerRepository();
+        await customerRepo.saveCustomer(Customer(
+          id: newCustId,
+          shopId: shopId,
+          name: state.customerName.trim(),
+          phone: '',
+          currentBalance: 0.0,
+        ));
+        finalCustomerId = newCustId;
+      }
+
+      final syncManager = SyncManager.instance;
+
+      // 1. Insert draft_invoice record — direct on web, queued on mobile/desktop
+      // This is necessary because sales table has a foreign key referencing draft_invoices
+      final draftInvoicePayload = {
+        'id': draftInvoiceId,
+        'shop_id': shopId,
+        'customer_id': finalCustomerId,
+        'customer_name': state.customerName,
+        'items': state.items.map((i) => i.toJson()).toList(),
+        'total_amount': state.totalAmount,
+        'tax_breakdown': state.taxBreakdown,
+        'status': 'approved',
+        'draft_approval_id': null, // avoid foreign key violation as POS checkout has no approval record
+      };
+      if (kIsWeb) {
+        await supabase.from('draft_invoices').insert(draftInvoicePayload);
+      } else {
+        await syncManager.queueOperation(
+          tableName: 'draft_invoices',
+          action: 'INSERT',
+          recordId: draftInvoiceId,
+          payload: draftInvoicePayload,
+        );
+      }
+
+      // 2. Save local transaction log in SQFlite database (this queues 'sales' sync)
       final saleRepo = SaleRepository();
       await saleRepo.saveSale({
         'id': saleId,
         'invoice_number': invoiceNo,
         'shop_id': shopId,
         'invoice_id': draftInvoiceId,
-        'customer_id': state.customerId,
+        'customer_id': finalCustomerId,
         'customer_name': state.customerName,
         'customer_state': state.customerState,
         'amount': state.totalAmount,
@@ -353,51 +399,22 @@ class POSNotifier extends StateNotifier<POSInvoiceState> {
         'status': 'approved',
       });
 
-      // 2. Adjust local inventories and register operations with SyncManager
+      // 3. Adjust inventory — web-aware (adjustStock handles kIsWeb internally)
       final productRepo = ProductRepository();
       final allProducts = await productRepo.getProducts(shopId);
-      final syncManager = SyncManager.instance;
 
       for (final item in state.items) {
         final pIndex = allProducts.indexWhere((p) => p.id == item.productId);
         if (pIndex != -1) {
-          final p = allProducts[pIndex];
-          final updatedProduct = p.copyWith(
-            stockQuantity: (p.stockQuantity - item.quantity).clamp(0, 999999),
-          );
-          await productRepo.updateProduct(updatedProduct);
+          // adjustStock is web-aware: uses Supabase RPC on web, local queue on mobile
+          await productRepo.adjustStock(item.productId, -item.quantity);
         }
-
-        // Add stocks adjustments background sync queue
-        await syncManager.queueOperation(
-          tableName: 'products',
-          action: 'ADJUST_STOCK',
-          recordId: item.productId,
-          payload: {'delta': -item.quantity},
-        );
       }
-
-      // 3. Queue invoice insertion with cloud background sync queue
-      await syncManager.queueOperation(
-        tableName: 'draft_invoices',
-        action: 'INSERT',
-        recordId: draftInvoiceId,
-        payload: {
-          'id': draftInvoiceId,
-          'shop_id': shopId,
-          'customer_id': state.customerId,
-          'customer_name': state.customerName,
-          'items': state.items.map((i) => i.toJson()).toList(),
-          'total_amount': state.totalAmount,
-          'tax_breakdown': state.taxBreakdown,
-          'status': 'approved',
-          'draft_approval_id': state.approvalId,
-        },
-      );
 
       state = state.copyWith(
         isApproved: true,
         invoiceNumber: invoiceNo,
+        customerId: finalCustomerId,
       );
       return true;
     } catch (e) {

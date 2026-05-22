@@ -649,18 +649,58 @@ Future<void> main(List<String> arguments) async {
 // Web chat session handler.
 
 const String _webSystemPrompt =
-  "You are Dukan Sathi Pro, a premium AI retail shop assistant. CRITICAL RULES: "
-  "1. NEVER hallucinate data; ONLY use tool responses. "
-  "2. For business analytics, use businessInsightsTool. DEFAULT to period='all_time'. "
-  "3. When reporting revenue, clearly state: 'Total Revenue (Tax Inclusive): ₹X'. "
-  "4. For shop expenses, use logExpense. If a category is missing (e.g. 'tea party'), use 'General'. "
-  "5. If a tool call fails, explain the error clearly to the user. "
-  "6. No narration (don't say 'I am checking'). Output results directly. "
-  "7. For customer dues or balances, use checkCustomerDue or listCustomersDue. "
-  "8. Always include Approval/Batch IDs in responses. "
-  "9. DEFAULT to period='all_time' for analytics unless a specific timeframe is mentioned. "
-  "10. Reply concisely, professionally, and authoritatively. Do NOT ask for IDs or Shop names; use the provided context. "
-  "11. NEVER hallucinate or make up financial numbers. If you cannot find data using a tool, explain that you don't have access to that information.";
+  "You are Dukan Sathi Pro — the AI brain of a smart retail shop management system built for Indian small business owners.\n\n"
+
+  "## YOUR IDENTITY\n"
+  "- Professional, concise assistant for shop owners in India\n"
+  "- Respond in the same language the user writes in (Hindi or English)\n"
+  "- NEVER hallucinate numbers, inventory, or customer data\n"
+  "- Do NOT narrate your actions (never say 'I am checking...' — just give results)\n\n"
+
+  "## GOLDEN RULE\n"
+  "ALWAYS call a tool to answer factual questions. NEVER generate financial numbers, stock counts, or customer balances from memory.\n\n"
+
+  "## YOUR TOOLS — USE THEM PRECISELY\n"
+  "1. checkInventory(productName) → Check stock & price of a specific product\n"
+  "2. browseCatalogTool(category?) → List all products, optionally filtered by category\n"
+  "3. createDraftInvoice(requestedItems, customerName?, paymentStatus?) → Create a GST invoice draft — REQUIRES HUMAN APPROVAL before finalizing\n"
+  "4. proposeProducts(products[]) → Add new products to inventory — REQUIRES HUMAN APPROVAL\n"
+  "5. requestProductDeletion(productName) → Delete a product — REQUIRES HUMAN APPROVAL\n"
+  "6. businessInsightsTool(period?) → Revenue, profit, orders analytics. Default period='all_time'. Use period='today' when user says 'today'\n"
+  "7. logExpense(description, amount, category?) → Log a shop expense immediately. Default category='General'\n"
+  "8. getExpenses(category?) → Show expense report, optionally filtered by category\n"
+  "9. checkCustomerDue(customerName) → Check a specific customer's outstanding balance\n"
+  "10. listCustomersDue() → Show all customers with pending dues\n"
+  "11. recordPayment(customerName, amount, paymentMethod?) → Record a customer payment\n"
+  "12. invoiceLookup(invoiceNumber?, customerName?, paymentStatus?) → Find past invoices by number, customer, or status\n"
+  "13. getWeather(location?) → Get current weather. Default to shop's city if not specified\n\n"
+
+  "## TOOL SELECTION RULES (follow strictly)\n"
+  "- 'make a bill / create invoice / bill karo' → createDraftInvoice\n"
+  "- 'add product / naya item / add item / new stock' → proposeProducts\n"
+  "- 'delete / remove product' → requestProductDeletion\n"
+  "- 'revenue / sales / profit / kitna kamaya / orders / analytics' → businessInsightsTool\n"
+  "- 'show products / catalog / kya hai hamare paas' → browseCatalogTool\n"
+  "- '[product name] kitna hai / price / stock' → checkInventory\n"
+  "- 'who owes me / all dues / sabka due' → listCustomersDue\n"
+  "- '[customer] ka due / balance / owes' → checkCustomerDue\n"
+  "- '[customer] ne pay kiya / paid / payment liya' → recordPayment\n"
+  "- 'log expense / I spent / rent diya / salary / I paid' → logExpense\n"
+  "- 'show expenses / mera kharcha' → getExpenses\n"
+  "- 'find invoice / invoice dhundho / search invoice' → invoiceLookup\n"
+  "- 'weather / mausam' → getWeather\n\n"
+
+  "## RESPONSE FORMAT\n"
+  "- Keep responses SHORT (2-3 sentences max for confirmations)\n"
+  "- Always show currency as ₹ for Indian Rupees\n"
+  "- For draft/approval actions: confirm what was created and say 'pending human approval'\n"
+  "- For errors: explain clearly what went wrong and suggest a fix\n"
+  "- Always include Approval/Batch IDs when returning draft results\n\n"
+
+  "## CONTEXT (injected at runtime)\n"
+  "- All monetary values are in Indian Rupees (INR)\n"
+  "- Do NOT ask for Shop ID or User ID — they are already in your context\n"
+  "- DEFAULT analytics period to 'all_time' unless user specifies 'today', 'this week', or 'this month'";
 
 DateTime _nowIst() => DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
 String _twoDigits(int v) => v.toString().padLeft(2, '0');
@@ -803,219 +843,135 @@ class WebChatSession {
   Future<Map<String, dynamic>> processMessage(String input, {String? shopId, String? userId}) async {
     if (shopId != null) _currentShopId = shopId;
     if (userId != null) _currentUserId = userId;
-    
+
     if (_currentShopId == null) {
       return {'text': '⚠️ Shop context not found. Please ensure you are logged in.'};
     }
-    
+
     final n = input.toLowerCase().trim();
 
-    // Time intent
+    // Fast-path: time/date queries don't need AI
     if (_isTimeIntent(n)) {
       final now = _nowIst();
       final text = 'The current time is ${_fmtTime(now)} IST.';
       _addToHistory(input, text);
       return {'text': text};
     }
-
-    // Date intent
     if (_isDateIntent(n)) {
       final now = _nowIst();
-      final text = "Today's date is \${_fmtDate(now)} IST.";
+      final text = "Today's date is ${_fmtDate(now)} IST.";
       _addToHistory(input, text);
       return {'text': text};
     }
 
-    // Analytics intent
-    if (n.contains('revenue') || n.contains('sales') || n.contains('sale') || n.contains('profit') || n.contains('analytics') || n.contains('report')) {
-      try {
-        final isToday = n.contains('today');
-        final period = isToday ? 'today' : 'all_time';
-        final periodName = isToday ? "Today's" : "All-time";
-        
-        final result = await businessInsightsTool.fn(
-          {'shopId': _currentShopId, 'period': period},
-          (context: {'userIdentifier': _currentUserId, 'shopId': _currentShopId}, init: null, inputStream: null, sendChunk: (dynamic chunk) {}, streamingRequested: false)
-        );
-        final rev = result['total_revenue'] ?? 0.0;
-        final orders = result['total_orders'] ?? 0;
-        final approved = result['approved_count'] ?? 0;
-        final text = 'Total $periodName Revenue: ₹$rev | Orders: $orders | Approved: $approved';
-        _addToHistory(input, text);
-        return {'text': text};
-      } catch (e) {
-        return {'text': 'Sorry, could not fetch analytics: $e'};
-      }
-    }
-
-    // Best Customer intent
-    if (n.contains('best customer') || n.contains('top customer')) {
-      try {
-        final result = await businessInsightsTool.fn(
-          {'shopId': _currentShopId, 'period': 'all_time'},
-          (context: {'userIdentifier': _currentUserId, 'shopId': _currentShopId}, init: null, inputStream: null, sendChunk: (dynamic chunk) {}, streamingRequested: false)
-        );
-        final name = result['top_customer_name'];
-        final rev = result['top_customer_revenue'];
-        if (name != null) {
-          final text = '🏆 Your best customer is $name with a total revenue of ₹$rev.';
-          _addToHistory(input, text);
-          return {'text': text};
-        } else {
-          return {'text': 'I couldn\'t find any customer data yet.'};
-        }
-      } catch (e) {
-        return {'text': 'Error finding best customer: $e'};
-      }
-    }
-
-    // Customer Dues intent
-    if (n.contains('due') || n.contains('owe') || n.contains('balance')) {
-      try {
-        // Check for specific customer name
-        String? targetName;
-        final words = input.split(' ');
-        for (var i = 0; i < words.length; i++) {
-          if (words[i].toLowerCase() == 'does' && i + 1 < words.length) {
-             targetName = words[i+1];
-             break;
-          }
-          if (words[i].toLowerCase() == 'for' && i + 1 < words.length) {
-             targetName = words[i+1];
-             break;
-          }
-        }
-        
-        // Simple heuristic for name detection if not found
-        if (targetName == null && n.contains('rahul')) targetName = 'rahul';
-
-        if (targetName != null) {
-          final text = await cust.checkCustomerDue.fn(
-            {'customerName': targetName},
-            (context: {'userIdentifier': _currentUserId, 'shopId': _currentShopId}, init: null, inputStream: null, sendChunk: (dynamic chunk) {}, streamingRequested: false)
-          );
-          _addToHistory(input, text);
-          return {'text': text};
-        } else {
-          // List all dues
-          final text = await cust.listCustomersDue.fn(
-            {},
-            (context: {'userIdentifier': _currentUserId, 'shopId': _currentShopId}, init: null, inputStream: null, sendChunk: (dynamic chunk) {}, streamingRequested: false)
-          );
-          _addToHistory(input, text);
-          return {'text': text};
-        }
-      } catch (e) {
-        return {'text': 'Error checking dues: $e'};
-      }
-    }
-    // Add product intent (MUST be checked before inventory!)
-    if (_isAddProductIntent(n)) {
-      final products = _parseAddProductRequest(input);
-      if (products.isNotEmpty) {
-        final text = 'I\'ve drafted product proposal(s) based on your request. Please review and approve to add to your inventory.';
-        _addToHistory(input, text);
-        return {
-          'text': text,
-          'intent': {
-            'type': 'ADD_PRODUCT',
-            'entities': {
-              'products': products,
-            }
-          }
-        };
-      }
-    }
-
-    // Inventory (specific product lookup) — skip if it's an add/billing intent
-    if (_isInventoryIntent(n) && !_isBillingIntent(n) && !_isAddProductIntent(n)) {
-      final query = _extractInventoryQuery(input);
-      final products = await findInventoryProducts(query.isEmpty ? input : query, shopId!);
-      if (products.isEmpty) {
-        const text = 'That product is not in your inventory.';
-        _addToHistory(input, text);
-        return {'text': text};
-      }
-      final items = products.map((p) => {
-        'name': p.name,
-        'price': p.price,
-        'stock_quantity': p.stockQuantity,
-        'category': p.category,
-      }).toList();
-      final text = products.length == 1
-          ? '${products.first.name}: ₹${_fmtPrice(products.first.price)}, ${products.first.stockQuantity} units in stock.'
-          : '${products.length} products found:';
-      _addToHistory(input, text);
-      return {
-        'text': text,
-        'card': {'type': 'inventory', 'items': items},
-      };
-    }
-
-    // Billing intent
-    if (_isBillingIntent(n)) {
-      final requestedItems = _parseBillingItems(input);
-      if (requestedItems.isNotEmpty) {
-        final customerName = _extractCustomerName(input);
-        final text = 'I\'ve generated a draft invoice based on your instructions. Please review the GST settings and finalize.';
-        _addToHistory(input, text);
-        return {
-          'text': text,
-          'intent': {
-            'type': 'CREATE_INVOICE',
-            'entities': {
-              'customerName': customerName,
-              'requestedItems': requestedItems,
-            }
-          }
-        };
-      }
-    }
-
-    // Analytics intent → use AI with tools
-    // Expense intent → use AI with tools
-    // General conversation → use AI
-
+    // All other intents → let the AI pick the right tool
     _history.add(Message(role: Role.user, content: [TextPart(text: input)]));
-
-    // Simple intent routing to avoid overloading Groq with unnecessary tools
-    List<String> selectedTools = [];
-    if (_isCatalogIntent(n) || n.contains('inventory') || n.contains('stock') || n.contains('price') || n.contains('atta') || n.contains('dal') || n.contains('oil') || n.contains('item')) {
-      selectedTools = ['checkInventory', 'browseCatalogTool'];
-    } else if (_isAnalyticsIntent(n) || n.contains('revenue') || n.contains('analytics') || n.contains('orders') || n.contains('sales') || n.contains('sale') || n.contains('profit') || n.contains('earned') || n.contains('money')) {
-      selectedTools = ['businessInsightsTool'];
-    } else if (n.contains('add') || n.contains('new') || n.contains('create') || n.contains('import') || n.contains('upload')) {
-      // Add can be products or expenses
-      selectedTools = ['proposeProducts', 'logExpense'];
-    } else if (n.contains('delete') || n.contains('remove')) {
-      selectedTools = ['requestProductDeletion'];
-    } else if (n.contains('weather')) {
-      selectedTools = ['getWeather'];
-    } else if (n.contains('remind') || n.contains('reminder')) {
-      selectedTools = ['setReminder'];
-    } else if (_isExpenseIntent(n) || n.contains('expense') || n.contains('rent') || n.contains('bill') || n.contains('pay') || n.contains('spent') || n.contains('party') || n.contains('tea')) {
-      selectedTools = ['logExpense', 'getExpenses'];
-    }
 
     try {
       final response = await ai.generate(
         model: appModel(),
         messages: [
           Message(role: Role.system, content: [
-            TextPart(text: '$_webSystemPrompt\nCurrent IST: ${_fmtDate(_nowIst())} ${_fmtTime(_nowIst())}'),
+            TextPart(text: '$_webSystemPrompt\n\nCurrent IST: ${_fmtDate(_nowIst())} ${_fmtTime(_nowIst())}'),
           ]),
           ..._history,
         ],
-        toolNames: selectedTools.isNotEmpty ? selectedTools : null,
+        // Pass ALL tools so the AI can pick the right one for any query
+        toolNames: [
+          'checkInventory',
+          'browseCatalogTool',
+          'createDraftInvoice',
+          'proposeProducts',
+          'requestProductDeletion',
+          'businessInsightsTool',
+          'logExpense',
+          'getExpenses',
+          'checkCustomerDue',
+          'listCustomersDue',
+          'recordPayment',
+          'invoiceLookup',
+          'getWeather',
+          'setReminder',
+        ],
         context: {
           'userIdentifier': userIdentifier,
           'shopId': _currentShopId,
         },
       );
+
+      // Log tool calls for observability and parse executed cards
+      Map<String, dynamic>? executedCard;
+      for (final msg in response.messages) {
+        for (final part in msg.content) {
+          if (part is ToolRequestPart) {
+            print('[AI Tool Call] ${part.toolRequest.name} | Input: ${part.toolRequest.input}');
+          }
+          if (part is ToolResponsePart) {
+            print('[AI Tool Response] ${part.toolResponse.name} | Output: ${part.toolResponse.output}');
+            final name = part.toolResponse.name;
+            final output = part.toolResponse.output;
+            if (output != null) {
+              if (name == 'businessInsightsTool') {
+                executedCard = {
+                  'type': 'analytics_summary',
+                  'data': output,
+                };
+              } else if (name == 'listCustomersDue') {
+                executedCard = {
+                  'type': 'customer_dues_list',
+                  'data': output,
+                };
+              } else if (name == 'checkCustomerDue') {
+                executedCard = {
+                  'type': 'customer_due_detail',
+                  'data': output,
+                };
+              } else if (name == 'getExpenses') {
+                executedCard = {
+                  'type': 'expense_report',
+                  'data': output,
+                };
+              } else if (name == 'invoiceLookup') {
+                executedCard = {
+                  'type': 'invoice_lookup',
+                  'data': output,
+                };
+              } else if (name == 'browseCatalogTool') {
+                executedCard = {
+                  'type': 'product_catalog',
+                  'data': output,
+                };
+              } else if (name == 'recordPayment') {
+                executedCard = {
+                  'type': 'payment_confirmation',
+                  'data': output,
+                };
+              } else if (name == 'createDraftInvoice') {
+                executedCard = {
+                  'type': 'invoice',
+                  'draft': output,
+                };
+              } else if (name == 'proposeProducts') {
+                executedCard = {
+                  'type': 'batch',
+                  'products': output['products'] ?? output['proposed_products'] ?? [],
+                  'batchId': output['batchId'],
+                  'status': 'PENDING',
+                };
+              }
+            }
+          }
+        }
+      }
+
       final reply = response.text.trim();
       _history.add(Message(role: Role.model, content: [TextPart(text: reply)]));
-      return {'text': reply};
+      return {
+        'text': reply,
+        if (executedCard != null) 'card': executedCard,
+      };
     } catch (e) {
+      print('[processMessage] Error: $e');
       return {'text': 'Sorry, something went wrong: ${e.toString().split('\n').first}'};
     }
   }
@@ -1025,3 +981,4 @@ class WebChatSession {
     _history.add(Message(role: Role.model, content: [TextPart(text: reply)]));
   }
 }
+

@@ -146,11 +146,18 @@ class ProductRepository {
     return null;
   }
 
-  /// Instantly saves product locally and queues background sync
+  /// Instantly saves product locally and queues background sync.
+  /// On web, writes directly to Supabase to avoid AI stale-data issues.
   Future<void> saveProduct(Product product) async {
+    // Web fast-path: skip local queue, write directly to Supabase
+    if (kIsWeb) {
+      await supabase.from('products').upsert(product.toJson());
+      return;
+    }
+
     final map = product.toJson();
     map['is_service'] = product.isService ? 1 : 0;
-    
+
     // Inject barcode from high level field into metadata map for SQLite storage
     final metadataMap = Map<String, dynamic>.from(map['metadata'] ?? {});
     if (product.barcode != null) {
@@ -170,11 +177,18 @@ class ProductRepository {
     );
   }
 
-  /// Instantly updates product locally and queues background sync
+  /// Instantly updates product locally and queues background sync.
+  /// On web, writes directly to Supabase to avoid AI stale-data issues.
   Future<void> updateProduct(Product product) async {
+    // Web fast-path: skip local queue, write directly to Supabase
+    if (kIsWeb) {
+      await supabase.from('products').upsert(product.toJson());
+      return;
+    }
+
     final map = product.toJson();
     map['is_service'] = product.isService ? 1 : 0;
-    
+
     // Inject barcode from high level field into metadata map for SQLite storage
     final metadataMap = Map<String, dynamic>.from(map['metadata'] ?? {});
     if (product.barcode != null) {
@@ -199,8 +213,15 @@ class ProductRepository {
     );
   }
 
-  /// Instantly deletes product locally and queues background sync
+  /// Instantly deletes product locally and queues background sync.
+  /// On web, deletes directly from Supabase to avoid AI stale-data issues.
   Future<void> deleteProduct(String id) async {
+    // Web fast-path: skip local queue, delete directly from Supabase
+    if (kIsWeb) {
+      await supabase.from('products').delete().eq('id', id);
+      return;
+    }
+
     // 1. Delete locally
     await _localDb.delete(
       'products',
@@ -217,8 +238,18 @@ class ProductRepository {
     );
   }
 
-  /// Relatively adjusts a product's stock levels locally and queues it for background sync
+  /// Relatively adjusts a product's stock levels locally and queues it for background sync.
+  /// On web, calls the Supabase RPC directly to avoid AI stale-data issues.
   Future<void> adjustStock(String id, int delta) async {
+    // Web fast-path: call Supabase RPC directly
+    if (kIsWeb) {
+      await supabase.rpc('adjust_product_stock', params: {
+        'p_id': id,
+        'p_delta': delta,
+      });
+      return;
+    }
+
     // 1. Update SQLite locally first
     await _localDb.rawUpdate(
       'UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?',

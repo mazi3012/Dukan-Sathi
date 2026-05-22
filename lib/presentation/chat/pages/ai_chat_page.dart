@@ -14,6 +14,13 @@ import '../providers/chat_provider.dart';
 import '../widgets/invoice_draft_card.dart';
 import '../widgets/inventory_draft_card.dart';
 import '../widgets/ai_thinking_indicator.dart';
+import '../widgets/analytics_summary_card.dart';
+import '../widgets/customer_dues_card.dart';
+import '../widgets/customer_due_detail_card.dart';
+import '../widgets/expense_report_card.dart';
+import '../widgets/invoice_lookup_card.dart';
+import '../widgets/product_catalog_card.dart';
+import '../widgets/payment_confirmation_card.dart';
 import '../../../core/services/tts_service.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/widgets/barcode_scanner_dialog.dart';
@@ -375,6 +382,20 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
         return InvoiceDraftCard(payload: msg.payload as Map<String, dynamic>?);
       case MessageType.aiDraftInventory:
         return InventoryDraftCard(payload: msg.payload);
+      case MessageType.aiAnalyticsSummary:
+        return AnalyticsSummaryCard(payload: Map<String, dynamic>.from(msg.payload as Map));
+      case MessageType.aiCustomerDuesList:
+        return CustomerDuesCard(payload: Map<String, dynamic>.from(msg.payload as Map));
+      case MessageType.aiCustomerDueDetail:
+        return CustomerDueDetailCard(payload: Map<String, dynamic>.from(msg.payload as Map));
+      case MessageType.aiExpenseReport:
+        return ExpenseReportCard(payload: Map<String, dynamic>.from(msg.payload as Map));
+      case MessageType.aiInvoiceLookup:
+        return InvoiceLookupCard(payload: Map<String, dynamic>.from(msg.payload as Map));
+      case MessageType.aiProductCatalog:
+        return ProductCatalogCard(payload: Map<String, dynamic>.from(msg.payload as Map));
+      case MessageType.aiPaymentConfirmation:
+        return PaymentConfirmationCard(payload: Map<String, dynamic>.from(msg.payload as Map));
       default:
         return const SizedBox.shrink();
     }

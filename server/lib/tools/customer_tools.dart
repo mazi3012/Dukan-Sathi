@@ -2,7 +2,7 @@ import 'package:schemantic/schemantic.dart';
 import '../core/database.dart';
 import '../runtime/genkit_runtime.dart';
 
-final checkCustomerDue = ai.defineTool<Map<String, dynamic>, String>(
+final checkCustomerDue = ai.defineTool<Map<String, dynamic>, Map<String, dynamic>>(
   name: 'checkCustomerDue',
   description: 'Check how much a specific customer owes (their current balance) and list their recent unpaid invoices.',
   inputSchema: SchemanticType.from<Map<String, dynamic>>(
@@ -21,7 +21,9 @@ final checkCustomerDue = ai.defineTool<Map<String, dynamic>, String>(
   fn: (input, context) async {
     try {
       final userIdentifier = context.context?['userIdentifier'] as String?;
-      if (userIdentifier == null) return 'Error: User context missing.';
+      if (userIdentifier == null) {
+        return {'status': 'error', 'message': 'User context missing.'};
+      }
       
       final shopId = (context.context?['shopId'] as String?) ?? await getShopIdForUser(userIdentifier);
       final customerName = input['customerName'] as String;
@@ -34,7 +36,10 @@ final checkCustomerDue = ai.defineTool<Map<String, dynamic>, String>(
           .maybeSingle();
 
       if (customerRes == null) {
-        return 'No customer found matching "$customerName".';
+        return {
+          'status': 'not_found',
+          'message': 'No customer found matching "$customerName".',
+        };
       }
 
       final customerData = Map<String, dynamic>.from(customerRes as Map);
@@ -43,7 +48,14 @@ final checkCustomerDue = ai.defineTool<Map<String, dynamic>, String>(
       final exactName = customerData['name'] as String;
 
       if (balance <= 0) {
-        return '💳 $exactName — No dues. Account is clear.';
+        return {
+          'status': 'no_dues',
+          'customerName': exactName,
+          'customerId': customerId,
+          'balance': 0.0,
+          'recentUnpaid': [],
+          'message': '💳 $exactName — No dues. Account is clear.',
+        };
       }
 
       final salesRes = await supabase
@@ -55,43 +67,35 @@ final checkCustomerDue = ai.defineTool<Map<String, dynamic>, String>(
           .order('timestamp', ascending: false)
           .limit(5);
 
-      final buffer = StringBuffer();
-      buffer.writeln('💳 $exactName — Total Due: ₹$balance\n');
-
       final sales = salesRes as List<dynamic>;
-      if (sales.isEmpty) {
-        buffer.writeln('No specific unpaid invoices found.');
-      } else {
-        buffer.writeln('Recent unpaid invoices:');
-        for (final saleRow in sales) {
-          final sale = Map<String, dynamic>.from(saleRow as Map);
-          final invNumber = sale['invoice_number'] as String;
-          final due = (sale['due_amount'] as num).toDouble();
-          final amountPaid = (sale['amount_paid'] as num?)?.toDouble() ?? 0.0;
-          final status = sale['payment_status'] as String;
-          
-          final date = DateTime.parse(sale['timestamp'].toString()).toLocal();
-          final dateStr = '${date.day}/${date.month}/${date.year}';
-          
-          String extraInfo = '';
-          if (status == 'PARTIAL') {
-            extraInfo = ' (Partial, ₹$amountPaid paid)';
-          } else {
-            extraInfo = ' (Unpaid)';
-          }
-          
-          buffer.writeln('• $invNumber — ₹$due$extraInfo — $dateStr');
-        }
-      }
+      final recentUnpaidList = sales.map((saleRow) {
+        final sale = Map<String, dynamic>.from(saleRow as Map);
+        final date = DateTime.parse(sale['timestamp'].toString()).toLocal();
+        final dateStr = '${date.day}/${date.month}/${date.year}';
+        return {
+          'invoiceNumber': sale['invoice_number'] as String,
+          'due': (sale['due_amount'] as num).toDouble(),
+          'amountPaid': (sale['amount_paid'] as num?)?.toDouble() ?? 0.0,
+          'paymentStatus': sale['payment_status'] as String,
+          'date': dateStr,
+        };
+      }).toList();
 
-      return buffer.toString();
+      return {
+        'status': 'success',
+        'customerName': exactName,
+        'customerId': customerId,
+        'balance': balance,
+        'recentUnpaid': recentUnpaidList,
+        'message': '💳 $exactName — Total Due: ₹$balance',
+      };
     } catch (e) {
-      return 'Error checking customer due: $e';
+      return {'status': 'error', 'message': 'Error checking customer due: $e'};
     }
   },
 );
 
-final listCustomersDue = ai.defineTool<Map<String, dynamic>, String>(
+final listCustomersDue = ai.defineTool<Map<String, dynamic>, Map<String, dynamic>>(
   name: 'listCustomersDue',
   description: 'List all customers who have outstanding dues/balances.',
   inputSchema: SchemanticType.from<Map<String, dynamic>>(
@@ -104,7 +108,9 @@ final listCustomersDue = ai.defineTool<Map<String, dynamic>, String>(
   fn: (input, context) async {
     try {
       final userIdentifier = context.context?['userIdentifier'] as String?;
-      if (userIdentifier == null) return 'Error: User context missing.';
+      if (userIdentifier == null) {
+        return {'status': 'error', 'message': 'User context missing.'};
+      }
       
       final shopId = (context.context?['shopId'] as String?) ?? await getShopIdForUser(userIdentifier);
       
@@ -117,29 +123,38 @@ final listCustomersDue = ai.defineTool<Map<String, dynamic>, String>(
 
       final customers = customersRes as List<dynamic>;
       if (customers.isEmpty) {
-        return 'No customers have outstanding dues.';
+        return {
+          'status': 'no_dues',
+          'customers': [],
+          'totalDues': 0.0,
+          'message': 'No customers have outstanding dues.',
+        };
       }
 
-      double totalDues = 0;
-      final buffer = StringBuffer();
-      
-      for (final row in customers) {
+      final customersList = customers.map((row) {
         final data = Map<String, dynamic>.from(row as Map);
-        final name = data['name'] as String;
-        final balance = (data['current_balance'] as num).toDouble();
-        totalDues += balance;
-        buffer.writeln('• $name — ₹$balance');
-      }
+        return {
+          'id': data['id'] as String,
+          'name': data['name'] as String,
+          'balance': (data['current_balance'] as num).toDouble(),
+        };
+      }).toList();
+
+      final totalDues = customersList.fold<double>(0.0, (sum, c) => sum + (c['balance'] as double));
       
-      final header = '📋 Customers with Dues (Total: ₹$totalDues)\n\n';
-      return header + buffer.toString();
+      return {
+        'status': 'success',
+        'customers': customersList,
+        'totalDues': totalDues,
+        'message': '📋 Customers with Dues (Total: ₹$totalDues)',
+      };
     } catch (e) {
-      return 'Error listing customers with dues: $e';
+      return {'status': 'error', 'message': 'Error listing customers with dues: $e'};
     }
   },
 );
 
-final recordPayment = ai.defineTool<Map<String, dynamic>, String>(
+final recordPayment = ai.defineTool<Map<String, dynamic>, Map<String, dynamic>>(
   name: 'recordPayment',
   description: 'Record a payment made by a customer to settle their dues/balance.',
   inputSchema: SchemanticType.from<Map<String, dynamic>>(
@@ -166,7 +181,9 @@ final recordPayment = ai.defineTool<Map<String, dynamic>, String>(
   fn: (input, context) async {
     try {
       final userIdentifier = context.context?['userIdentifier'] as String?;
-      if (userIdentifier == null) return 'Error: User context missing.';
+      if (userIdentifier == null) {
+        return {'status': 'error', 'message': 'User context missing.'};
+      }
       
       final shopId = (context.context?['shopId'] as String?) ?? await getShopIdForUser(userIdentifier);
       final customerName = input['customerName'] as String;
@@ -174,7 +191,7 @@ final recordPayment = ai.defineTool<Map<String, dynamic>, String>(
       final paymentMethod = (input['paymentMethod'] as String?) ?? 'cash';
       
       if (amount <= 0) {
-        return 'Amount must be greater than zero.';
+        return {'status': 'error', 'message': 'Amount must be greater than zero.'};
       }
 
       final customerRes = await supabase
@@ -185,7 +202,10 @@ final recordPayment = ai.defineTool<Map<String, dynamic>, String>(
           .maybeSingle();
 
       if (customerRes == null) {
-        return 'No customer found matching "$customerName".';
+        return {
+          'status': 'not_found',
+          'message': 'No customer found matching "$customerName".',
+        };
       }
 
       final customerData = Map<String, dynamic>.from(customerRes as Map);
@@ -210,9 +230,17 @@ final recordPayment = ai.defineTool<Map<String, dynamic>, String>(
         'recorded_by': 'AI Assistant',
       });
 
-      return '✅ Recorded ₹$amount payment from $exactName via $paymentMethod.\nNew balance: ₹${newBalance < 0 ? 0 : newBalance}';
+      return {
+        'status': 'success',
+        'customerName': exactName,
+        'customerId': customerId,
+        'amount': amount,
+        'paymentMethod': paymentMethod,
+        'newBalance': newBalance < 0 ? 0 : newBalance,
+        'message': '✅ Recorded ₹$amount payment from $exactName via $paymentMethod.\nNew balance: ₹${newBalance < 0 ? 0 : newBalance}',
+      };
     } catch (e) {
-      return 'Error recording payment: $e';
+      return {'status': 'error', 'message': 'Error recording payment: $e'};
     }
   },
 );
