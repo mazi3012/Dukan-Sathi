@@ -42,13 +42,6 @@ class DukanSathiLogo extends StatelessWidget {
             color: const Color(0xFF32E6FF).withOpacity(0.35),
             width: 1.5,
           ),
-          boxShadow: showGlow ? [
-            BoxShadow(
-              color: const Color(0xFF32E6FF).withOpacity(0.2),
-              blurRadius: 8,
-              spreadRadius: 1,
-            ),
-          ] : null,
         ),
         child: Center(
           child: logoWidget,
@@ -67,31 +60,6 @@ class DukanSathiLogo extends StatelessWidget {
             .fadeIn(duration: 400.ms);
       }
       return badge;
-    }
-
-    // Default regular size implementation
-    if (showGlow) {
-      logoWidget = Stack(
-        alignment: Alignment.center,
-        children: [
-          // Ambient neon glow backplate
-          Container(
-            width: size * 0.9,
-            height: size * 0.9,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF32E6FF).withOpacity(0.4),
-                  blurRadius: size * 0.4,
-                  spreadRadius: size * 0.05,
-                ),
-              ],
-            ),
-          ),
-          logoWidget,
-        ],
-      );
     }
 
     if (animate) {
@@ -125,7 +93,7 @@ class DukanSathiHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Left spacing and ratio calculations
-    final double calculatedWidth = height * 4.0; // horizontal text aspect ratio is ~4:1
+    final double calculatedWidth = height; // horizontal text aspect ratio is now 1:1
 
     Widget headerWidget = Image.asset(
       'assets/logo_full.png',
@@ -133,33 +101,6 @@ class DukanSathiHeader extends StatelessWidget {
       height: height,
       fit: BoxFit.contain,
     );
-
-    if (showGlow) {
-      headerWidget = Stack(
-        alignment: Alignment.centerLeft,
-        children: [
-          // Soft backplate glow on the DS icon portion
-          Positioned(
-            left: height * 0.25,
-            child: Container(
-              width: height * 0.8,
-              height: height * 0.8,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF32E6FF).withOpacity(0.35),
-                    blurRadius: height * 0.5,
-                    spreadRadius: height * 0.05,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          headerWidget,
-        ],
-      );
-    }
 
     if (animate) {
       headerWidget = headerWidget
