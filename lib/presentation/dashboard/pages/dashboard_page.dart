@@ -239,8 +239,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         },
       ),
       title: const DukanSathiHeader(
-        height: 24,
-        showGlow: true,
+        height: 48,
+        showGlow: false,
         animate: true,
       ),
       actions: [

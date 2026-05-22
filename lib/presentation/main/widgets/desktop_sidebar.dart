@@ -199,14 +199,14 @@ class DesktopSidebar extends ConsumerWidget {
       child: isCollapsed
           ? const Center(
               child: DukanSathiLogo(
-                size: 36,
-                showGlow: true,
+                size: 48,
+                showGlow: false,
                 animate: true,
               ),
             )
           : const DukanSathiHeader(
-              height: 28,
-              showGlow: true,
+              height: 80,
+              showGlow: false,
               animate: true,
             ),
     );

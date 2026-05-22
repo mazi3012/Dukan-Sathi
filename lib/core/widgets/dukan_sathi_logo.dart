@@ -18,6 +18,7 @@ class DukanSathiLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     // If it's a small collapsed logo (e.g., in a narrow sidebar),
     // use a beautifully polished, self-contained circular badge structure
     // that fits perfectly without any overflow clipping.
@@ -28,6 +29,7 @@ class DukanSathiLogo extends StatelessWidget {
       width: isSmall ? size * 0.65 : size,
       height: isSmall ? size * 0.65 : size,
       fit: BoxFit.contain,
+      color: isDark ? Colors.white : null,
     );
 
     if (isSmall) {
@@ -92,6 +94,7 @@ class DukanSathiHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     // Left spacing and ratio calculations
     final double calculatedWidth = height; // horizontal text aspect ratio is now 1:1
 
@@ -100,6 +103,7 @@ class DukanSathiHeader extends StatelessWidget {
       width: calculatedWidth,
       height: height,
       fit: BoxFit.contain,
+      color: isDark ? Colors.white : null,
     );
 
     if (animate) {

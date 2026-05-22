@@ -593,7 +593,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     return Column(
       children: [
         const DukanSathiLogo(
-          size: 100,
+          size: 180,
           showGlow: false,
           animate: true,
         ),

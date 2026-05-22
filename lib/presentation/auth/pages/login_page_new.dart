@@ -271,7 +271,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildLogo() {
     return Column(
       children: [
-        const DukanSathiLogo(size: 110),
+        const DukanSathiLogo(size: 200),
         const SizedBox(height: 12),
         const SizedBox(height: 8),
         Text(

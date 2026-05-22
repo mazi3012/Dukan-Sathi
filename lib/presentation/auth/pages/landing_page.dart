@@ -88,8 +88,8 @@ class _LandingPageState extends State<LandingPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const DukanSathiHeader(
-            height: 32,
-            showGlow: true,
+            height: 64,
+            showGlow: false,
             animate: true,
           ),
           TextButton(
