@@ -914,7 +914,10 @@ class WebChatSession {
       return {'text': text};
     }
 
-    // All other intents → let the AI pick the right tool
+    // ─── Simple greeting / conversational → skip tools entirely ───────
+    final _greetings = RegExp(r'^(hi|hello|hey|hii|hiii|namaste|hola|good\s*(morning|evening|afternoon|night)|salam|howdy|yo|sup|kya\s*hal|kaise\s*ho)\b', caseSensitive: false);
+    final isSimpleGreeting = _greetings.hasMatch(n) && n.split(' ').length <= 4;
+
     _history.add(Message(role: Role.user, content: [TextPart(text: input)]));
 
     try {
@@ -926,12 +929,15 @@ class WebChatSession {
           ]),
           ..._history,
         ],
-        // Dynamically pass only the relevant tools based on keyword-matching to avoid API bottlenecks
-        toolNames: _getRelevantTools(input),
+        // Skip tools for simple greetings to avoid Groq schema validation issues
+        toolNames: isSimpleGreeting ? [] : _getRelevantTools(input),
         context: {
           'userIdentifier': userIdentifier,
           'shopId': _currentShopId,
         },
+      ).timeout(
+        const Duration(seconds: 55),
+        onTimeout: () => throw TimeoutException('AI generation timed out after 55 seconds'),
       );
 
       // Log tool calls for observability and parse executed cards

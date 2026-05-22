@@ -43,7 +43,7 @@ Genkit _createGenkit() {
   }
 
   final defaultModel =
-      _envValue('MODEL_ID') ?? 'meta-llama/llama-4-scout-17b-16e-instruct';
+      _envValue('MODEL_ID') ?? 'llama-3.3-70b-versatile';
 
   return Genkit(
     plugins: [
