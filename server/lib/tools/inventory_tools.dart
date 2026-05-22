@@ -87,7 +87,6 @@ final SchemanticType<Map<String, dynamic>> checkInventoryInputSchema =
       'productName': {'type': 'string'},
     },
     'required': ['productName'],
-    'additionalProperties': false,
   },
   parse: (json) => Map<String, dynamic>.from(json as Map),
 );
@@ -98,7 +97,8 @@ final checkInventoryTool = ai.defineTool<Map<String, dynamic>, List<Product>>(
   inputSchema: checkInventoryInputSchema,
   fn: (input, context) async {
     final query = (input['productName'] as String?) ?? '';
-    final shopId = (input['shopId'] as String?) ?? 
+    final rawShopId = input['shopId'] as String?;
+    final shopId = (isValidUuid(rawShopId) ? rawShopId : null) ?? 
                    (context.context?['shopId'] as String?) ?? 
                    await getShopIdForUser(context.context?['userIdentifier'] as String?);
     return findInventoryProducts(query, shopId);
@@ -114,7 +114,6 @@ final SchemanticType<Map<String, dynamic>> browseCatalogInputSchema =
     'properties': {
       'category': {'type': 'string'},
     },
-    'additionalProperties': false,
   },
   parse: (json) => Map<String, dynamic>.from(json as Map),
 );
@@ -127,7 +126,8 @@ final browseCatalogTool =
   inputSchema: browseCatalogInputSchema,
   fn: (input, context) async {
     final category = (input['category'] as String?)?.trim();
-    final shopId = (input['shopId'] as String?) ?? 
+    final rawShopId = input['shopId'] as String?;
+    final shopId = (isValidUuid(rawShopId) ? rawShopId : null) ?? 
                    (context.context?['shopId'] as String?) ?? 
                    await getShopIdForUser(context.context?['userIdentifier'] as String?);
     
@@ -179,14 +179,12 @@ final SchemanticType<Map<String, dynamic>> proposeProductsInputSchema =
             'gst_rate': {'type': 'number', 'default': 0},
             'hsn_sac_code': {'type': 'string'},
             'cost_price': {'type': 'number'},
-            'metadata': {'type': 'object'},
           },
           'required': ['name', 'price', 'category'],
         },
       },
     },
     'required': ['products'],
-    'additionalProperties': false,
   },
   parse: (json) => Map<String, dynamic>.from(json as Map),
 );
@@ -202,7 +200,8 @@ final proposeProductsTool =
         .map((p) => Map<String, dynamic>.from(p as Map))
         .toList();
 
-    final shopId = (input['shopId'] as String?) ?? 
+    final rawShopId = input['shopId'] as String?;
+    final shopId = (isValidUuid(rawShopId) ? rawShopId : null) ?? 
                    (context.context?['shopId'] as String?) ?? 
                    await getShopIdForUser(context.context?['userIdentifier'] as String?);
 
@@ -218,6 +217,7 @@ final proposeProductsTool =
             'Product draft created. Human approval is required to finalize.',
         'batchId': response['id'],
         'itemCount': products.length,
+        'products': products,
       };
     } catch (e) {
       return {
@@ -347,14 +347,13 @@ final SchemanticType<Map<String, dynamic>> requestProductDeletionInputSchema =
       'reason': {'type': 'string'},
     },
     'required': ['productName'],
-    'additionalProperties': false,
   },
   parse: (json) => Map<String, dynamic>.from(json as Map),
 );
 
 final requestProductDeletionTool =
     ai.defineTool<Map<String, dynamic>, Map<String, dynamic>>(
-  name: 'deleteProduct',
+  name: 'requestProductDeletion',
   description:
       'Create a human-approval request before deleting one or more products from inventory.',
   inputSchema: requestProductDeletionInputSchema,

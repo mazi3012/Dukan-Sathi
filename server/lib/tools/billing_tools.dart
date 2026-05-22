@@ -205,7 +205,6 @@ final SchemanticType<Map<String, dynamic>> createDraftInvoiceInputSchema =
       'userPrompt': {'type': 'string'},
     },
     'required': ['requestedItems'],
-    'additionalProperties': false,
   },
   parse: (json) => Map<String, dynamic>.from(json as Map),
 );
@@ -228,7 +227,8 @@ Future<Map<String, dynamic>> createDraftInvoiceRequest({
   required String? userIdentifier,
   String? shopId,
 }) async {
-  final effectiveShopId = (input['shopId'] as String?) ?? 
+  final rawShopId = input['shopId'] as String?;
+  final effectiveShopId = (isValidUuid(rawShopId) ? rawShopId : null) ?? 
                  shopId ?? 
                  await getShopIdForUser(userIdentifier);
   final customerId = input['customerId'] as String?;

@@ -23,7 +23,6 @@ final logExpense = ai.defineTool<Map<String, dynamic>, String>(
         },
       },
       'required': ['description', 'amount'],
-      'additionalProperties': false,
     },
     parse: (json) => Map<String, dynamic>.from(json as Map),
   ),

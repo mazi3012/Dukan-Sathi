@@ -50,7 +50,19 @@ Genkit _createGenkit() {
       openAI(
         apiKey: groqApiKey,
         baseUrl: 'https://api.groq.com/openai/v1',
-        models: [CustomModelDefinition(name: defaultModel)],
+        models: [
+          CustomModelDefinition(
+            name: defaultModel,
+            info: ModelInfo(
+              label: 'Groq Custom Model',
+              supports: {
+                'multiturn': true,
+                'tools': true,
+                'systemRole': true,
+              },
+            ),
+          ),
+        ],
       ),
     ],
   );

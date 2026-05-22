@@ -11,6 +11,9 @@ import 'package:dukansathi_server/tools/approval_tools.dart';
 import 'package:dukansathi_server/tools/billing_tools.dart';
 import 'package:dukansathi_server/tools/analytics_tools.dart';
 import 'package:dukansathi_server/tools/customer_tools.dart' as cust;
+import 'package:dukansathi_server/tools/expense_tools.dart';
+import 'package:dukansathi_server/tools/invoice_lookup_tools.dart';
+import 'package:dukansathi_server/tools/utility_tools.dart';
 import 'package:dukansathi_server/shared/services/invoice_pdf_generator.dart';
 import 'package:genkit/genkit.dart';
 import 'package:http/http.dart' as http;
@@ -80,11 +83,33 @@ class RateLimiter {
   }
 }
 
+void registerAllToolsEagerly() {
+  print('Registering Genkit tools eagerly to prevent lazy evaluation gotchas...');
+  final tools = [
+    checkInventoryTool,
+    browseCatalogTool,
+    createDraftInvoiceTool,
+    proposeProductsTool,
+    requestProductDeletionTool,
+    businessInsightsTool,
+    logExpense,
+    getExpenses,
+    cust.checkCustomerDue,
+    cust.listCustomersDue,
+    cust.recordPayment,
+    invoiceLookup,
+    getWeather,
+    setReminder,
+  ];
+  print('Registered ${tools.length} tools: ${tools.map((t) => t.name).toList()}');
+}
+
 Future<void> main(List<String> arguments) async {
   print('--- Genkit Server Initializing ---');
   try {
     initializeGenkit();
     print('✅ Genkit initialized successfully');
+    registerAllToolsEagerly();
   } catch (e) {
     print('❌ FATAL: Could not initialize Genkit: $e');
     exit(1);
@@ -660,36 +685,6 @@ const String _webSystemPrompt =
   "## GOLDEN RULE\n"
   "ALWAYS call a tool to answer factual questions. NEVER generate financial numbers, stock counts, or customer balances from memory.\n\n"
 
-  "## YOUR TOOLS — USE THEM PRECISELY\n"
-  "1. checkInventory(productName) → Check stock & price of a specific product\n"
-  "2. browseCatalogTool(category?) → List all products, optionally filtered by category\n"
-  "3. createDraftInvoice(requestedItems, customerName?, paymentStatus?) → Create a GST invoice draft — REQUIRES HUMAN APPROVAL before finalizing\n"
-  "4. proposeProducts(products[]) → Add new products to inventory — REQUIRES HUMAN APPROVAL\n"
-  "5. requestProductDeletion(productName) → Delete a product — REQUIRES HUMAN APPROVAL\n"
-  "6. businessInsightsTool(period?) → Revenue, profit, orders analytics. Default period='all_time'. Use period='today' when user says 'today'\n"
-  "7. logExpense(description, amount, category?) → Log a shop expense immediately. Default category='General'\n"
-  "8. getExpenses(category?) → Show expense report, optionally filtered by category\n"
-  "9. checkCustomerDue(customerName) → Check a specific customer's outstanding balance\n"
-  "10. listCustomersDue() → Show all customers with pending dues\n"
-  "11. recordPayment(customerName, amount, paymentMethod?) → Record a customer payment\n"
-  "12. invoiceLookup(invoiceNumber?, customerName?, paymentStatus?) → Find past invoices by number, customer, or status\n"
-  "13. getWeather(location?) → Get current weather. Default to shop's city if not specified\n\n"
-
-  "## TOOL SELECTION RULES (follow strictly)\n"
-  "- 'make a bill / create invoice / bill karo' → createDraftInvoice\n"
-  "- 'add product / naya item / add item / new stock' → proposeProducts\n"
-  "- 'delete / remove product' → requestProductDeletion\n"
-  "- 'revenue / sales / profit / kitna kamaya / orders / analytics' → businessInsightsTool\n"
-  "- 'show products / catalog / kya hai hamare paas' → browseCatalogTool\n"
-  "- '[product name] kitna hai / price / stock' → checkInventory\n"
-  "- 'who owes me / all dues / sabka due' → listCustomersDue\n"
-  "- '[customer] ka due / balance / owes' → checkCustomerDue\n"
-  "- '[customer] ne pay kiya / paid / payment liya' → recordPayment\n"
-  "- 'log expense / I spent / rent diya / salary / I paid' → logExpense\n"
-  "- 'show expenses / mera kharcha' → getExpenses\n"
-  "- 'find invoice / invoice dhundho / search invoice' → invoiceLookup\n"
-  "- 'weather / mausam' → getWeather\n\n"
-
   "## RESPONSE FORMAT\n"
   "- Keep responses SHORT (2-3 sentences max for confirmations)\n"
   "- Always show currency as ₹ for Indian Rupees\n"
@@ -839,6 +834,61 @@ class WebChatSession {
     return products;
   }
 
+  List<String> _getRelevantTools(String query) {
+    final q = query.toLowerCase();
+    final List<String> tools = [];
+    
+    if (q.contains('stock') || q.contains('price') || q.contains('have') || q.contains('item') || q.contains('product') || q.contains('atta') || q.contains('butter')) {
+      tools.add('checkInventory');
+    }
+    if (q.contains('catalog') || q.contains('sell') || q.contains('products') || q.contains('items') || q.contains('show') || q.contains('list')) {
+      tools.add('browseCatalogTool');
+    }
+    if (q.contains('bill') || q.contains('invoice') || q.contains('draft') || q.contains('checkout') || q.contains('make') || q.contains('create')) {
+      tools.add('createDraftInvoice');
+    }
+    if (q.contains('add') || q.contains('new') || q.contains('propose') || q.contains('insert')) {
+      tools.add('proposeProducts');
+    }
+    if (q.contains('delete') || q.contains('remove')) {
+      tools.add('requestProductDeletion');
+    }
+    if (q.contains('revenue') || q.contains('sales') || q.contains('profit') || q.contains('kamaya') || q.contains('insights') || q.contains('today') || q.contains('summary')) {
+      tools.add('businessInsightsTool');
+    }
+    if (q.contains('expense') || q.contains('kharcha') || q.contains('spend') || q.contains('paid') || q.contains('rent') || q.contains('salary')) {
+      tools.add('logExpense');
+      tools.add('getExpenses');
+    }
+    if (q.contains('due') || q.contains('owe') || q.contains('balance') || q.contains('outstanding') || q.contains('pending')) {
+      tools.add('checkCustomerDue');
+      tools.add('listCustomersDue');
+    }
+    if (q.contains('payment') || q.contains('pay') || q.contains('receive') || q.contains('collected')) {
+      tools.add('recordPayment');
+    }
+    if (q.contains('lookup') || q.contains('find') || q.contains('search') || q.contains('inv-')) {
+      tools.add('invoiceLookup');
+    }
+    if (q.contains('weather') || q.contains('mausam') || q.contains('temperature')) {
+      tools.add('getWeather');
+    }
+    if (q.contains('reminder') || q.contains('remind') || q.contains('task')) {
+      tools.add('setReminder');
+    }
+    
+    if (tools.isEmpty) {
+      tools.addAll([
+        'checkInventory',
+        'browseCatalogTool',
+        'createDraftInvoice',
+        'businessInsightsTool',
+      ]);
+    }
+    
+    return tools.toSet().toList();
+  }
+
   // ─── MAIN MESSAGE HANDLER ─────────────────────────────────────────────
   Future<Map<String, dynamic>> processMessage(String input, {String? shopId, String? userId}) async {
     if (shopId != null) _currentShopId = shopId;
@@ -876,23 +926,8 @@ class WebChatSession {
           ]),
           ..._history,
         ],
-        // Pass ALL tools so the AI can pick the right one for any query
-        toolNames: [
-          'checkInventory',
-          'browseCatalogTool',
-          'createDraftInvoice',
-          'proposeProducts',
-          'requestProductDeletion',
-          'businessInsightsTool',
-          'logExpense',
-          'getExpenses',
-          'checkCustomerDue',
-          'listCustomersDue',
-          'recordPayment',
-          'invoiceLookup',
-          'getWeather',
-          'setReminder',
-        ],
+        // Dynamically pass only the relevant tools based on keyword-matching to avoid API bottlenecks
+        toolNames: _getRelevantTools(input),
         context: {
           'userIdentifier': userIdentifier,
           'shopId': _currentShopId,
@@ -903,14 +938,19 @@ class WebChatSession {
       Map<String, dynamic>? executedCard;
       for (final msg in response.messages) {
         for (final part in msg.content) {
-          if (part is ToolRequestPart) {
-            print('[AI Tool Call] ${part.toolRequest.name} | Input: ${part.toolRequest.input}');
+          if (part.isToolRequest) {
+            final name = part.toolRequest?.name;
+            final input = part.toolRequest?.input;
+            print('[AI Tool Call] $name | Input: $input');
           }
-          if (part is ToolResponsePart) {
-            print('[AI Tool Response] ${part.toolResponse.name} | Output: ${part.toolResponse.output}');
-            final name = part.toolResponse.name;
-            final output = part.toolResponse.output;
+          if (part.isToolResponse) {
+            final name = part.toolResponse?.name;
+            final output = part.toolResponse?.output;
+            print('[AI Tool Response] $name | Output: $output');
             if (output != null) {
+              final Map<String, dynamic> outputMap = output is Map
+                  ? Map<String, dynamic>.from(output)
+                  : {};
               if (name == 'businessInsightsTool') {
                 executedCard = {
                   'type': 'analytics_summary',
@@ -954,8 +994,8 @@ class WebChatSession {
               } else if (name == 'proposeProducts') {
                 executedCard = {
                   'type': 'batch',
-                  'products': output['products'] ?? output['proposed_products'] ?? [],
-                  'batchId': output['batchId'],
+                  'products': outputMap['products'] ?? outputMap['proposed_products'] ?? [],
+                  'batchId': outputMap['batchId'],
                   'status': 'PENDING',
                 };
               }

@@ -26,6 +26,12 @@ SupabaseClient get supabase {
   return _supabaseInstance!;
 }
 
+bool isValidUuid(String? id) {
+  if (id == null) return false;
+  final regExp = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+  return regExp.hasMatch(id);
+}
+
 Future<String> getShopIdForUser(String? userIdentifier) async {
   if (userIdentifier == null || userIdentifier.isEmpty) {
     throw StateError('Missing userIdentifier');

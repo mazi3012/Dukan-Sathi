@@ -148,7 +148,6 @@ final SchemanticType<Map<String, dynamic>> businessInsightsInputSchema =
       'toDate': {'type': 'string'},
     },
     'required': [],
-    'additionalProperties': false,
   },
   parse: (json) => Map<String, dynamic>.from(json as Map),
 );
@@ -160,7 +159,8 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
   inputSchema: businessInsightsInputSchema,
   fn: (input, context) async {
     print("Tool Context: \${context.context}");
-    final shopId = (input['shopId'] as String?) ?? 
+    final rawShopId = input['shopId'] as String?;
+    final shopId = (isValidUuid(rawShopId) ? rawShopId : null) ?? 
                    (context.context?['shopId'] as String?) ?? 
                    await getShopIdForUser(context.context?['userIdentifier'] as String?);
     if (shopId.isEmpty) {

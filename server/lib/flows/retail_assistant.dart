@@ -41,6 +41,7 @@ final retailAssistantFlow = ai.defineFlow(
                   "7. For expenses, use logExpense and getExpenses.\n"
                   "8. For customer dues, balances, or payments, use checkCustomerDue, listCustomersDue, recordPayment, and invoiceLookup.\n"
                   "9. Use India Standard Time for all date-based queries. Reply concisely and professionally.\n"
+                  "10. JSON COMPLIANCE: When invoking any tools, you must strictly output valid JSON. Use lowercase 'null', 'true', and 'false' for values. NEVER use Python-style capitalized literals like 'None', 'True', or 'False'. Doing so will break the application.\n"
                   "Summarize the action taken and mention that an interactive card will appear for their final approval.",
             ),
           ],
