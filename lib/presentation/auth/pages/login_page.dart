@@ -7,6 +7,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/session.dart';
+import '../../../core/widgets/dukan_sathi_logo.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback? onBack;
@@ -591,45 +592,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   Widget _buildLogo(bool isDark) {
     return Column(
       children: [
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            // Pulse glow background
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(0.3),
-                    blurRadius: 30,
-                    spreadRadius: 8,
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                gradient: AppColors.primaryGradient,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(0.4),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: const Icon(Iconsax.shop, size: 36, color: Colors.white),
-            ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
-          ],
+        const DukanSathiLogo(
+          size: 80,
+          showGlow: true,
+          animate: true,
         ),
         const SizedBox(height: 20),
         Text(
-          'Dukan Sathi Pro',
+          'Dukan Sathi',
           style: TextStyle(
             color: isDark ? Colors.white : AppColors.lightOnSurface,
             fontSize: 26,

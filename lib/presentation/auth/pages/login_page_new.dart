@@ -5,6 +5,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/session.dart';
 import '../../main/pages/main_layout.dart';
+import '../../../core/widgets/dukan_sathi_logo.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -140,7 +141,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildDescriptionText() {
     return Center(
       child: Text(
-        'Sign in securely with your Google account to access your Dukan Sathi Pro dashboard.',
+        'Sign in securely with your Google account to access your Dukan Sathi dashboard.',
         textAlign: TextAlign.center,
         style: TextStyle(
           color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
@@ -270,21 +271,10 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildLogo() {
     return Column(
       children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: AppColors.primaryGradient,
-            boxShadow: [
-              BoxShadow(color: Theme.of(context).primaryColor.withOpacity(0.5), blurRadius: 30, offset: const Offset(0, 10)),
-            ],
-          ),
-          child: const Icon(Iconsax.shop, size: 42, color: Colors.white),
-        ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
+        const DukanSathiLogo(size: 90),
         const SizedBox(height: 20),
         Text(
-          'Dukan Sathi Pro',
+          'Dukan Sathi',
           style: TextStyle(
             color: Theme.of(context).textTheme.displayLarge?.color,
             fontSize: 28,

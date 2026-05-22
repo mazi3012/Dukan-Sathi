@@ -4,6 +4,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/session.dart';
+import '../../../core/widgets/dukan_sathi_logo.dart';
 
 class ShopSetupPage extends StatefulWidget {
   const ShopSetupPage({super.key});
@@ -86,10 +87,11 @@ class _ShopSetupPageState extends State<ShopSetupPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Iconsax.shop, size: 48, color: Theme.of(context).primaryColor)
-                      .animate()
-                      .fadeIn(duration: 600.ms)
-                      .scale(),
+                  const DukanSathiLogo(
+                    size: 64,
+                    showGlow: true,
+                    animate: true,
+                  ),
                   const SizedBox(height: 24),
                   Text(
                     "Setup Your Shop",

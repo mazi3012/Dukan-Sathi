@@ -8,6 +8,7 @@ import '../../../core/widgets/glass_box.dart';
 import '../../../core/session.dart';
 import '../../auth/pages/welcome_auth_flow.dart';
 import '../../../data/sync/sync_manager.dart';
+import '../../../core/widgets/dukan_sathi_logo.dart';
 
 class DesktopSidebar extends ConsumerWidget {
   final int currentIndex;
@@ -194,29 +195,20 @@ class DesktopSidebar extends ConsumerWidget {
 
   Widget _buildSidebarHeader(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: isCollapsed ? 0 : 10),
-      child: Row(
-        mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
-        children: [
-          const CircleAvatar(
-            radius: 20,
-            backgroundColor: AppColors.primary,
-            child: Icon(Iconsax.shop, size: 20, color: Colors.white),
-          ),
-          if (!isCollapsed) ...[
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                "DUKAN SATHI",
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
-                ),
-              ).animate().fadeIn(),
+      padding: EdgeInsets.symmetric(horizontal: isCollapsed ? 0 : 8),
+      child: isCollapsed
+          ? const Center(
+              child: DukanSathiLogo(
+                size: 36,
+                showGlow: true,
+                animate: true,
+              ),
+            )
+          : const DukanSathiHeader(
+              height: 28,
+              showGlow: true,
+              animate: true,
             ),
-          ],
-        ],
-      ),
     );
   }
 

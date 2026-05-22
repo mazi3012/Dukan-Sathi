@@ -20,7 +20,7 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
   ChatController() : super([
     ChatMessage(
       id: const Uuid().v4(),
-      text: "Hi! I'm Dukan Sathi Pro. How can I help you manage your shop today?",
+      text: "Hi! I'm Dukan Sathi. How can I help you manage your shop today?",
       type: MessageType.aiText,
     ),
   ]);

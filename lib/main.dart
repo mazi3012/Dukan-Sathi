@@ -44,7 +44,7 @@ class DukanSathiApp extends ConsumerWidget {
     final themeMode = ref.watch(themeProvider);
     
     return MaterialApp(
-      title: 'Dukan Sathi Pro',
+      title: 'Dukan Sathi',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

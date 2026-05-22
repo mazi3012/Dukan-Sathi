@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/dukan_sathi_logo.dart';
 
 class LandingPage extends StatefulWidget {
   final VoidCallback onGetStarted;
@@ -86,35 +87,11 @@ class _LandingPageState extends State<LandingPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withOpacity(0.3),
-                      blurRadius: 15,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: const Icon(Iconsax.shop, size: 24, color: Colors.white),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Dukan Sathi Pro',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.5,
-                  color: isDark ? Colors.white : AppColors.lightOnSurface,
-                ),
-              ),
-            ],
-          ).animate().fadeIn(duration: 500.ms).slideX(begin: -0.2),
+          const DukanSathiHeader(
+            height: 32,
+            showGlow: true,
+            animate: true,
+          ),
           TextButton(
             onPressed: widget.onGetStarted,
             style: TextButton.styleFrom(

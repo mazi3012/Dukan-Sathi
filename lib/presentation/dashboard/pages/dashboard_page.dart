@@ -10,6 +10,7 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../providers/dashboard_provider.dart';
 import '../../../core/session.dart';
+import '../../../core/widgets/dukan_sathi_logo.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -237,25 +238,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           mainScaffoldKey.currentState?.openDrawer();
         },
       ),
-      title: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Iconsax.shop, color: AppColors.primary, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            "DUKAN SATHI",
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.1,
-            ),
-          ),
-        ],
+      title: const DukanSathiHeader(
+        height: 24,
+        showGlow: true,
+        animate: true,
       ),
       actions: [
         IconButton(
