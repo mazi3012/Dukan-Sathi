@@ -877,13 +877,9 @@ class WebChatSession {
       tools.add('setReminder');
     }
     
+    // If no specific tools are matched, return an empty list so the assistant is fast and doesn't choke on schemas it won't use.
     if (tools.isEmpty) {
-      tools.addAll([
-        'checkInventory',
-        'browseCatalogTool',
-        'createDraftInvoice',
-        'businessInsightsTool',
-      ]);
+      return [];
     }
     
     return tools.toSet().toList();
