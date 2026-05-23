@@ -17,17 +17,14 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
   final _uuid = const Uuid();
   final String _sessionId = const Uuid().v4();
 
-  ChatController() : super([
-    ChatMessage(
-      id: const Uuid().v4(),
-      text: "Hi! I'm Dukan Sathi. How can I help you manage your shop today?",
-      type: MessageType.aiText,
-    ),
-  ]);
+  ChatController() : super([]);
 
   Future<void> loadHistory() async {
     final shopId = UserSession().shopId;
-    if (shopId == null || shopId.isEmpty) return;
+    if (shopId == null || shopId.isEmpty) {
+      _showWelcomeMessage();
+      return;
+    }
 
     try {
       final rows = await LocalDatabase.instance.queryAll(
@@ -58,10 +55,23 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
         }).toList();
 
         state = messages;
+      } else {
+        _showWelcomeMessage();
       }
     } catch (e) {
       debugPrint('[ChatController] Failed to load chat history: $e');
+      _showWelcomeMessage();
     }
+  }
+
+  void _showWelcomeMessage() {
+    state = [
+      ChatMessage(
+        id: const Uuid().v4(),
+        text: "Hi! I'm Dukan Sathi. How can I help you manage your shop today?",
+        type: MessageType.aiText,
+      ),
+    ];
   }
 
   Future<void> _saveMessageToDb(ChatMessage msg) async {
