@@ -634,7 +634,11 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
 
 Uri _getApiUri(String path) {
   if (kIsWeb) {
-    return Uri.base.resolve(path);
+    final baseUri = Uri.base;
+    if (baseUri.host == 'localhost' || baseUri.host == '127.0.0.1') {
+      return Uri.parse('http://localhost:3100').resolve(path);
+    }
+    return baseUri.resolve(path);
   }
   const baseUrl = String.fromEnvironment(
     'API_URL',

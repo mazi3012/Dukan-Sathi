@@ -124,14 +124,16 @@ class UserSession extends ChangeNotifier {
       _shopBusinessType = prefs.getString(SessionStorage.shopBusinessTypeKey);
 
       final currentSupabaseUser = supabase.auth.currentUser;
+      final isBypass = prefs.getBool('ds_debug_bypass') ?? false;
       
-      if (currentSupabaseUser != null) {
-        _userId = currentSupabaseUser.id;
-        _userName = currentSupabaseUser.userMetadata?['full_name'] ?? currentSupabaseUser.email;
+      if (currentSupabaseUser != null || (isBypass && _userId != null)) {
+        if (currentSupabaseUser != null) {
+          _userId = currentSupabaseUser.id;
+          _userName = currentSupabaseUser.userMetadata?['full_name'] ?? currentSupabaseUser.email;
+          await _storage.saveUser(_userId!, _userName ?? '');
+        }
         
-        await _storage.saveUser(_userId!, _userName ?? '');
-        
-        if (_shopId == null) {
+        if (_shopId == null && _userId != null) {
           await _fetchAndPersistShop(_userId!);
         }
         if (_shopId != null) {

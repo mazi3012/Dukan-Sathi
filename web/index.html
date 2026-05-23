@@ -42,6 +42,20 @@
 
   <title>Dukan Sathi | AI Retail Assistant</title>
   <link rel="manifest" href="manifest.json">
+  <script>
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      console.log("[Dukan Sathi Bypass] Injecting local development session bypass keys...");
+      localStorage.setItem('flutter.ds_debug_bypass', true);
+      localStorage.setItem('flutter.ds_user_id', '"60a27e2e-b0d7-4aa2-b9e6-5780807855d7"');
+      localStorage.setItem('flutter.ds_user_name', '"Mazidur Rahman"');
+      localStorage.setItem('flutter.ds_shop_id', '"4a6eea2b-4468-41a6-a2f1-d851793a8f2d"');
+      localStorage.setItem('flutter.ds_shop_name', '"Mazi"');
+      localStorage.setItem('flutter.ds_shop_state', '"AS"');
+      localStorage.setItem('flutter.ds_shop_gst_mode', '"REGISTERED"');
+      localStorage.setItem('flutter.ds_shop_gst_num', '"GSTN6373hsuw635"');
+      localStorage.setItem('flutter.ds_shop_business_type', '"retail"');
+    }
+  </script>
 </head>
 <body>
   <!--
