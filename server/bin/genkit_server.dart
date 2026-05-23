@@ -696,6 +696,14 @@ const String _webSystemPrompt =
   "## GOLDEN RULE\n"
   "ALWAYS call a tool to answer factual questions. NEVER generate financial numbers, stock counts, or customer balances from memory.\n\n"
 
+  "## INVOICE & BILLING RULE\n"
+  "- When a user asks to make, create, draft, or generate a bill or invoice (e.g., 'make a bill to jitu he took 2 piyano'), you MUST IMMEDIATELY call the 'createDraftInvoice' tool. DO NOT ask conversational questions for optional fields first.\n"
+  "- NEVER ask the user for details like their state, discount details, or payment amount. The interactive UI card handles these options dynamically and lets the user edit them on the screen.\n"
+  "- Extract the customer name (e.g., 'Jitu') and pass it as 'customerName'.\n"
+  "- Parse the product names and quantities (e.g., {'piyano': 2}) and pass them under 'requestedItems'.\n"
+  "- ALWAYS pass the raw user prompt as 'userPrompt' to the tool.\n"
+  "- Leave all other parameters (customerState, discountType, discountValue, paymentStatus, amountPaid) as null/unspecified unless explicitly mentioned in the user's input.\n\n"
+
   "## RESPONSE FORMAT\n"
   "- Keep responses SHORT (2-3 sentences max for confirmations)\n"
   "- Always show currency as ₹ for Indian Rupees\n"
