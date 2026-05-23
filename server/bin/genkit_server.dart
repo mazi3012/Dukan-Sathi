@@ -966,6 +966,7 @@ class WebChatSession {
           print('[AddProduct Fast-path] Failed: $e');
           // Fall through to AI path if fast-path fails
         }
+      }
     }
 
     // Fast-path for show catalog / list products intent (instantly returns catalog card without slow generation)
@@ -975,7 +976,7 @@ class WebChatSession {
         final rows = await supabase
             .from('products')
             .select('id, shop_id, name, price, stock_quantity, category, cost_price')
-            .eq('shop_id', _currentShopId)
+            .eq('shop_id', _currentShopId ?? '')
             .limit(20);
 
         final products = (rows as List<dynamic>).map((row) {
