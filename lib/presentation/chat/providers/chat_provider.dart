@@ -180,11 +180,18 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
         final aiText = data['text'] as String? ?? '';
         final card = data['card'] as Map<String, dynamic>?;
 
+        debugPrint('[ChatProvider] Response received - text: ${aiText.substring(0, aiText.length > 80 ? 80 : aiText.length)}...');
+        debugPrint('[ChatProvider] Card present: ${card != null}, Card type: ${card?['type']}');
+        if (card != null) {
+          debugPrint('[ChatProvider] Card keys: ${card.keys.toList()}');
+        }
+
         // Determine card type and payload
         MessageType? cardType;
         Map<String, dynamic>? cardPayload = card;
 
         if (data['intent'] != null) {
+          debugPrint('[ChatProvider] Intent detected: ${data['intent']}');
           final intent = AiIntent.fromJson(Map<String, dynamic>.from(data['intent']));
           final executorResult = await IntentExecutor().execute(intent);
 
@@ -200,6 +207,7 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
           }
         } else if (card != null) {
           final type = card['type'] as String?;
+          debugPrint('[ChatProvider] Processing card type: $type');
           if (type == 'inventory' || type == 'batch') {
             cardType = MessageType.aiDraftInventory;
             cardPayload = card;
@@ -232,6 +240,8 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
           }
         }
 
+        debugPrint('[ChatProvider] Final cardType: $cardType, cardPayload null: ${cardPayload == null}');
+
         final aiTextMsg = ChatMessage(
           id: _uuid.v4(),
           text: aiText,
@@ -240,6 +250,7 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
 
         ChatMessage? aiCardMsg;
         if (cardType != null && cardPayload != null) {
+          debugPrint('[ChatProvider] Creating card message with type: $cardType');
           aiCardMsg = ChatMessage(
             id: _uuid.v4(),
             text: "",

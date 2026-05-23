@@ -831,6 +831,10 @@ class WebChatSession {
         // Find GST
         final gstMatch = RegExp(r'gst\s*[:\-]?\s*(\d+)', caseSensitive: false).firstMatch(line);
         if (gstMatch != null) product['gst_rate'] = double.tryParse(gstMatch.group(1)!);
+        
+        // Find Cost Price (cp, cost price, cost)
+        final cpMatch = RegExp(r'(?:cost\s*price|cp|cost)\s*[:\-]?\s*(\d+(?:\.\d+)?)', caseSensitive: false).firstMatch(line);
+        if (cpMatch != null) product['cost_price'] = double.tryParse(cpMatch.group(1)!);
       }
       
       if (product.containsKey('name') && product['name']!.toString().isNotEmpty) {
@@ -919,6 +923,42 @@ class WebChatSession {
       final text = "Today's date is ${_fmtDate(now)} IST.";
       _addToHistory(input, text);
       return {'text': text};
+    }
+
+    // ─── Fast-path: Add product intent → directly call proposeProducts tool ──
+    if (_isAddProductIntent(n)) {
+      final products = _parseAddProductRequest(input);
+      if (products.isNotEmpty) {
+        try {
+          final effectiveShopId = _currentShopId!;
+          final response = await supabase.from('draft_product_batches').insert({
+            'shop_id': effectiveShopId,
+            'proposed_products': products,
+            'status': 'PENDING',
+          }).select('id').single();
+
+          final batchId = response['id'].toString();
+          final text = 'I\'ll create a draft proposal to add ${products.length == 1 ? "this product" : "these ${products.length} products"}. '
+              'Once approved by a human, ${products.length == 1 ? "it" : "they"} will become part of your inventory.\n\n'
+              '**Draft created successfully:**\n'
+              '- **Batch ID:** $batchId\n'
+              '- **Status:** Pending Approval';
+
+          _addToHistory(input, text);
+          return {
+            'text': text,
+            'card': {
+              'type': 'batch',
+              'products': products,
+              'batchId': batchId,
+              'status': 'PENDING',
+            },
+          };
+        } catch (e) {
+          print('[AddProduct Fast-path] Failed: $e');
+          // Fall through to AI path if fast-path fails
+        }
+      }
     }
 
     // ─── Simple greeting / conversational → skip tools entirely ───────

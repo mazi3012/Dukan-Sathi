@@ -30,15 +30,22 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
 
   void _parsePayload() {
     final payload = widget.payload;
+    debugPrint('[InventoryDraftCard] Parsing payload type: ${payload.runtimeType}');
     if (payload is List) {
       _products = payload;
       _batchId = null;
+      debugPrint('[InventoryDraftCard] Parsed as List with ${_products.length} products');
     } else if (payload is Map) {
       _products = payload['items'] ?? payload['inventory'] ?? payload['products'] ?? [];
       _batchId = payload['batchId']?.toString() ?? payload['id']?.toString();
       _isApproved = payload['status'] == 'APPROVED';
+      debugPrint('[InventoryDraftCard] Parsed as Map - products: ${_products.length}, batchId: $_batchId, status: ${payload['status']}');
+      if (_products.isEmpty) {
+        debugPrint('[InventoryDraftCard] WARNING: No products found! Available keys: ${payload.keys.toList()}');
+      }
     } else {
       _products = [];
+      debugPrint('[InventoryDraftCard] Unknown payload type, defaulting to empty products');
     }
   }
 
