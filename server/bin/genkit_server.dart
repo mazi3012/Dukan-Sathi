@@ -776,18 +776,33 @@ class WebChatSession {
 
   String? _extractCustomerName(String input) {
     var text = input.toLowerCase().trim();
-    text = text.replaceAll(RegExp(r'^(please\s+)?(make|create|generate)\s+(a\s+)?(bill|invoice)\s*(for|with|to)?\s*'), '').replaceAll(RegExp(r'\.$'), '').trim();
+    text = text.replaceAll(RegExp(r'^(please\s+)?(make|create|generate|draft)\s+(a\s+)?(bill|invoice)\s*(for|with|to)?\s*'), '').replaceAll(RegExp(r'\.$'), '').trim();
     if (text.isEmpty) return null;
-    final stopWords = {'he', 'she', 'they', 'customer', 'buyer', 'bought', 'want', 'for', 'to', 'the', 'a', 'an', 'of', 'item', 'items'};
+    final stopWords = {
+      'he', 'she', 'they', 'customer', 'buyer', 'bought', 'took', 'takes', 'take',
+      'brought', 'want', 'needs', 'need', 'please', 'for', 'to', 'the', 'a', 'an',
+      'of', 'item', 'items', 'product', 'products', 'with', 'and', 'plus', 'has', 'have', 'got', 'create', 'make', 'generate', 'draft', 'bill', 'invoice'
+    };
     final tokens = text.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
     final nameTokens = <String>[];
     for (final token in tokens) {
       if (RegExp(r'^\d+$').hasMatch(token)) break;
-      if (stopWords.contains(token)) break;
+      if (stopWords.contains(token)) continue;
       nameTokens.add(token);
     }
     if (nameTokens.isEmpty) return null;
     return nameTokens.map((t) => t[0].toUpperCase() + t.substring(1)).join(' ');
+  }
+
+  String _resolveAnalyticsPeriod(String input) {
+    final text = input.toLowerCase();
+    if (text.contains('yesterday')) return 'yesterday';
+    if (text.contains('today') || text.contains('current day') || text.contains('now')) return 'today';
+    if (text.contains('last week')) return 'last_week';
+    if (text.contains('this week') || text.contains('week')) return 'this_week';
+    if (text.contains('last month')) return 'last_month';
+    if (text.contains('this month') || text.contains('month')) return 'this_month';
+    return 'all_time';
   }
 
   List<Map<String, dynamic>> _parseAddProductRequest(String input) {
@@ -1007,6 +1022,75 @@ class WebChatSession {
         };
       } catch (e) {
         print('[Catalog Fast-path] Failed: $e');
+        // Fall through to AI path if fast-path fails
+      }
+    }
+
+    // ─── Fast-path: Billing intent → directly call createDraftInvoiceRequest ──
+    if (_isBillingIntent(n)) {
+      final items = _parseBillingItems(input);
+      if (items.isNotEmpty) {
+        try {
+          final customerName = _extractCustomerName(input);
+          print('[Billing Fast-path] Processing billing query: "$input" | Items: $items | Customer: $customerName');
+          
+          final result = await createDraftInvoiceRequest(
+            input: {
+              'shopId': _currentShopId,
+              'customerName': customerName,
+              'requestedItems': items,
+              'userPrompt': input,
+            },
+            userIdentifier: userIdentifier,
+            shopId: _currentShopId,
+          );
+
+          final String text = 'I\'ve created a draft invoice for ${customerName ?? "Customer"}. '
+              'Pending human approval.';
+
+          _addToHistory(input, text);
+          return {
+            'text': text,
+            'card': {
+              'type': 'invoice',
+              'draft': result,
+            },
+          };
+        } catch (e) {
+          print('[Billing Fast-path] Failed: $e');
+          // Fall through to AI path if fast-path fails
+        }
+      }
+    }
+
+    // ─── Fast-path: Analytics/Sales reports → directly call getBusinessInsightsRequest ──
+    if (_isAnalyticsIntent(n)) {
+      try {
+        final period = _resolveAnalyticsPeriod(input);
+        print('[Analytics Fast-path] Processing analytics query: "$input" | Period: $period');
+        
+        final result = await getBusinessInsightsRequest(
+          input: {
+            'shopId': _currentShopId,
+            'period': period,
+            'metric': 'overview',
+          },
+          userIdentifier: userIdentifier,
+          shopId: _currentShopId,
+        );
+
+        final String text = 'Here is your business performance summary for $period:';
+
+        _addToHistory(input, text);
+        return {
+          'text': text,
+          'card': {
+            'type': 'analytics_summary',
+            'data': result,
+          },
+        };
+      } catch (e) {
+        print('[Analytics Fast-path] Failed: $e');
         // Fall through to AI path if fast-path fails
       }
     }

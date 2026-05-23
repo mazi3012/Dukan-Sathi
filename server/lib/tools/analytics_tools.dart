@@ -151,6 +151,254 @@ final SchemanticType<Map<String, dynamic>> businessInsightsInputSchema =
   parse: (json) => Map<String, dynamic>.from(json as Map),
 );
 
+Future<Map<String, dynamic>> getBusinessInsightsRequest({
+  required Map<String, dynamic> input,
+  required String? userIdentifier,
+  String? shopId,
+}) async {
+  final rawShopId = input['shopId'] as String?;
+  final resolvedShopId = (isValidUuid(rawShopId) ? rawShopId : null) ?? 
+                 shopId ?? 
+                 await getShopIdForUser(userIdentifier);
+  
+  print('[getBusinessInsightsRequest] Resolved shopId: $resolvedShopId');
+  if (resolvedShopId.isEmpty) {
+    print('[getBusinessInsightsRequest] Error: No shop found');
+    return {
+      'status': 'error',
+      'message': 'No shop found for user',
+      'total_revenue': 0.0,
+      'total_orders': 0,
+    };
+  }
+
+  try {
+    final metric = (input['metric'] as String?)?.trim().toLowerCase() ?? 'overview';
+    final range = _resolveDateRange(input);
+    final from = range?['from'];
+    final to = range?['to'];
+    print('[getBusinessInsightsRequest] Date Range resolved: from=$from to=$to | Metric: $metric');
+
+    final swApprovals = Stopwatch()..start();
+    var approvalsQuery = supabase
+        .from('draft_approvals')
+        .select('approval_id, proposed_total, approval_status, created_at, reviewed_at, sale_id, shop_id')
+        .eq('shop_id', resolvedShopId);
+
+    if (from != null) {
+      approvalsQuery = approvalsQuery.gte('created_at', from.toIso8601String());
+    }
+    if (to != null) {
+      approvalsQuery = approvalsQuery.lte('created_at', to.toIso8601String());
+    }
+
+    final approvals = await approvalsQuery.order('created_at', ascending: false);
+    print('[getBusinessInsightsRequest] Approvals query completed in ${swApprovals.elapsedMilliseconds}ms. Count: ${(approvals as List).length}');
+    
+    final approvalRecords = (approvals as List<dynamic>)
+        .map((record) => Map<String, dynamic>.from(record as Map))
+        .toList();
+
+    final swSales = Stopwatch()..start();
+    var salesQuery = supabase
+        .from('sales')
+        .select('id, invoice_id, shop_id, amount, subtotal_after_discount, timestamp, status, payment_method, customer_id, customer_name')
+        .eq('shop_id', resolvedShopId);
+
+    if (from != null) {
+      salesQuery = salesQuery.gte('timestamp', from.toIso8601String());
+    }
+    if (to != null) {
+      salesQuery = salesQuery.lte('timestamp', to.toIso8601String());
+    }
+
+    final sales = await salesQuery.order('timestamp', ascending: false);
+    print('[getBusinessInsightsRequest] Sales query completed in ${swSales.elapsedMilliseconds}ms. Count: ${(sales as List).length}');
+    
+    final saleRecords = (sales as List<dynamic>)
+        .map((record) => Map<String, dynamic>.from(record as Map))
+        .toList();
+
+    final invoiceIds = saleRecords
+        .map((record) => record['invoice_id']?.toString())
+        .whereType<String>()
+        .toSet()
+        .toList();
+
+    final invoiceItemMap = <String, List<Map<String, dynamic>>>{};
+    if (invoiceIds.isNotEmpty) {
+      final invoices = await supabase
+          .from('draft_invoices')
+          .select('id, items')
+          .inFilter('id', invoiceIds);
+
+      for (final row in invoices as List<dynamic>) {
+        final data = Map<String, dynamic>.from(row as Map);
+        final items = (data['items'] as List<dynamic>? ?? const [])
+            .map((item) => Map<String, dynamic>.from(item as Map))
+            .toList();
+        final invoiceId = data['id']?.toString();
+        if (invoiceId != null) {
+          invoiceItemMap[invoiceId] = items;
+        }
+      }
+    }
+
+    final productIds = invoiceItemMap.values
+        .expand((items) => items)
+        .map((item) => item['productId']?.toString())
+        .whereType<String>()
+        .toSet()
+        .toList();
+
+    final productCostMap = <String, double>{};
+    if (productIds.isNotEmpty) {
+      final products = await supabase
+          .from('products')
+          .select('id, cost_price, metadata')
+          .inFilter('id', productIds);
+
+      for (final row in products as List<dynamic>) {
+        final data = Map<String, dynamic>.from(row as Map);
+        final productId = data['id']?.toString();
+        final costPerUnit = (data['cost_price'] as num?)?.toDouble() ?? _extractCostPerUnit(data);
+        if (productId != null && costPerUnit != null && costPerUnit > 0) {
+          productCostMap[productId] = costPerUnit;
+        }
+      }
+    }
+
+    double estimatedGrossProfit = 0.0;
+    bool hasMissingCostBasis = false;
+    final missingCostProducts = <String>{};
+
+    for (final record in saleRecords) {
+      final invoiceId = record['invoice_id']?.toString();
+      final items = invoiceId == null
+          ? const <Map<String, dynamic>>[]
+          : invoiceItemMap[invoiceId] ?? const <Map<String, dynamic>>[];
+      var cogs = 0.0;
+
+      for (final item in items) {
+        final productId = item['productId']?.toString();
+        final quantity = _safeNum(item['quantity']).toInt();
+        final costPerUnit = productId == null ? null : productCostMap[productId];
+
+        if (costPerUnit == null) {
+          hasMissingCostBasis = true;
+          if (productId != null) {
+            missingCostProducts.add(productId);
+          }
+          continue;
+        }
+
+        cogs += costPerUnit * quantity;
+      }
+
+      final revenueBasis = _safeNum(record['subtotal_after_discount'] ?? record['amount']);
+      estimatedGrossProfit += revenueBasis - cogs;
+    }
+
+    int totalItemsSold = 0;
+    int itemsWithCost = 0;
+    for (final items in invoiceItemMap.values) {
+      for (final item in items) {
+        totalItemsSold += _safeNum(item['quantity']).toInt();
+        final productId = item['productId']?.toString();
+        if (productId != null && productCostMap.containsKey(productId)) {
+          itemsWithCost += _safeNum(item['quantity']).toInt();
+        }
+      }
+    }
+    final costBasisCoverage = totalItemsSold > 0 ? (itemsWithCost / totalItemsSold) : 0.0;
+    final isCompleteCostBasis = costBasisCoverage >= 0.99; // effectively 100%
+    final isZeroCostBasis = costBasisCoverage <= 0.01; // effectively 0%
+
+    final approvedCount = approvalRecords.where((record) => record['approval_status'] == 'APPROVED').length;
+    final pendingCount = approvalRecords.where((record) => record['approval_status'] == 'PENDING').length;
+    final rejectedCount = approvalRecords.where((record) => record['approval_status'] == 'REJECTED').length;
+    final pendingRevenue = approvalRecords
+        .where((record) => record['approval_status'] == 'PENDING')
+        .fold<double>(0.0, (sum, record) => sum + _safeNum(record['proposed_total']));
+    final rejectedRevenue = approvalRecords
+        .where((record) => record['approval_status'] == 'REJECTED')
+        .fold<double>(0.0, (sum, record) => sum + _safeNum(record['proposed_total']));
+    final totalRevenue = saleRecords.fold<double>(0.0, (sum, record) => sum + _safeNum(record['amount']));
+    final netRevenue = saleRecords.fold<double>(0.0, (sum, record) => sum + _safeNum(record['subtotal_after_discount'] ?? record['amount']));
+    final taxCollected = totalRevenue - netRevenue;
+    final customerRevenueMap = <String, double>{};
+    final customerNameMap = <String, String>{};
+    for (final record in saleRecords) {
+      final cid = record['customer_id']?.toString();
+      final cname = record['customer_name']?.toString() ?? 'Walk-in';
+      if (cid != null) {
+        customerRevenueMap[cid] = (customerRevenueMap[cid] ?? 0.0) + _safeNum(record['amount']);
+        customerNameMap[cid] = cname;
+      }
+    }
+    String? topCustomerId;
+    double topCustomerRevenue = 0.0;
+    customerRevenueMap.forEach((id, rev) {
+      if (rev > topCustomerRevenue) {
+        topCustomerRevenue = rev;
+        topCustomerId = id;
+      }
+    });
+    final topCustomerName = topCustomerId != null ? customerNameMap[topCustomerId] : null;
+
+    final response = <String, dynamic>{
+      'status': 'success',
+      'metric': metric,
+      'timezone': _istTimeZone,
+      'period': input['period'] ?? 'all_time',
+      'fromDate': from?.toIso8601String(),
+      'toDate': to?.toIso8601String(),
+      'total_revenue': totalRevenue,
+      'total_revenue_tax_inclusive': totalRevenue,
+      'net_revenue_tax_exclusive': netRevenue,
+      'total_tax_collected': taxCollected,
+      'top_customer_name': topCustomerName,
+      'top_customer_revenue': topCustomerRevenue,
+      'total_orders': saleRecords.length,
+      'approved_count': approvedCount,
+      'pending_count': pendingCount,
+      'rejected_count': rejectedCount,
+      'pending_revenue': pendingRevenue,
+      'rejected_revenue': rejectedRevenue,
+      'average_order_value': saleRecords.isNotEmpty ? totalRevenue / saleRecords.length : 0.0,
+      'currency': 'INR',
+    };
+
+    if (metric == 'profit' || metric == 'overview' || metric == 'time_period') {
+      response['gross_profit'] = isCompleteCostBasis ? estimatedGrossProfit : null;
+      response['gross_profit_estimate'] = isZeroCostBasis ? 0.0 : estimatedGrossProfit;
+      response['gross_profit_status'] = isCompleteCostBasis ? 'complete' : (isZeroCostBasis ? 'no_cost_basis' : 'partial_cost_basis');
+      response['cost_basis_coverage'] = costBasisCoverage;
+      
+      if (isZeroCostBasis) {
+        response['gross_profit_message'] = 'Profit cannot be calculated because none of your products have cost data saved in their metadata.';
+      } else if (!isCompleteCostBasis) {
+        response['gross_profit_message'] = 'Gross profit is partially estimated (${(costBasisCoverage * 100).toStringAsFixed(1)}% coverage) because some products lack cost data.';
+      } else {
+        response['gross_profit_message'] = 'Gross profit calculated from finalized sales and complete cost records.';
+      }
+      
+      if (missingCostProducts.isNotEmpty) {
+        response['missing_cost_product_ids'] = missingCostProducts.toList();
+      }
+    }
+
+    return response;
+  } catch (e) {
+    return {
+      'status': 'error',
+      'message': 'Failed to calculate analytics: $e',
+      'total_revenue': 0.0,
+      'total_orders': 0,
+    };
+  }
+}
+
 final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dynamic>>(
   name: 'businessInsightsTool',
   description:
@@ -158,246 +406,10 @@ final businessInsightsTool = ai.defineTool<Map<String, dynamic>, Map<String, dyn
   inputSchema: businessInsightsInputSchema,
   fn: (input, context) async {
     print('[Tool:businessInsightsTool] Started. Context: ${context.context}');
-    final rawShopId = input['shopId'] as String?;
-    final shopId = (isValidUuid(rawShopId) ? rawShopId : null) ?? 
-                   (context.context?['shopId'] as String?) ?? 
-                   await getShopIdForUser(context.context?['userIdentifier'] as String?);
-    
-    print('[Tool:businessInsightsTool] Resolved shopId: $shopId');
-    if (shopId.isEmpty) {
-      print('[Tool:businessInsightsTool] Error: No shop found');
-      return {
-        'status': 'error',
-        'message': 'No shop found for user',
-        'total_revenue': 0.0,
-        'total_orders': 0,
-      };
-    }
-
-    try {
-      final metric = (input['metric'] as String?)?.trim().toLowerCase() ?? 'overview';
-      final range = _resolveDateRange(input);
-      final from = range?['from'];
-      final to = range?['to'];
-      print('[Tool:businessInsightsTool] Date Range resolved: from=$from to=$to | Metric: $metric');
-
-      final swApprovals = Stopwatch()..start();
-      var approvalsQuery = supabase
-          .from('draft_approvals')
-          .select('approval_id, proposed_total, approval_status, created_at, reviewed_at, sale_id, shop_id')
-          .eq('shop_id', shopId);
-
-      if (from != null) {
-        approvalsQuery = approvalsQuery.gte('created_at', from.toIso8601String());
-      }
-      if (to != null) {
-        approvalsQuery = approvalsQuery.lte('created_at', to.toIso8601String());
-      }
-
-      final approvals = await approvalsQuery.order('created_at', ascending: false);
-      print('[Tool:businessInsightsTool] Approvals query completed in ${swApprovals.elapsedMilliseconds}ms. Count: ${(approvals as List).length}');
-      
-      final approvalRecords = (approvals as List<dynamic>)
-          .map((record) => Map<String, dynamic>.from(record as Map))
-          .toList();
-
-      final swSales = Stopwatch()..start();
-      var salesQuery = supabase
-          .from('sales')
-          .select('id, invoice_id, shop_id, amount, subtotal_after_discount, timestamp, status, payment_method, customer_id, customer_name')
-          .eq('shop_id', shopId);
-
-      if (from != null) {
-        salesQuery = salesQuery.gte('timestamp', from.toIso8601String());
-      }
-      if (to != null) {
-        salesQuery = salesQuery.lte('timestamp', to.toIso8601String());
-      }
-
-      final sales = await salesQuery.order('timestamp', ascending: false);
-      print('[Tool:businessInsightsTool] Sales query completed in ${swSales.elapsedMilliseconds}ms. Count: ${(sales as List).length}');
-      
-      final saleRecords = (sales as List<dynamic>)
-          .map((record) => Map<String, dynamic>.from(record as Map))
-          .toList();
-
-      final invoiceIds = saleRecords
-          .map((record) => record['invoice_id']?.toString())
-          .whereType<String>()
-          .toSet()
-          .toList();
-
-      final invoiceItemMap = <String, List<Map<String, dynamic>>>{};
-      if (invoiceIds.isNotEmpty) {
-        final invoices = await supabase
-            .from('draft_invoices')
-            .select('id, items')
-            .inFilter('id', invoiceIds);
-
-        for (final row in invoices as List<dynamic>) {
-          final data = Map<String, dynamic>.from(row as Map);
-          final items = (data['items'] as List<dynamic>? ?? const [])
-              .map((item) => Map<String, dynamic>.from(item as Map))
-              .toList();
-          final invoiceId = data['id']?.toString();
-          if (invoiceId != null) {
-            invoiceItemMap[invoiceId] = items;
-          }
-        }
-      }
-
-      final productIds = invoiceItemMap.values
-          .expand((items) => items)
-          .map((item) => item['productId']?.toString())
-          .whereType<String>()
-          .toSet()
-          .toList();
-
-      final productCostMap = <String, double>{};
-      if (productIds.isNotEmpty) {
-        final products = await supabase
-            .from('products')
-            .select('id, cost_price, metadata')
-            .inFilter('id', productIds);
-
-        for (final row in products as List<dynamic>) {
-          final data = Map<String, dynamic>.from(row as Map);
-          final productId = data['id']?.toString();
-          final costPerUnit = (data['cost_price'] as num?)?.toDouble() ?? _extractCostPerUnit(data);
-          if (productId != null && costPerUnit != null && costPerUnit > 0) {
-            productCostMap[productId] = costPerUnit;
-          }
-        }
-      }
-
-      double estimatedGrossProfit = 0.0;
-      bool hasMissingCostBasis = false;
-      final missingCostProducts = <String>{};
-
-      for (final record in saleRecords) {
-        final invoiceId = record['invoice_id']?.toString();
-        final items = invoiceId == null
-            ? const <Map<String, dynamic>>[]
-            : invoiceItemMap[invoiceId] ?? const <Map<String, dynamic>>[];
-        var cogs = 0.0;
-
-        for (final item in items) {
-          final productId = item['productId']?.toString();
-          final quantity = _safeNum(item['quantity']).toInt();
-          final costPerUnit = productId == null ? null : productCostMap[productId];
-
-          if (costPerUnit == null) {
-            hasMissingCostBasis = true;
-            if (productId != null) {
-              missingCostProducts.add(productId);
-            }
-            continue;
-          }
-
-          cogs += costPerUnit * quantity;
-        }
-
-        final revenueBasis = _safeNum(record['subtotal_after_discount'] ?? record['amount']);
-        estimatedGrossProfit += revenueBasis - cogs;
-      }
-
-      int totalItemsSold = 0;
-      int itemsWithCost = 0;
-      for (final items in invoiceItemMap.values) {
-        for (final item in items) {
-          totalItemsSold += _safeNum(item['quantity']).toInt();
-          final productId = item['productId']?.toString();
-          if (productId != null && productCostMap.containsKey(productId)) {
-            itemsWithCost += _safeNum(item['quantity']).toInt();
-          }
-        }
-      }
-      final costBasisCoverage = totalItemsSold > 0 ? (itemsWithCost / totalItemsSold) : 0.0;
-      final isCompleteCostBasis = costBasisCoverage >= 0.99; // effectively 100%
-      final isZeroCostBasis = costBasisCoverage <= 0.01; // effectively 0%
-
-      final approvedCount = approvalRecords.where((record) => record['approval_status'] == 'APPROVED').length;
-      final pendingCount = approvalRecords.where((record) => record['approval_status'] == 'PENDING').length;
-      final rejectedCount = approvalRecords.where((record) => record['approval_status'] == 'REJECTED').length;
-      final pendingRevenue = approvalRecords
-          .where((record) => record['approval_status'] == 'PENDING')
-          .fold<double>(0.0, (sum, record) => sum + _safeNum(record['proposed_total']));
-      final rejectedRevenue = approvalRecords
-          .where((record) => record['approval_status'] == 'REJECTED')
-          .fold<double>(0.0, (sum, record) => sum + _safeNum(record['proposed_total']));
-      final totalRevenue = saleRecords.fold<double>(0.0, (sum, record) => sum + _safeNum(record['amount']));
-      final netRevenue = saleRecords.fold<double>(0.0, (sum, record) => sum + _safeNum(record['subtotal_after_discount'] ?? record['amount']));
-      final taxCollected = totalRevenue - netRevenue;
-      final customerRevenueMap = <String, double>{};
-      final customerNameMap = <String, String>{};
-      for (final record in saleRecords) {
-        final cid = record['customer_id']?.toString();
-        final cname = record['customer_name']?.toString() ?? 'Walk-in';
-        if (cid != null) {
-          customerRevenueMap[cid] = (customerRevenueMap[cid] ?? 0.0) + _safeNum(record['amount']);
-          customerNameMap[cid] = cname;
-        }
-      }
-      String? topCustomerId;
-      double topCustomerRevenue = 0.0;
-      customerRevenueMap.forEach((id, rev) {
-        if (rev > topCustomerRevenue) {
-          topCustomerRevenue = rev;
-          topCustomerId = id;
-        }
-      });
-      final topCustomerName = topCustomerId != null ? customerNameMap[topCustomerId] : null;
-
-      final response = <String, dynamic>{
-        'status': 'success',
-        'metric': metric,
-        'timezone': _istTimeZone,
-        'period': input['period'] ?? 'all_time',
-        'fromDate': from?.toIso8601String(),
-        'toDate': to?.toIso8601String(),
-        'total_revenue': totalRevenue,
-        'total_revenue_tax_inclusive': totalRevenue,
-        'net_revenue_tax_exclusive': netRevenue,
-        'total_tax_collected': taxCollected,
-        'top_customer_name': topCustomerName,
-        'top_customer_revenue': topCustomerRevenue,
-        'total_orders': saleRecords.length,
-        'approved_count': approvedCount,
-        'pending_count': pendingCount,
-        'rejected_count': rejectedCount,
-        'pending_revenue': pendingRevenue,
-        'rejected_revenue': rejectedRevenue,
-        'average_order_value': saleRecords.isNotEmpty ? totalRevenue / saleRecords.length : 0.0,
-        'currency': 'INR',
-      };
-
-      if (metric == 'profit' || metric == 'overview' || metric == 'time_period') {
-        response['gross_profit'] = isCompleteCostBasis ? estimatedGrossProfit : null;
-        response['gross_profit_estimate'] = isZeroCostBasis ? 0.0 : estimatedGrossProfit;
-        response['gross_profit_status'] = isCompleteCostBasis ? 'complete' : (isZeroCostBasis ? 'no_cost_basis' : 'partial_cost_basis');
-        response['cost_basis_coverage'] = costBasisCoverage;
-        
-        if (isZeroCostBasis) {
-          response['gross_profit_message'] = 'Profit cannot be calculated because none of your products have cost data saved in their metadata.';
-        } else if (!isCompleteCostBasis) {
-          response['gross_profit_message'] = 'Gross profit is partially estimated (${(costBasisCoverage * 100).toStringAsFixed(1)}% coverage) because some products lack cost data.';
-        } else {
-          response['gross_profit_message'] = 'Gross profit calculated from finalized sales and complete cost records.';
-        }
-        
-        if (missingCostProducts.isNotEmpty) {
-          response['missing_cost_product_ids'] = missingCostProducts.toList();
-        }
-      }
-
-      return response;
-    } catch (e) {
-      return {
-        'status': 'error',
-        'message': 'Failed to calculate analytics: $e',
-        'total_revenue': 0.0,
-        'total_orders': 0,
-      };
-    }
+    return getBusinessInsightsRequest(
+      input: input,
+      userIdentifier: context.context?['userIdentifier'] as String?,
+      shopId: context.context?['shopId'] as String?,
+    );
   },
 );
