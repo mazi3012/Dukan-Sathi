@@ -74,19 +74,62 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       });
     }
   }
-  String get _approvalId => (_data['approval_id'] ?? _data['approvalId'] ?? '').toString();
+  String get _approvalId {
+    final rawId = (_data['approval_id'] ?? _data['approvalId'] ?? '').toString();
+    if (rawId.isEmpty) {
+      final generatedId = const Uuid().v4();
+      _data['approval_id'] = generatedId;
+      return generatedId;
+    }
+    return rawId;
+  }
+
+  TaxBreakdown _getValidTaxBreakdown() {
+    final shopConfig = UserSession().shopConfig;
+    final itemsList = (_data['proposed_items'] ?? _data['items'] ?? []) as List<dynamic>;
+    final List<CartItem> cartItems = itemsList.map((itemJson) {
+      final json = Map<String, dynamic>.from(itemJson as Map);
+      final pId = (json['productId'] ?? json['product_id'] ?? '').toString();
+      final finalPId = pId.isNotEmpty ? pId : 'temp-${const Uuid().v4().substring(0, 8)}';
+      return CartItem(
+        productId: finalPId,
+        productName: json['productName']?.toString() ?? json['name']?.toString() ?? 'Item',
+        quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+        unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
+        gstRate: (json['gstRate'] as num?)?.toDouble() ?? 18.0,
+      );
+    }).toList();
+
+    final gstType = _data['gst_type'] ?? _data['gstType'] ?? 'CGST_SGST';
+    String customerState = shopConfig.state;
+    if (gstType == 'IGST') {
+      customerState = shopConfig.state == 'DL' ? 'MH' : 'DL';
+    }
+
+    final discAmt = (_data['discount_amount'] ?? _data['discountAmount'] ?? 0.0) as num;
+    
+    return GSTCalculator.calculateTax(
+      items: cartItems,
+      shopConfig: shopConfig,
+      customerState: customerState,
+      invoiceDiscount: discAmt.toDouble(),
+    );
+  }
+
   void _recalculateLocalDraft(Map<String, dynamic> updatedData) {
     final shopConfig = UserSession().shopConfig;
 
-    // 1. Parse items into CartItem
+    // 1. Parse items into CartItem safely
     final itemsList = (updatedData['proposed_items'] ?? updatedData['items'] ?? []) as List<dynamic>;
     final List<CartItem> cartItems = itemsList.map((itemJson) {
       final json = Map<String, dynamic>.from(itemJson as Map);
+      final pId = (json['productId'] ?? json['product_id'] ?? '').toString();
+      final finalPId = pId.isNotEmpty ? pId : 'temp-${const Uuid().v4().substring(0, 8)}';
       return CartItem(
-        productId: json['productId'] as String,
+        productId: finalPId,
         productName: json['productName']?.toString() ?? json['name']?.toString() ?? 'Item',
-        quantity: (json['quantity'] as num).toInt(),
-        unitPrice: (json['unitPrice'] as num).toDouble(),
+        quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+        unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
         gstRate: (json['gstRate'] as num?)?.toDouble() ?? 18.0,
       );
     }).toList();
@@ -296,38 +339,52 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       final session = UserSession();
       final shopConfig = session.shopConfig;
 
-      // Construct DraftApproval model locally
-      final draftApproval = DraftApproval.fromJson({
-        'approval_id': aid,
-        'shop_id': session.shopId ?? '',
-        'customer_id': _data['customer_id'] ?? _data['customerId'],
-        'customer_name': _data['customer_name'] ?? _data['customerName'] ?? 'Walk-in Customer',
-        'customer_state': _data['customer_state'] ?? _data['customerState'] ?? shopConfig.state,
-        'proposed_items': _data['proposed_items'] ?? _data['items'] ?? [],
-        'proposed_tax_breakdown': _data['proposed_tax_breakdown'] ?? _data['taxBreakdown'] ?? {},
-        'proposed_total': _data['proposed_total'] ?? _data['proposedTotal'] ?? 0.0,
-        'subtotal_before_discount': _data['subtotal_before_discount'] ?? _data['subtotalBeforeDiscount'] ?? 0.0,
-        'subtotal_after_discount': _data['subtotal_after_discount'] ?? _data['subtotalAfterDiscount'] ?? 0.0,
-        'discount_type': _data['discount_type'] ?? _data['discountType'],
-        'discount_value': _data['discount_value'] ?? _data['discountValue'],
-        'discount_amount': _data['discount_amount'] ?? _data['discountAmount'] ?? 0.0,
-        'amount_paid': _data['amount_paid'] ?? _data['amountPaid'] ?? 0.0,
-        'payment_status': _data['payment_status'] ?? _data['paymentStatus'] ?? 'UNPAID',
-        'due_amount': _data['due_amount'] ?? _data['dueAmount'] ?? 0.0,
-        'approval_status': 'APPROVED',
-        'reviewed_by': session.userId ?? 'merchant',
-        'reviewed_at': DateTime.now().toIso8601String(),
-      });
+      final validTax = _getValidTaxBreakdown();
+
+      final itemsList = (_data['proposed_items'] ?? _data['items'] ?? []) as List<dynamic>;
+      final List<CartItem> cartItems = itemsList.map((itemJson) {
+        final json = Map<String, dynamic>.from(itemJson as Map);
+        final pId = (json['productId'] ?? json['product_id'] ?? '').toString();
+        final finalPId = pId.isNotEmpty ? pId : 'temp-${const Uuid().v4().substring(0, 8)}';
+        return CartItem(
+          productId: finalPId,
+          productName: json['productName']?.toString() ?? json['name']?.toString() ?? 'Item',
+          quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+          unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
+          gstRate: (json['gstRate'] as num?)?.toDouble() ?? 18.0,
+        );
+      }).toList();
+
+      // Construct DraftApproval model locally with the standard constructor
+      final draftApproval = DraftApproval(
+        approvalId: aid,
+        shopId: session.shopId ?? '',
+        customerId: (_data['customer_id'] ?? _data['customerId'])?.toString(),
+        customerName: _data['customer_name'] ?? _data['customerName'] ?? 'Walk-in Customer',
+        customerState: _data['customer_state'] ?? _data['customerState'] ?? shopConfig.state,
+        proposedItems: cartItems,
+        proposedTaxBreakdown: validTax,
+        proposedTotal: (_data['proposed_total'] ?? _data['proposedTotal'] ?? validTax.totalAmount as num).toDouble(),
+        subtotalBeforeDiscount: (_data['subtotal_before_discount'] ?? _data['subtotalBeforeDiscount'] ?? validTax.subtotal as num).toDouble(),
+        subtotalAfterDiscount: (_data['subtotal_after_discount'] ?? _data['subtotalAfterDiscount'] ?? validTax.subtotal as num).toDouble(),
+        discountType: (_data['discount_type'] ?? _data['discountType'])?.toString(),
+        discountValue: (_data['discount_value'] ?? _data['discountValue'] as num?)?.toDouble(),
+        discountAmount: (_data['discount_amount'] ?? _data['discountAmount'] ?? 0.0 as num).toDouble(),
+        amountPaid: (_data['amount_paid'] ?? _data['amountPaid'] ?? 0.0 as num).toDouble(),
+        paymentStatus: (_data['payment_status'] ?? _data['paymentStatus'] ?? 'UNPAID').toString(),
+        dueAmount: (_data['due_amount'] ?? _data['dueAmount'] ?? (validTax.totalAmount - (_data['amount_paid'] ?? 0.0)) as num).toDouble(),
+        approvalStatus: ApprovalStatus.approved,
+        reviewedBy: session.userId ?? 'merchant',
+        reviewedAt: DateTime.now(),
+        createdAt: DateTime.now(),
+      );
 
       final productDetails = <String, Map<String, dynamic>>{};
-      final itemsList = (_data['proposed_items'] ?? _data['items'] ?? []) as List<dynamic>;
-      for (final itemJson in itemsList) {
-        final json = Map<String, dynamic>.from(itemJson as Map);
-        final pId = json['productId'] as String;
-        productDetails[pId] = {
-          'name': json['productName'] ?? json['name'] ?? 'Item',
-          'hsn_sac_code': json['hsn_sac_code'] ?? json['hsnSacCode'] ?? '-',
-          'gst_rate': json['gstRate'] ?? 18.0,
+      for (final item in cartItems) {
+        productDetails[item.productId] = {
+          'name': item.productName,
+          'hsn_sac_code': '-',
+          'gst_rate': item.gstRate,
         };
       }
 
@@ -387,7 +444,8 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
     }
 
     final aid = _approvalId;
-    final invoiceNo = 'INV-${aid.substring(0, 13).replaceAll('-', '').toUpperCase()}';
+    final String shortId = aid.length > 13 ? aid.substring(0, 13) : aid;
+    final invoiceNo = 'INV-${shortId.replaceAll('-', '').toUpperCase()}';
     final customerName = (_data['customer_name'] ?? _data['customerName'])?.toString() ?? "Walk-in Customer";
 
     // Show the premium step-by-step progress dialog
@@ -411,15 +469,19 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       final saleId = const Uuid().v4();
       final draftInvoiceId = const Uuid().v4();
 
-      // Parse items
+      final validTax = _getValidTaxBreakdown();
+
+      // Parse items safely
       final itemsList = (_data['proposed_items'] ?? _data['items'] ?? []) as List<dynamic>;
       final List<CartItem> cartItems = itemsList.map((itemJson) {
         final json = Map<String, dynamic>.from(itemJson as Map);
+        final pId = (json['productId'] ?? json['product_id'] ?? '').toString();
+        final finalPId = pId.isNotEmpty ? pId : 'temp-${const Uuid().v4().substring(0, 8)}';
         return CartItem(
-          productId: json['productId'] as String,
+          productId: finalPId,
           productName: json['productName']?.toString() ?? json['name']?.toString() ?? 'Item',
-          quantity: (json['quantity'] as num).toInt(),
-          unitPrice: (json['unitPrice'] as num).toDouble(),
+          quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+          unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
           gstRate: (json['gstRate'] as num?)?.toDouble() ?? 18.0,
         );
       }).toList();
@@ -441,15 +503,15 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
         customerId = newCustId;
       }
 
-      final proposedTotal = (_data['proposed_total'] ?? _data['proposedTotal'] ?? 0.0) as num;
+      final proposedTotal = (_data['proposed_total'] ?? _data['proposedTotal'] ?? validTax.totalAmount as num).toDouble();
 
-      final subtotalBeforeDiscount = (_data['subtotal_before_discount'] ?? _data['subtotalBeforeDiscount'] ?? proposedTotal).toDouble();
-      final subtotalAfterDiscount = (_data['subtotal_after_discount'] ?? _data['subtotalAfterDiscount'] ?? proposedTotal).toDouble();
+      final subtotalBeforeDiscount = (_data['subtotal_before_discount'] ?? _data['subtotalBeforeDiscount'] ?? validTax.subtotal as num).toDouble();
+      final subtotalAfterDiscount = (_data['subtotal_after_discount'] ?? _data['subtotalAfterDiscount'] ?? validTax.subtotal as num).toDouble();
       final discountType = (_data['discount_type'] ?? _data['discountType'])?.toString();
       final discountValue = (_data['discount_value'] ?? _data['discountValue'] as num?)?.toDouble();
       final discountAmount = (_data['discount_amount'] ?? _data['discountAmount'] ?? 0.0).toDouble();
 
-      final dueAmount = proposedTotal.toDouble() - amountPaidVal;
+      final dueAmount = proposedTotal - amountPaidVal;
       
       final syncManager = SyncManager.instance;
 
@@ -461,8 +523,8 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
         'customer_id': customerId,
         'customer_name': customerName,
         'items': cartItems.map((c) => c.toJson()).toList(),
-        'total_amount': proposedTotal.toDouble(),
-        'tax_breakdown': _data['proposed_tax_breakdown'],
+        'total_amount': proposedTotal,
+        'tax_breakdown': _data['proposed_tax_breakdown'] ?? validTax.toJson(),
         'status': 'approved',
         'draft_approval_id': null, // avoid foreign key violation as there is no draft approval record in supabase
       };
@@ -487,7 +549,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
         'customer_id': customerId,
         'customer_name': customerName,
         'customer_state': customerState,
-        'amount': proposedTotal.toDouble(),
+        'amount': proposedTotal,
         'amount_paid': amountPaidVal,
         'due_amount': dueAmount,
         'payment_status': currentPaymentStatus,
@@ -1156,9 +1218,10 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
   }
   Widget _buildApprovedActions() {
     final aid = _approvalId;
+    final String shortId = aid.length > 8 ? aid.substring(0, 8) : aid;
     final invoiceNo = _data['invoice_number'] as String? ??
         _data['invoiceNumber'] as String? ??
-        'INV-${aid.isNotEmpty ? aid.substring(0, 8).toUpperCase() : 'DRAFT'}';
+        'INV-${aid.isNotEmpty ? shortId.toUpperCase() : 'DRAFT'}';
     return Column(
       children: [
         // Primary: View & Print button
@@ -1264,39 +1327,56 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
   Future<dynamic> _buildPdfForDownload(String aid, String invoiceNo) async {
     final session = UserSession();
     final shopConfig = session.shopConfig;
-    final draftApproval = DraftApproval.fromJson({
-      'approval_id': aid,
-      'shop_id': session.shopId ?? '',
-      'customer_id': _data['customer_id'] ?? _data['customerId'],
-      'customer_name': _data['customer_name'] ?? _data['customerName'] ?? 'Walk-in Customer',
-      'customer_state': _data['customer_state'] ?? _data['customerState'] ?? shopConfig.state,
-      'proposed_items': _data['proposed_items'] ?? _data['items'] ?? [],
-      'proposed_tax_breakdown': _data['proposed_tax_breakdown'] ?? _data['taxBreakdown'] ?? {},
-      'proposed_total': _data['proposed_total'] ?? _data['proposedTotal'] ?? 0.0,
-      'subtotal_before_discount': _data['subtotal_before_discount'] ?? _data['subtotalBeforeDiscount'] ?? 0.0,
-      'subtotal_after_discount': _data['subtotal_after_discount'] ?? _data['subtotalAfterDiscount'] ?? 0.0,
-      'discount_type': _data['discount_type'] ?? _data['discountType'],
-      'discount_value': _data['discount_value'] ?? _data['discountValue'],
-      'discount_amount': _data['discount_amount'] ?? _data['discountAmount'] ?? 0.0,
-      'amount_paid': _data['amount_paid'] ?? _data['amountPaid'] ?? 0.0,
-      'payment_status': _data['payment_status'] ?? _data['paymentStatus'] ?? 'UNPAID',
-      'due_amount': _data['due_amount'] ?? _data['dueAmount'] ?? 0.0,
-      'approval_status': 'APPROVED',
-      'reviewed_by': session.userId ?? 'merchant',
-      'reviewed_at': DateTime.now().toIso8601String(),
-      'created_at': DateTime.now().toIso8601String(),
-    });
-    final productDetails = <String, Map<String, dynamic>>{};
+
+    final validTax = _getValidTaxBreakdown();
+
     final itemsList = (_data['proposed_items'] ?? _data['items'] ?? []) as List<dynamic>;
-    for (final itemJson in itemsList) {
+    final List<CartItem> cartItems = itemsList.map((itemJson) {
       final json = Map<String, dynamic>.from(itemJson as Map);
-      final pId = json['productId'] as String;
-      productDetails[pId] = {
-        'name': json['productName'] ?? json['name'] ?? 'Item',
-        'hsn_sac_code': json['hsn_sac_code'] ?? json['hsnSacCode'] ?? '-',
-        'gst_rate': json['gstRate'] ?? 18.0,
+      final pId = (json['productId'] ?? json['product_id'] ?? '').toString();
+      final finalPId = pId.isNotEmpty ? pId : 'temp-${const Uuid().v4().substring(0, 8)}';
+      return CartItem(
+        productId: finalPId,
+        productName: json['productName']?.toString() ?? json['name']?.toString() ?? 'Item',
+        quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+        unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
+        gstRate: (json['gstRate'] as num?)?.toDouble() ?? 18.0,
+      );
+    }).toList();
+
+    // Construct DraftApproval model locally with the standard constructor
+    final draftApproval = DraftApproval(
+      approvalId: aid,
+      shopId: session.shopId ?? '',
+      customerId: (_data['customer_id'] ?? _data['customerId'])?.toString(),
+      customerName: _data['customer_name'] ?? _data['customerName'] ?? 'Walk-in Customer',
+      customerState: _data['customer_state'] ?? _data['customerState'] ?? shopConfig.state,
+      proposedItems: cartItems,
+      proposedTaxBreakdown: validTax,
+      proposedTotal: (_data['proposed_total'] ?? _data['proposedTotal'] ?? validTax.totalAmount as num).toDouble(),
+      subtotalBeforeDiscount: (_data['subtotal_before_discount'] ?? _data['subtotalBeforeDiscount'] ?? validTax.subtotal as num).toDouble(),
+      subtotalAfterDiscount: (_data['subtotal_after_discount'] ?? _data['subtotalAfterDiscount'] ?? validTax.subtotal as num).toDouble(),
+      discountType: (_data['discount_type'] ?? _data['discountType'])?.toString(),
+      discountValue: (_data['discount_value'] ?? _data['discountValue'] as num?)?.toDouble(),
+      discountAmount: (_data['discount_amount'] ?? _data['discountAmount'] ?? 0.0 as num).toDouble(),
+      amountPaid: (_data['amount_paid'] ?? _data['amountPaid'] ?? 0.0 as num).toDouble(),
+      paymentStatus: (_data['payment_status'] ?? _data['paymentStatus'] ?? 'UNPAID').toString(),
+      dueAmount: (_data['due_amount'] ?? _data['dueAmount'] ?? (validTax.totalAmount - (_data['amount_paid'] ?? 0.0)) as num).toDouble(),
+      approvalStatus: ApprovalStatus.approved,
+      reviewedBy: session.userId ?? 'merchant',
+      reviewedAt: DateTime.now(),
+      createdAt: DateTime.now(),
+    );
+
+    final productDetails = <String, Map<String, dynamic>>{};
+    for (final item in cartItems) {
+      productDetails[item.productId] = {
+        'name': item.productName,
+        'hsn_sac_code': '-',
+        'gst_rate': item.gstRate,
       };
     }
+
     final generated = await InvoicePdfGenerator.generateApprovedInvoicePdfOffline(
       approval: draftApproval,
       invoiceNumber: invoiceNo,

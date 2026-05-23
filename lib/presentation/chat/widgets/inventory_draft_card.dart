@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
@@ -65,10 +66,62 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
     setState(() => _isApproving = true);
     try {
       final productRepo = ProductRepository();
+      final currentShopId = UserSession().shopId ?? 'default_shop';
       
       // Save all products locally via SQLite repository
       for (final pMap in _products) {
-        final product = Product.fromJson(Map<String, dynamic>.from(pMap));
+        final cleanMap = <String, dynamic>{};
+        final pData = Map<String, dynamic>.from(pMap as Map);
+        
+        // Generate a random UUID if not provided
+        cleanMap['id'] = pData['id']?.toString() ?? const Uuid().v4();
+        
+        // Set shop_id
+        cleanMap['shop_id'] = pData['shop_id']?.toString() ?? pData['shopId']?.toString() ?? currentShopId;
+        
+        // Map name / item_name
+        cleanMap['name'] = pData['name']?.toString() ?? pData['item_name']?.toString() ?? 'Unnamed Product';
+        
+        // Map price / price_per_unit
+        final rawPrice = pData['price'] ?? pData['price_per_unit'] ?? 0.0;
+        cleanMap['price'] = rawPrice is num ? rawPrice.toDouble() : double.tryParse(rawPrice.toString()) ?? 0.0;
+        
+        // Map stock_quantity / quantity
+        final rawStock = pData['stock_quantity'] ?? pData['quantity'] ?? 0;
+        cleanMap['stock_quantity'] = rawStock is num ? rawStock.toInt() : int.tryParse(rawStock.toString()) ?? 0;
+        
+        // Map category
+        cleanMap['category'] = pData['category']?.toString() ?? 'General';
+        
+        // Map description
+        cleanMap['description'] = pData['description']?.toString();
+        
+        // Map is_service
+        final rawIsService = pData['is_service'] ?? pData['isService'] ?? false;
+        cleanMap['is_service'] = rawIsService is bool ? rawIsService : (rawIsService.toString().toLowerCase() == 'true' || rawIsService == 1);
+        
+        // Map gst_rate / gst
+        final rawGstRate = pData['gst_rate'] ?? pData['gst'] ?? 0.0;
+        cleanMap['gst_rate'] = rawGstRate is num ? rawGstRate.toDouble() : double.tryParse(rawGstRate.toString()) ?? 0.0;
+        
+        // Map hsn_sac_code / hsnCode
+        cleanMap['hsn_sac_code'] = pData['hsn_sac_code']?.toString() ?? pData['hsn_code']?.toString() ?? pData['hsnSacCode']?.toString();
+        
+        // Map barcode
+        cleanMap['barcode'] = pData['barcode']?.toString();
+        
+        // Map cost_price / cp
+        final rawCostPrice = pData['cost_price'] ?? pData['cp'] ?? 0.0;
+        cleanMap['cost_price'] = rawCostPrice is num ? rawCostPrice.toDouble() : double.tryParse(rawCostPrice.toString()) ?? 0.0;
+        
+        // Map metadata
+        if (pData['metadata'] is Map) {
+          cleanMap['metadata'] = Map<String, dynamic>.from(pData['metadata']);
+        } else {
+          cleanMap['metadata'] = <String, dynamic>{};
+        }
+
+        final product = Product.fromJson(cleanMap);
         await productRepo.saveProduct(product);
       }
 
