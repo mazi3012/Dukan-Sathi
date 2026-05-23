@@ -30,7 +30,12 @@ String? _envValue(String key) {
 String? getEnv(String key) => _envValue(key);
 
 String? _getApiKey() {
-  return _envValue('OPENROUTER_API_KEY') ?? _envValue('GROQ_API_KEY');
+  return _envValue('NVIDIA_API_KEY') ?? _envValue('OPENROUTER_API_KEY') ?? _envValue('GROQ_API_KEY');
+}
+
+bool get isNvidia {
+  final key = _getApiKey() ?? '';
+  return key.startsWith('nvapi-');
 }
 
 bool get isOpenRouter {
@@ -40,7 +45,7 @@ bool get isOpenRouter {
 
 bool get isGroq {
   final key = _getApiKey() ?? '';
-  return key.isNotEmpty && !key.startsWith('sk-or-');
+  return key.isNotEmpty && !key.startsWith('sk-or-') && !key.startsWith('nvapi-');
 }
 
 // ─── Lazy initialization — avoids top-level crash before main() runs ─────────
@@ -52,18 +57,22 @@ Genkit _createGenkit() {
   final apiKey = _getApiKey();
   if (apiKey == null || apiKey.isEmpty) {
     throw StateError(
-      'Missing required API key. Please set GROQ_API_KEY or OPENROUTER_API_KEY in the environment.',
+      'Missing required API key. Please set NVIDIA_API_KEY, GROQ_API_KEY or OPENROUTER_API_KEY in the environment.',
     );
   }
 
   final rawModel = _envValue('MODEL_ID') ?? _envValue('OPENROUTER_MODEL_ID');
   final defaultModel = (rawModel != null && rawModel.isNotEmpty && !rawModel.contains('llama-4-scout'))
       ? rawModel
-      : (isOpenRouter ? 'deepseek/deepseek-v4-flash:free' : 'llama-3.3-70b-versatile');
+      : (isNvidia
+          ? 'mistralai/mistral-nemotron'
+          : (isOpenRouter ? 'deepseek/deepseek-v4-flash:free' : 'llama-3.3-70b-versatile'));
 
-  final baseUrl = isOpenRouter 
-      ? 'https://openrouter.ai/api/v1' 
-      : 'https://api.groq.com/openai/v1';
+  final baseUrl = isNvidia
+      ? 'https://integrate.api.nvidia.com/v1'
+      : (isOpenRouter 
+          ? 'https://openrouter.ai/api/v1' 
+          : 'https://api.groq.com/openai/v1');
 
   return Genkit(
     plugins: [
@@ -71,6 +80,13 @@ Genkit _createGenkit() {
         apiKey: apiKey,
         baseUrl: baseUrl,
         models: [
+          CustomModelDefinition(
+            name: 'mistralai/mistral-nemotron',
+            info: ModelInfo(
+              label: 'Mistral Nemotron',
+              supports: {'multiturn': true, 'tools': true, 'systemRole': true},
+            ),
+          ),
           CustomModelDefinition(
             name: 'deepseek/deepseek-v4-flash:free',
             info: ModelInfo(
@@ -94,7 +110,8 @@ Genkit _createGenkit() {
           ),
           if (defaultModel != 'llama-3.3-70b-versatile' && 
               defaultModel != 'llama-3.1-8b-instant' && 
-              defaultModel != 'deepseek/deepseek-v4-flash:free')
+              defaultModel != 'deepseek/deepseek-v4-flash:free' &&
+              defaultModel != 'mistralai/mistral-nemotron')
             CustomModelDefinition(
               name: defaultModel,
               info: ModelInfo(
@@ -125,10 +142,12 @@ String get modelId {
   if (raw != null && raw.isNotEmpty && !raw.contains('llama-4-scout')) {
     return raw;
   }
+  if (isNvidia) return 'mistralai/mistral-nemotron';
   return isOpenRouter ? 'deepseek/deepseek-v4-flash:free' : (isGroq ? 'llama-3.3-70b-versatile' : 'gemini-1.5-flash');
 }
 
 String get aiProvider {
+  if (isNvidia) return 'NVIDIA via OpenAI Plugin';
   if (isOpenRouter) return 'OpenRouter via OpenAI Plugin';
   return isGroq ? 'Groq via OpenAI Plugin' : 'Google GenAI SDK';
 }
@@ -136,7 +155,7 @@ String get aiProvider {
 dynamic appModel([String? override]) {
   final String mId =
       (override == null || override.trim().isEmpty) ? modelId : override.trim();
-  if (isOpenRouter || isGroq) {
+  if (isNvidia || isOpenRouter || isGroq) {
     return openAI.model(mId);
   }
   return googleAI.gemini(mId);
