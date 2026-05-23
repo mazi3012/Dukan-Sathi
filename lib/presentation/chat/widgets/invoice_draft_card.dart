@@ -491,16 +491,37 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       
       // Auto-save new customer if needed
       if (customerId == null && customerName != 'Walk-in Customer' && customerName.trim().isNotEmpty) {
-        final newCustId = const Uuid().v4();
-        final customerRepo = CustomerRepository();
-        await customerRepo.saveCustomer(Customer(
-          id: newCustId,
-          shopId: shopId,
-          name: customerName.trim(),
-          phone: '',
-          currentBalance: 0.0,
-        ));
-        customerId = newCustId;
+        final normalizedName = customerName.trim();
+        String? existingId;
+        try {
+          final existing = await supabase
+              .from('customers')
+              .select('id')
+              .eq('shop_id', shopId)
+              .ilike('name', normalizedName)
+              .maybeSingle();
+          if (existing != null) {
+            existingId = (existing as Map)['id']?.toString();
+          }
+        } catch (e) {
+          debugPrint("Error checking existing customer: $e");
+        }
+
+        if (existingId != null && existingId.isNotEmpty) {
+          customerId = existingId;
+        } else {
+          final newCustId = const Uuid().v4();
+          final customerRepo = CustomerRepository();
+          final generatedPhone = 'AUTO-${DateTime.now().millisecondsSinceEpoch}-${const Uuid().v4().substring(0, 6)}';
+          await customerRepo.saveCustomer(Customer(
+            id: newCustId,
+            shopId: shopId,
+            name: normalizedName,
+            phone: generatedPhone,
+            currentBalance: 0.0,
+          ));
+          customerId = newCustId;
+        }
       }
 
       final proposedTotal = (_data['proposed_total'] ?? _data['proposedTotal'] ?? validTax.totalAmount as num).toDouble();

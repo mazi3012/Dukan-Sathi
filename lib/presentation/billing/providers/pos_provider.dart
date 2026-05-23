@@ -337,16 +337,37 @@ class POSNotifier extends StateNotifier<POSInvoiceState> {
       
       // Auto-save new customer if needed
       if (finalCustomerId == null && state.customerName != 'Walk-in Customer' && state.customerName.trim().isNotEmpty) {
-        final newCustId = const Uuid().v4();
-        final customerRepo = CustomerRepository();
-        await customerRepo.saveCustomer(Customer(
-          id: newCustId,
-          shopId: shopId,
-          name: state.customerName.trim(),
-          phone: '',
-          currentBalance: 0.0,
-        ));
-        finalCustomerId = newCustId;
+        final normalizedName = state.customerName.trim();
+        String? existingId;
+        try {
+          final existing = await supabase
+              .from('customers')
+              .select('id')
+              .eq('shop_id', shopId)
+              .ilike('name', normalizedName)
+              .maybeSingle();
+          if (existing != null) {
+            existingId = (existing as Map)['id']?.toString();
+          }
+        } catch (e) {
+          // Fallback or log
+        }
+
+        if (existingId != null && existingId.isNotEmpty) {
+          finalCustomerId = existingId;
+        } else {
+          final newCustId = const Uuid().v4();
+          final customerRepo = CustomerRepository();
+          final generatedPhone = 'AUTO-${DateTime.now().millisecondsSinceEpoch}-${const Uuid().v4().substring(0, 6)}';
+          await customerRepo.saveCustomer(Customer(
+            id: newCustId,
+            shopId: shopId,
+            name: normalizedName,
+            phone: generatedPhone,
+            currentBalance: 0.0,
+          ));
+          finalCustomerId = newCustId;
+        }
       }
 
       final syncManager = SyncManager.instance;
