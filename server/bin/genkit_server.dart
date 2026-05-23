@@ -966,6 +966,47 @@ class WebChatSession {
           print('[AddProduct Fast-path] Failed: $e');
           // Fall through to AI path if fast-path fails
         }
+    }
+
+    // Fast-path for show catalog / list products intent (instantly returns catalog card without slow generation)
+    if (n.contains('catalog') || n.contains('list product') || n.contains('show product') || n.contains('list items') || (n.contains('show') && n.contains('items'))) {
+      try {
+        print('[Catalog Fast-path] Triggered. Query: $input');
+        final rows = await supabase
+            .from('products')
+            .select('id, shop_id, name, price, stock_quantity, category, cost_price')
+            .eq('shop_id', _currentShopId)
+            .limit(20);
+
+        final products = (rows as List<dynamic>).map((row) {
+          final data = Map<String, dynamic>.from(row as Map);
+          return {
+            'id': data['id']?.toString() ?? '',
+            'shop_id': data['shop_id']?.toString() ?? '',
+            'name': data['name']?.toString() ?? '',
+            'price': (data['price'] as num?)?.toDouble() ?? 0.0,
+            'stock_quantity': (data['stock_quantity'] as num?)?.toInt() ?? 0,
+            'category': data['category']?.toString() ?? 'General',
+          };
+        }).toList();
+
+        final String text = products.isEmpty
+            ? 'Your product catalog is currently empty.'
+            : 'Here is your current product catalog:';
+
+        return {
+          'text': text,
+          'card': {
+            'type': 'product_catalog',
+            'data': {
+              'message': 'Catalog items',
+              'items': products,
+            },
+          },
+        };
+      } catch (e) {
+        print('[Catalog Fast-path] Failed: $e');
+        // Fall through to AI path if fast-path fails
       }
     }
 
