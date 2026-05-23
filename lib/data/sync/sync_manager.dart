@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show ValueNotifier, debugPrint, kIsWeb;
 import '../../core/services/connectivity_service.dart';
 import '../../core/database.dart';
 import '../local/local_database.dart';
@@ -20,8 +20,26 @@ class SyncManager {
         triggerSync();
       }
     });
-    // Check pending count on start
-    updatePendingCount();
+    // On web, drain any stale sync queue items since web writes directly to Supabase
+    if (kIsWeb) {
+      _drainStaleWebQueue();
+    } else {
+      // Check pending count on start
+      updatePendingCount();
+    }
+  }
+
+  /// Drain stale sync queue on web — these items were queued before the
+  /// web fast-path was added. Web repositories now write directly to
+  /// Supabase, so these queue items are duplicates / stale.
+  Future<void> _drainStaleWebQueue() async {
+    try {
+      await _localDb.clearTable('sync_queue');
+      pendingCountNotifier.value = 0;
+      debugPrint('[SyncManager] Web: cleared stale sync queue.');
+    } catch (e) {
+      debugPrint('[SyncManager] Web: failed to clear stale queue: $e');
+    }
   }
 
   bool get isSyncing => _isSyncing;
@@ -55,8 +73,20 @@ class SyncManager {
     }
   }
 
+  /// Clears the entire sync queue. Used when resetting data or on web startup.
+  Future<void> clearSyncQueue() async {
+    await _localDb.clearTable('sync_queue');
+    await updatePendingCount();
+    debugPrint('[SyncManager] Sync queue cleared.');
+  }
+
   /// Iterates and uploads queued database operations to Supabase in order
   Future<void> triggerSync() async {
+    // On web, repositories write directly to Supabase — skip queue processing
+    if (kIsWeb) {
+      await _drainStaleWebQueue();
+      return;
+    }
     if (_isSyncing || !_connectivity.isOnline) return;
     
     _isSyncing = true;

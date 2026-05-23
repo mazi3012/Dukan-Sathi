@@ -419,6 +419,26 @@ class LocalDatabase {
     await db.delete(table);
   }
 
+  /// Clears ALL local data from every table (products, customers, sales, sync_queue, chat_messages).
+  /// Used for data resets or when switching accounts.
+  Future<void> clearAllData() async {
+    if (kIsWeb) {
+      await _ensureWebDbLoaded();
+      for (final key in _webDb.keys) {
+        _webDb[key]?.clear();
+      }
+      _webSyncQueueIdCounter = 1;
+      await _saveWebDb();
+      debugPrint('[LocalDatabase] Web: all local data cleared.');
+      return;
+    }
+    final db = await database;
+    for (final table in ['sync_queue', 'chat_messages', 'sales', 'customers', 'products']) {
+      await db.delete(table);
+    }
+    debugPrint('[LocalDatabase] All local data cleared.');
+  }
+
   Future<void> executeInTransaction(Future<void> Function(Transaction txn) action) async {
     if (kIsWeb) {
       await _ensureWebDbLoaded();

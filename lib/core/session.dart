@@ -1,13 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'database.dart'; // Import supabase client
 import 'package:dukansathi_new/models/shop_config.dart';
+import 'package:dukansathi_new/data/local/local_database.dart';
 
 import 'session/session_storage.dart';
 import 'session/auth_service.dart';
 import 'session/shop_service.dart';
 import 'session/cache_warmup_service.dart';
+
 
 class UserSession extends ChangeNotifier {
   static final UserSession _instance = UserSession._();
@@ -101,6 +102,18 @@ class UserSession extends ChangeNotifier {
       }
       
       final prefs = await SharedPreferences.getInstance();
+
+      // One-time migration: clear stale mock data from local DB
+      if (!prefs.containsKey('local_data_reset_v2')) {
+        try {
+          await LocalDatabase.instance.clearAllData();
+          debugPrint('[UserSession] One-time local data reset completed.');
+        } catch (e) {
+          debugPrint('[UserSession] One-time reset failed: $e');
+        }
+        await prefs.setBool('local_data_reset_v2', true);
+      }
+
       _userId = prefs.getString(SessionStorage.userIdKey);
       _userName = prefs.getString(SessionStorage.userNameKey);
       _shopId = prefs.getString(SessionStorage.shopIdKey);
@@ -134,6 +147,7 @@ class UserSession extends ChangeNotifier {
     _isLoading = false;
     notifyListeners();
   }
+
 
   /// Login with Google OAuth using Supabase integration.
   Future<Map<String, dynamic>> loginWithGoogle() async {

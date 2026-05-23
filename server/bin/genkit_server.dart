@@ -960,8 +960,8 @@ class WebChatSession {
           'shopId': _currentShopId,
         },
       ).timeout(
-        const Duration(seconds: 45),
-        onTimeout: () => throw TimeoutException('AI generation timed out after 45 seconds'),
+        const Duration(seconds: 75),
+        onTimeout: () => throw TimeoutException('AI generation timed out after 75 seconds'),
       );
 
       print('[AI Response] Generated successfully in ${stopwatch.elapsedMilliseconds}ms');

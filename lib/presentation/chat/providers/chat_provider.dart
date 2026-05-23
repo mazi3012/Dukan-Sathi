@@ -163,6 +163,13 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
           'shopId': UserSession().shopId,
           'userId': UserSession().userId,
         }),
+      ).timeout(
+        const Duration(seconds: 90),
+        onTimeout: () => http.Response(
+          '{"text": "The AI is taking longer than usual. Please try again with a simpler request."}',
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
       );
 
       // Remove typing indicator
@@ -244,8 +251,8 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
         state = [
           ...state,
           aiTextMsg,
-          if (aiCardMsg != null) aiCardMsg,
-        ];
+          aiCardMsg,
+        ].whereType<ChatMessage>().toList();
 
         _saveMessageToDb(aiTextMsg);
         if (aiCardMsg != null) {
