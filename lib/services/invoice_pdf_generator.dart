@@ -366,7 +366,6 @@ class InvoicePdfGenerator {
     );
 
     // 3. ITEMS TABLE — Indian GST Invoice format
-    final tax = approval.proposedTaxBreakdown;
     final useAdjusted = tax.breakdown.isNotEmpty && tax.breakdown.length == approval.proposedItems.length;
 
     final itemRows = approval.proposedItems.asMap().entries.map((entry) {
