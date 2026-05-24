@@ -52,9 +52,16 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
   @override
   void initState() {
     super.initState();
-    _data = _normalizePayload(widget.payload);
-    _discountController.text = (_data['discount_value'] ?? _data['discountValue'] ?? _data['discount']?['discountValue'] ?? 0).toString();
-    _paidAmountController.text = (_data['amount_paid'] ?? _data['amountPaid'] ?? _data['payment']?['amountPaid'] ?? 0).toString();
+    final normalized = _normalizePayload(widget.payload);
+    _data = _calculateUpdatedDraftMap(normalized);
+    
+    final discountValue = _data['discount_value'] ?? 0.0;
+    final discountType = _data['discount_type'] ?? 'PERCENT';
+    _discountController.text = discountValue > 0 
+        ? (discountType == 'PERCENT' ? '${discountValue.toStringAsFixed(0)}%' : discountValue.toStringAsFixed(2))
+        : '';
+    final amountPaid = _data['amount_paid'] ?? 0.0;
+    _paidAmountController.text = amountPaid > 0 ? amountPaid.toStringAsFixed(2) : '';
   }
   @override
   void dispose() {
@@ -68,9 +75,16 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
     super.didUpdateWidget(oldWidget);
     if (widget.payload != oldWidget.payload && widget.payload != null) {
       setState(() {
-        _data = _normalizePayload(widget.payload);
-        _discountController.text = (_data['discount_value'] ?? _data['discountValue'] ?? _data['discount']?['discountValue'] ?? 0).toString();
-        _paidAmountController.text = (_data['amount_paid'] ?? _data['amountPaid'] ?? _data['payment']?['amountPaid'] ?? 0).toString();
+        final normalized = _normalizePayload(widget.payload);
+        _data = _calculateUpdatedDraftMap(normalized);
+        
+        final discountValue = _data['discount_value'] ?? 0.0;
+        final discountType = _data['discount_type'] ?? 'PERCENT';
+        _discountController.text = discountValue > 0 
+            ? (discountType == 'PERCENT' ? '${discountValue.toStringAsFixed(0)}%' : discountValue.toStringAsFixed(2))
+            : '';
+        final amountPaid = _data['amount_paid'] ?? 0.0;
+        _paidAmountController.text = amountPaid > 0 ? amountPaid.toStringAsFixed(2) : '';
       });
     }
   }
@@ -116,7 +130,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
     );
   }
 
-  void _recalculateLocalDraft(Map<String, dynamic> updatedData) {
+  Map<String, dynamic> _calculateUpdatedDraftMap(Map<String, dynamic> updatedData) {
     final shopConfig = UserSession().shopConfig;
 
     // 1. Parse items into CartItem safely
@@ -178,23 +192,31 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
       amountPaid = amountPaid.clamp(0.0, taxBreakdown.totalAmount);
     }
 
+    return {
+      ...updatedData,
+      'proposed_items': cartItems.map((c) => c.toJson()).toList(),
+      'gst_type': gstType,
+      'discount_type': discountType,
+      'discount_value': discountValueDouble,
+      'discount_amount': discountAmount,
+      'subtotal_before_discount': subtotal,
+      'subtotal_after_discount': taxBreakdown.subtotal,
+      'proposed_tax_breakdown': taxBreakdown.toJson(),
+      'proposed_total': taxBreakdown.totalAmount,
+      'payment_status': paymentStatus,
+      'amount_paid': amountPaid,
+      'due_amount': taxBreakdown.totalAmount - amountPaid,
+    };
+  }
+
+  void _recalculateLocalDraft(Map<String, dynamic> updatedData) {
     setState(() {
-      _data = {
-        ...updatedData,
-        'proposed_items': cartItems.map((c) => c.toJson()).toList(),
-        'gst_type': gstType,
-        'discount_type': discountType,
-        'discount_value': discountValueDouble,
-        'discount_amount': discountAmount,
-        'subtotal_before_discount': taxBreakdown.subtotal,
-        'subtotal_after_discount': taxBreakdown.subtotal,
-        'proposed_tax_breakdown': taxBreakdown.toJson(),
-        'proposed_total': taxBreakdown.totalAmount,
-        'payment_status': paymentStatus,
-        'amount_paid': amountPaid,
-        'due_amount': taxBreakdown.totalAmount - amountPaid,
-      };
+      _data = _calculateUpdatedDraftMap(updatedData);
       
+      final discountValueDouble = (_data['discount_value'] as num).toDouble();
+      final discountType = _data['discount_type'] ?? 'PERCENT';
+      final amountPaid = (_data['amount_paid'] as num).toDouble();
+
       _discountController.text = discountValueDouble > 0 
           ? (discountType == 'PERCENT' ? '${discountValueDouble.toStringAsFixed(0)}%' : discountValueDouble.toStringAsFixed(2))
           : '';
@@ -355,6 +377,11 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
         );
       }).toList();
 
+      double originalSubtotal = 0.0;
+      for (final item in cartItems) {
+        originalSubtotal += item.quantity * item.unitPrice;
+      }
+
       // Construct DraftApproval model locally with the standard constructor
       final draftApproval = DraftApproval(
         approvalId: aid,
@@ -365,14 +392,14 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
         proposedItems: cartItems,
         proposedTaxBreakdown: validTax,
         proposedTotal: (_data['proposed_total'] ?? _data['proposedTotal'] ?? validTax.totalAmount as num).toDouble(),
-        subtotalBeforeDiscount: (_data['subtotal_before_discount'] ?? _data['subtotalBeforeDiscount'] ?? validTax.subtotal as num).toDouble(),
+        subtotalBeforeDiscount: (_data['subtotal_before_discount'] ?? _data['subtotalBeforeDiscount'] ?? originalSubtotal as num).toDouble(),
         subtotalAfterDiscount: (_data['subtotal_after_discount'] ?? _data['subtotalAfterDiscount'] ?? validTax.subtotal as num).toDouble(),
         discountType: (_data['discount_type'] ?? _data['discountType'])?.toString(),
         discountValue: (_data['discount_value'] ?? _data['discountValue'] as num?)?.toDouble(),
         discountAmount: (_data['discount_amount'] ?? _data['discountAmount'] ?? 0.0 as num).toDouble(),
         amountPaid: (_data['amount_paid'] ?? _data['amountPaid'] ?? 0.0 as num).toDouble(),
         paymentStatus: (_data['payment_status'] ?? _data['paymentStatus'] ?? 'UNPAID').toString(),
-        dueAmount: (_data['due_amount'] ?? _data['dueAmount'] ?? (validTax.totalAmount - (_data['amount_paid'] ?? 0.0)) as num).toDouble(),
+        dueAmount: (validTax.totalAmount - (_data['amount_paid'] ?? 0.0) as num).toDouble(),
         approvalStatus: ApprovalStatus.approved,
         reviewedBy: session.userId ?? 'merchant',
         reviewedAt: DateTime.now(),
@@ -740,21 +767,19 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                             style: Theme.of(context).textTheme.labelSmall,
                           ),
                         ),
-                        if (discAmt == 0) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).primaryColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text('GST $gstRateStr', style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 9, fontWeight: FontWeight.bold)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '+₹${taxAmount.toStringAsFixed(2)}',
-                            style: TextStyle(color: Colors.amber.shade300, fontSize: 11, fontWeight: FontWeight.w500),
-                          ),
-                        ],
+                          child: Text('GST $gstRateStr', style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 9, fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '+₹${taxAmount.toStringAsFixed(2)}',
+                          style: TextStyle(color: Colors.amber.shade300, fontSize: 11, fontWeight: FontWeight.w500),
+                        ),
                       ],
                     ),
                     const Divider(color: Colors.white10, height: 12),
@@ -764,7 +789,7 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                       children: [
                         const Text('Total: ', style: TextStyle(fontSize: 11)),
                         Text(
-                          '₹${(discAmt > 0 ? taxableValue : totalWithTax).toStringAsFixed(2)}',
+                          '₹${totalWithTax.toStringAsFixed(2)}',
                           style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ],

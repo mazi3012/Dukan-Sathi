@@ -366,7 +366,6 @@ class InvoicePdfGenerator {
     );
 
     // 3. ITEMS TABLE — Indian GST Invoice format
-    final hasDiscount = (approval.discountAmount ?? 0.0) > 0;
     final itemRows = approval.proposedItems.asMap().entries.map((entry) {
       final index = entry.key + 1;
       final item = entry.value;
@@ -374,7 +373,7 @@ class InvoicePdfGenerator {
       final itemName = details?['name'] as String? ?? item.productName ?? item.productId;
       final hsn = details?['hsn_sac_code'] as String? ?? '-';
       final gstRate = item.gstRate;
-      final rateStr = hasDiscount ? '-' : (gstRate == gstRate.roundToDouble() ? '${gstRate.toInt()}%' : '${gstRate.toStringAsFixed(1)}%');
+      final rateStr = gstRate == gstRate.roundToDouble() ? '${gstRate.toInt()}%' : '${gstRate.toStringAsFixed(1)}%';
       final taxableValue = item.quantity * item.unitPrice;
       final taxAmount = taxableValue * (gstRate / 100);
       final totalWithTax = taxableValue + taxAmount;
@@ -386,8 +385,8 @@ class InvoicePdfGenerator {
         _money(item.unitPrice),
         _money(taxableValue),
         rateStr,
-        hasDiscount ? '-' : _money(taxAmount),
-        _money(hasDiscount ? taxableValue : totalWithTax),
+        _money(taxAmount),
+        _money(totalWithTax),
       ];
     }).toList();
 
