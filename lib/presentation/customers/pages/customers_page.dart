@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+import '../../../models/customer.dart';
+import '../../../core/session.dart';
 import '../../main/pages/main_layout.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
@@ -108,9 +111,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
       floatingActionButton: Padding(
         padding: EdgeInsets.only(bottom: isDesktop ? 20.0 : 80.0), // Above bottom nav on mobile
         child: FloatingActionButton.extended(
-          onPressed: () {
-             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add Customer coming soon!')));
-          },
+          onPressed: () => _showCustomerForm(),
           backgroundColor: AppColors.primary,
           icon: const Icon(Iconsax.user_add, color: Colors.white),
           label: const Text("Add", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -334,9 +335,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
       subtitle: "Add your first customer to start tracking dues and sales.",
       icon: Iconsax.user_search,
       actionLabel: "Add Customer",
-      onAction: () {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add Customer coming soon!')));
-      },
+      onAction: () => _showCustomerForm(),
     );
   }
 
@@ -468,6 +467,149 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
           ),
         ).animate().slideX(begin: 0.1, delay: (index * 50).ms).fadeIn();
       },
+    );
+  }
+
+  void _showCustomerForm({Map<String, dynamic>? customer}) {
+    final isEdit = customer != null;
+    final nameController = TextEditingController(text: isEdit ? customer['name'] : '');
+    final phoneController = TextEditingController(text: isEdit ? customer['phone'] : '');
+    final balanceController = TextEditingController(text: isEdit ? customer['current_balance'].toString() : '0');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+            borderRadius: const BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
+            border: Border.all(color: isDark ? AppColors.darkGlassBorder : AppColors.lightGlassBorder),
+          ),
+          padding: const EdgeInsets.all(30),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    isEdit ? "Edit Customer Details" : "Add New Customer",
+                    style: TextStyle(
+                      color: isDark ? Colors.white : AppColors.lightOnSurface,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: isDark ? Colors.white54 : Colors.black54),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Text("Customer Name *", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              GlassBox(
+                child: TextField(
+                  controller: nameController,
+                  style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface),
+                  decoration: InputDecoration(
+                    hintText: "Enter full name",
+                    hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text("Phone Number *", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              GlassBox(
+                child: TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface),
+                  decoration: InputDecoration(
+                    hintText: "Enter 10-digit number",
+                    hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  ),
+                ),
+              ),
+              if (!isEdit) ...[
+                const SizedBox(height: 20),
+                Text("Initial Balance / Dues (INR)", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                GlassBox(
+                  child: TextField(
+                    controller: balanceController,
+                    keyboardType: TextInputType.number,
+                    style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface),
+                    decoration: InputDecoration(
+                      hintText: "0.00",
+                      hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 30),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final name = nameController.text.trim();
+                    final phone = phoneController.text.trim();
+                    final balance = double.tryParse(balanceController.text.trim()) ?? 0.0;
+                    if (name.isEmpty || phone.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Please fill all required fields"), backgroundColor: AppColors.warning),
+                      );
+                      return;
+                    }
+                    Navigator.pop(context);
+
+                    final shopId = UserSession().shopId ?? '';
+                    final newCustomer = Customer(
+                      id: isEdit ? customer['id'] : const Uuid().v4(),
+                      shopId: shopId,
+                      name: name,
+                      phone: phone,
+                      currentBalance: isEdit ? (customer['current_balance'] as num).toDouble() : balance,
+                    );
+
+                    if (isEdit) {
+                      await ref.read(customersProvider.notifier).updateCustomer(newCustomer);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Customer updated successfully!"), backgroundColor: AppColors.success),
+                      );
+                    } else {
+                      await ref.read(customersProvider.notifier).addCustomer(newCustomer);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Customer added successfully!"), backgroundColor: AppColors.success),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text(isEdit ? "Update Details" : "Save Customer", style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

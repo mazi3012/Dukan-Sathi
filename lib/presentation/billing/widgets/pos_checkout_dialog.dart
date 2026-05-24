@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/widgets/barcode_scanner_dialog.dart';
 import '../../../models/cart_item.dart';
 import '../../../models/product.dart';
+import '../../../models/customer.dart';
 import '../../../data/repositories/product_repository.dart';
+import '../../../data/repositories/customer_repository.dart';
 import '../../../core/session.dart';
 import '../providers/pos_provider.dart';
+import '../../customers/providers/customers_provider.dart';
 import '../../../services/invoice_pdf_generator.dart';
 import '../pages/invoice_pdf_preview_screen.dart';
 import '../../../models/draft_approval.dart';
@@ -36,6 +40,9 @@ class _POSCheckoutDialogState extends ConsumerState<POSCheckoutDialog> {
   void initState() {
     super.initState();
     _loadInventory();
+    Future.microtask(() {
+      ref.read(customersProvider.notifier).fetchCustomers();
+    });
   }
 
   Future<void> _loadInventory() async {
@@ -273,9 +280,19 @@ class _POSCheckoutDialogState extends ConsumerState<POSCheckoutDialog> {
                       ),
                       const SizedBox(height: 16),
 
-                      const Text(
-                        "Product Catalog",
-                        style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "Product Catalog",
+                            style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                          TextButton.icon(
+                            icon: const Icon(Iconsax.add_circle, size: 16, color: AppColors.primary),
+                            label: const Text("Add Custom Item", style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                            onPressed: _showAddCustomItemDialog,
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 10),
 
@@ -387,6 +404,45 @@ class _POSCheckoutDialogState extends ConsumerState<POSCheckoutDialog> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 8),
+
+                      // Customer Selection Row
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.03),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Iconsax.user, color: Colors.white70, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    invoice.customerName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                  ),
+                                  Text(
+                                    invoice.customerId == null ? "Walk-in" : "Dukan Customer",
+                                    style: const TextStyle(color: Colors.white38, fontSize: 9),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            TextButton.icon(
+                              icon: const Icon(Iconsax.edit, size: 12, color: AppColors.primary),
+                              label: const Text("Change", style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
+                              onPressed: _showCustomerSelectionDialog,
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 12),
 
                       // Cart Items list
@@ -406,14 +462,17 @@ class _POSCheckoutDialogState extends ConsumerState<POSCheckoutDialog> {
                                 itemCount: invoice.items.length,
                                 itemBuilder: (context, index) {
                                   final item = invoice.items[index];
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.03),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: Colors.white10),
-                                    ),
+                                  return InkWell(
+                                    onTap: () => _showEditCartItemDialog(item),
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.03),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: Colors.white10),
+                                      ),
                                     child: Row(
                                       children: [
                                         Expanded(
@@ -461,7 +520,7 @@ class _POSCheckoutDialogState extends ConsumerState<POSCheckoutDialog> {
                                         ),
                                       ],
                                     ),
-                                  );
+                                  ));
                                 },
                               ),
                       ),
@@ -595,6 +654,552 @@ class _POSCheckoutDialogState extends ConsumerState<POSCheckoutDialog> {
           Text(label, style: const TextStyle(color: Colors.white54, fontSize: 12)),
           Text(value, style: TextStyle(color: color ?? Colors.white70, fontSize: 12, fontWeight: FontWeight.w500)),
         ],
+      ),
+    );
+  }
+    );
+  }
+
+  void _showCustomerSelectionDialog() {
+    final customersState = ref.read(customersProvider);
+    final customersList = customersState.customers;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    String searchQuery = '';
+    bool isCreating = false;
+    final newNameController = TextEditingController();
+    final newPhoneController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          final filtered = customersList.where((c) {
+            final name = c['name']?.toString().toLowerCase() ?? '';
+            final phone = c['phone']?.toString() ?? '';
+            return name.contains(searchQuery.toLowerCase()) || phone.contains(searchQuery);
+          }).toList();
+
+          return AlertDialog(
+            backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  isCreating ? "New Customer" : "Select Customer",
+                  style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface, fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                IconButton(
+                  icon: Icon(Icons.close, color: isDark ? Colors.white54 : Colors.black54),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 400,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!isCreating) ...[
+                      // Search field
+                      Container(
+                        height: 44,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Iconsax.search_normal, color: Colors.white54, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface, fontSize: 13),
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  hintText: "Search by name or phone...",
+                                  hintStyle: TextStyle(color: Colors.white30, fontSize: 12),
+                                ),
+                                onChanged: (val) {
+                                  setState(() {
+                                    searchQuery = val;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      // Walk-in Option
+                      ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), shape: BoxShape.circle),
+                          child: const Icon(Iconsax.user, color: Colors.white70, size: 16),
+                        ),
+                        title: const Text("Walk-in Customer", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                        subtitle: const Text("Default customer profile", style: TextStyle(color: Colors.white30, fontSize: 10)),
+                        onTap: () {
+                          ref.read(posProvider.notifier).setCustomer(null, 'Walk-in Customer', UserSession().shopConfig.state);
+                          Navigator.pop(context);
+                        },
+                      ),
+                      const Divider(color: Colors.white10),
+                      // Customers List
+                      if (filtered.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Text("No customers match search.", style: TextStyle(color: Colors.white38, fontSize: 12)),
+                        )
+                      else
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, idx) {
+                            final c = filtered[idx];
+                            return ListTile(
+                              leading: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), shape: BoxShape.circle),
+                                child: const Icon(Iconsax.user, color: AppColors.primary, size: 16),
+                              ),
+                              title: Text(c['name'] ?? 'Customer', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                              subtitle: Text(c['phone'] ?? '', style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                              onTap: () {
+                                ref.read(posProvider.notifier).setCustomer(c['id'], c['name'], c['state'] ?? UserSession().shopConfig.state);
+                                Navigator.pop(context);
+                              },
+                            );
+                          },
+                        ),
+                      const Divider(color: Colors.white10),
+                      // Quick create trigger
+                      TextButton.icon(
+                        icon: const Icon(Iconsax.user_add, size: 16, color: AppColors.primary),
+                        label: const Text("Quick Register New Customer", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          setState(() {
+                            isCreating = true;
+                          });
+                        },
+                      ),
+                    ] else ...[
+                      // Create fields
+                      TextField(
+                        controller: newNameController,
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        decoration: const InputDecoration(
+                          hintText: "Enter customer name",
+                          hintStyle: TextStyle(color: Colors.white30),
+                          labelText: "Name *",
+                          labelStyle: TextStyle(color: AppColors.primary),
+                          enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+                          focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      TextField(
+                        controller: newPhoneController,
+                        keyboardType: TextInputType.phone,
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        decoration: const InputDecoration(
+                          hintText: "Enter phone number",
+                          hintStyle: TextStyle(color: Colors.white30),
+                          labelText: "Phone Number *",
+                          labelStyle: TextStyle(color: AppColors.primary),
+                          enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+                          focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                        ),
+                      ),
+                      const SizedBox(height: 25),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                isCreating = false;
+                              });
+                            },
+                            child: const Text("Back", style: TextStyle(color: Colors.white54)),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton(
+                            onPressed: () async {
+                              final name = newNameController.text.trim();
+                              final phone = newPhoneController.text.trim();
+                              if (name.isEmpty || phone.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("Name and phone are required"), backgroundColor: AppColors.warning),
+                                );
+                                return;
+                              }
+
+                              final shopId = UserSession().shopId ?? '';
+                              final newId = const Uuid().v4();
+                              final c = Customer(
+                                id: newId,
+                                shopId: shopId,
+                                name: name,
+                                phone: phone,
+                                currentBalance: 0.0,
+                              );
+                              
+                              await CustomerRepository().saveCustomer(c);
+                              await ref.read(customersProvider.notifier).fetchCustomers();
+
+                              ref.read(posProvider.notifier).setCustomer(newId, name, UserSession().shopConfig.state);
+                              Navigator.pop(context);
+                            },
+                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                            child: const Text("Save & Select", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showAddCustomItemDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final nameController = TextEditingController();
+    final priceController = TextEditingController();
+    final qtyController = TextEditingController(text: '1');
+    double selectedGst = 0.0;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "Add Custom Item",
+                style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface, fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              IconButton(
+                icon: Icon(Icons.close, color: isDark ? Colors.white54 : Colors.black54),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 400,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: const InputDecoration(
+                      hintText: "Enter custom service or item name",
+                      labelText: "Item Name *",
+                      labelStyle: TextStyle(color: AppColors.primary),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: priceController,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          decoration: const InputDecoration(
+                            hintText: "0.00",
+                            labelText: "Price *",
+                            labelStyle: TextStyle(color: AppColors.primary),
+                            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+                            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: TextField(
+                          controller: qtyController,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          decoration: const InputDecoration(
+                            hintText: "1",
+                            labelText: "Quantity *",
+                            labelStyle: TextStyle(color: AppColors.primary),
+                            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+                            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("GST Rate *", style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<double>(
+                            value: selectedGst,
+                            dropdownColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            icon: const Icon(Icons.arrow_drop_down, color: Colors.white70),
+                            isExpanded: true,
+                            items: [0.0, 5.0, 12.0, 18.0, 28.0].map((rate) {
+                              return DropdownMenuItem<double>(
+                                value: rate,
+                                child: Text("${rate.toStringAsFixed(0)}%"),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  selectedGst = val;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 25),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        final name = nameController.text.trim();
+                        final price = double.tryParse(priceController.text.trim()) ?? -1;
+                        final qty = int.tryParse(qtyController.text.trim()) ?? -1;
+
+                        if (name.isEmpty || price < 0 || qty < 1) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Please fill all required fields correctly"), backgroundColor: AppColors.warning),
+                          );
+                          return;
+                        }
+
+                        final customId = 'CUSTOM-${const Uuid().v4()}';
+                        final item = CartItem(
+                          productId: customId,
+                          productName: name,
+                          quantity: qty,
+                          unitPrice: price,
+                          gstRate: selectedGst,
+                        );
+
+                        ref.read(posProvider.notifier).addItem(item);
+                        Navigator.pop(context);
+                        
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("Added custom item: $name"), backgroundColor: AppColors.success),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                      child: const Text("Add to Cart", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showEditCartItemDialog(CartItem item) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final nameController = TextEditingController(text: item.productName);
+    final priceController = TextEditingController(text: item.unitPrice.toString());
+    final qtyController = TextEditingController(text: item.quantity.toString());
+    double selectedGst = item.gstRate;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Edit Cart Item",
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              IconButton(
+                icon: Icon(Icons.close, color: isDark ? Colors.white54 : Colors.black54),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 400,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: const InputDecoration(
+                      labelText: "Item Name *",
+                      labelStyle: TextStyle(color: AppColors.primary),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: priceController,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          decoration: const InputDecoration(
+                            labelText: "Price *",
+                            labelStyle: TextStyle(color: AppColors.primary),
+                            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+                            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: TextField(
+                          controller: qtyController,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          decoration: const InputDecoration(
+                            labelText: "Quantity *",
+                            labelStyle: TextStyle(color: AppColors.primary),
+                            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+                            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primary)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 15),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("GST Rate *", style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<double>(
+                            value: selectedGst,
+                            dropdownColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                            icon: const Icon(Icons.arrow_drop_down, color: Colors.white70),
+                            isExpanded: true,
+                            items: [0.0, 5.0, 12.0, 18.0, 28.0].map((rate) {
+                              return DropdownMenuItem<double>(
+                                value: rate,
+                                child: Text("${rate.toStringAsFixed(0)}%"),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  selectedGst = val;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 25),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            ref.read(posProvider.notifier).removeItem(item.productId);
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text("Removed ${item.productName} from cart"), backgroundColor: AppColors.error),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                          child: const Text("Delete", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            final name = nameController.text.trim();
+                            final price = double.tryParse(priceController.text.trim()) ?? -1;
+                            final qty = int.tryParse(qtyController.text.trim()) ?? -1;
+
+                            if (name.isEmpty || price < 0 || qty < 1) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Please fill all required fields correctly"), backgroundColor: AppColors.warning),
+                              );
+                              return;
+                            }
+
+                            final updated = CartItem(
+                              productId: item.productId,
+                              productName: name,
+                              quantity: qty,
+                              unitPrice: price,
+                              gstRate: selectedGst,
+                            );
+
+                            ref.read(posProvider.notifier).updateCartItem(updated);
+                            Navigator.pop(context);
+                          },
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                          child: const Text("Save", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+import '../../../core/session.dart';
 import '../../main/pages/main_layout.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
@@ -75,6 +77,15 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
             ),
           ),
         ],
+      ),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 80.0), // Above bottom nav
+        child: FloatingActionButton.extended(
+          onPressed: () => _showProductForm(),
+          backgroundColor: AppColors.primary,
+          icon: const Icon(Iconsax.add, color: Colors.white),
+          label: const Text("Add Product", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        ).animate().scale(delay: 500.ms, curve: Curves.easeOutBack),
       ),
     );
   }
@@ -366,6 +377,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
         ),
         child: GlassBox(
           child: ListTile(
+            onTap: () => _showProductForm(product: product),
             contentPadding: const EdgeInsets.all(15),
             leading: Container(
               width: 50,
@@ -407,5 +419,365 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
         ),
       ),
     ).animate().slideY(begin: 0.1, delay: (index * 50).ms).fadeIn();
+  }
+
+  void _showProductForm({Product? product}) {
+    final isEdit = product != null;
+    final nameController = TextEditingController(text: isEdit ? product.name : '');
+    final categoryController = TextEditingController(text: isEdit ? product.category : '');
+    final priceController = TextEditingController(text: isEdit ? product.price.toString() : '');
+    final costPriceController = TextEditingController(text: isEdit ? product.costPrice.toString() : '');
+    final stockController = TextEditingController(text: isEdit ? product.stockQuantity.toString() : '');
+    final barcodeController = TextEditingController(text: isEdit ? product.barcode ?? '' : '');
+    double selectedGst = isEdit ? product.gstRate : 0.0;
+    
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+              borderRadius: const BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
+              border: Border.all(color: isDark ? AppColors.darkGlassBorder : AppColors.lightGlassBorder),
+            ),
+            padding: const EdgeInsets.all(30),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isEdit ? "Edit Product Details" : "Add New Product",
+                        style: TextStyle(
+                          color: isDark ? Colors.white : AppColors.lightOnSurface,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close, color: isDark ? Colors.white54 : Colors.black54),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Text("Product Name *", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  GlassBox(
+                    child: TextField(
+                      controller: nameController,
+                      style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface),
+                      decoration: InputDecoration(
+                        hintText: "Enter product name",
+                        hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Selling Price (INR) *", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            GlassBox(
+                              child: TextField(
+                                controller: priceController,
+                                keyboardType: TextInputType.number,
+                                style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface),
+                                decoration: InputDecoration(
+                                  hintText: "0.00",
+                                  hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Cost Price (INR) *", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            GlassBox(
+                              child: TextField(
+                                controller: costPriceController,
+                                keyboardType: TextInputType.number,
+                                style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface),
+                                decoration: InputDecoration(
+                                  hintText: "0.00",
+                                  hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Stock Quantity *", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            GlassBox(
+                              child: TextField(
+                                controller: stockController,
+                                keyboardType: TextInputType.number,
+                                style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface),
+                                decoration: InputDecoration(
+                                  hintText: "0",
+                                  hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Category *", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            GlassBox(
+                              child: TextField(
+                                controller: categoryController,
+                                style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface),
+                                decoration: InputDecoration(
+                                  hintText: "General, Groceries...",
+                                  hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("GST Rate *", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 15),
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: isDark ? AppColors.darkGlassBorder : AppColors.lightGlassBorder),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<double>(
+                                  value: selectedGst,
+                                  dropdownColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+                                  style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface, fontSize: 16),
+                                  icon: Icon(Icons.arrow_drop_down, color: isDark ? Colors.white70 : Colors.black70),
+                                  isExpanded: true,
+                                  items: [0.0, 5.0, 12.0, 18.0, 28.0].map((rate) {
+                                    return DropdownMenuItem<double>(
+                                      value: rate,
+                                      child: Text("${rate.toStringAsFixed(0)}%"),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setSheetState(() {
+                                        selectedGst = val;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Barcode (Optional)", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            GlassBox(
+                              child: TextField(
+                                controller: barcodeController,
+                                style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface),
+                                decoration: InputDecoration(
+                                  hintText: "Scan/Enter code",
+                                  hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 35),
+                  Row(
+                    children: [
+                      if (isEdit) ...[
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _confirmDeleteProduct(product);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.error,
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text("Delete", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        const SizedBox(width: 15),
+                      ],
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final name = nameController.text.trim();
+                            final cat = categoryController.text.trim().isEmpty ? 'General' : categoryController.text.trim();
+                            final price = double.tryParse(priceController.text.trim()) ?? -1.0;
+                            final costPrice = double.tryParse(costPriceController.text.trim()) ?? 0.0;
+                            final stock = int.tryParse(stockController.text.trim()) ?? -1;
+                            final barcode = barcodeController.text.trim().isEmpty ? null : barcodeController.text.trim();
+
+                            if (name.isEmpty || price < 0 || stock < 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Please fill all required fields correctly"), backgroundColor: AppColors.warning),
+                              );
+                              return;
+                            }
+                            Navigator.pop(context);
+
+                            final shopId = UserSession().shopId ?? '';
+                            final newProduct = Product(
+                              id: isEdit ? product.id : const Uuid().v4(),
+                              shopId: shopId,
+                              name: name,
+                              price: price,
+                              stockQuantity: stock,
+                              category: cat,
+                              costPrice: costPrice,
+                              gstRate: selectedGst,
+                              barcode: barcode,
+                            );
+
+                            if (isEdit) {
+                              await ref.read(inventoryProvider.notifier).updateProduct(newProduct);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Product updated successfully!"), backgroundColor: AppColors.success),
+                              );
+                            } else {
+                              await ref.read(inventoryProvider.notifier).addProduct(newProduct);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Product added successfully!"), backgroundColor: AppColors.success),
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: Text(isEdit ? "Save Changes" : "Add Product", style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteProduct(Product product) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Iconsax.warning_2, color: AppColors.error),
+            const SizedBox(width: 10),
+            Text(
+              "Delete Product?",
+              style: TextStyle(
+                color: isDark ? Colors.white : AppColors.lightOnSurface,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          "Are you sure you want to delete ${product.name}? This will remove it completely from your stock list and sales database.",
+          style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Cancel", style: TextStyle(color: isDark ? Colors.white54 : Colors.black54)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context); // close dialog
+              await ref.read(inventoryProvider.notifier).deleteProduct(product.id);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Product deleted successfully"), backgroundColor: AppColors.success),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text("Delete", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 }

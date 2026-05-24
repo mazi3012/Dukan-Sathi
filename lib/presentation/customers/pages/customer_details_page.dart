@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_colors.dart';
@@ -8,8 +9,10 @@ import '../../../core/widgets/glass_box.dart';
 import '../../../core/database.dart';
 import '../../../core/session.dart';
 import '../../../core/widgets/responsive_layout.dart';
+import '../../../models/customer.dart';
+import '../providers/customers_provider.dart';
 
-class CustomerDetailsPage extends StatefulWidget {
+class CustomerDetailsPage extends ConsumerStatefulWidget {
   final Map<String, dynamic> customer;
   final bool isEmbedded;
   final VoidCallback? onPaymentProcessed;
@@ -22,18 +25,22 @@ class CustomerDetailsPage extends StatefulWidget {
   });
 
   @override
-  State<CustomerDetailsPage> createState() => _CustomerDetailsPageState();
+  ConsumerState<CustomerDetailsPage> createState() => _CustomerDetailsPageState();
 }
 
-class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
+class _CustomerDetailsPageState extends ConsumerState<CustomerDetailsPage> {
   List<Map<String, dynamic>> _transactions = [];
   bool _isLoading = true;
   double _currentBalance = 0;
   bool _isSettling = false;
+  String _customerName = '';
+  String _customerPhone = '';
 
   @override
   void initState() {
     super.initState();
+    _customerName = widget.customer['name'] ?? 'Unknown';
+    _customerPhone = widget.customer['phone'] ?? '';
     _currentBalance = (widget.customer['current_balance'] as num?)?.toDouble() ?? 0;
     _fetchTransactions();
   }
@@ -42,6 +49,8 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
   void didUpdateWidget(covariant CustomerDetailsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.customer['id'] != widget.customer['id']) {
+      _customerName = widget.customer['name'] ?? 'Unknown';
+      _customerPhone = widget.customer['phone'] ?? '';
       _currentBalance = (widget.customer['current_balance'] as num?)?.toDouble() ?? 0;
       _fetchTransactions();
     }
@@ -224,8 +233,8 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final name = widget.customer['name'] ?? 'Unknown';
-    final phone = widget.customer['phone'] ?? '';
+    final name = _customerName;
+    final phone = _customerPhone;
     final balance = _currentBalance;
     final hasDues = balance > 0;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -296,6 +305,15 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
               fontWeight: FontWeight.bold,
               color: isDark ? Colors.white : AppColors.lightOnSurface,
             ),
+          ),
+          const Spacer(),
+          IconButton(
+            icon: const Icon(Iconsax.edit, color: AppColors.primary),
+            onPressed: _showEditForm,
+          ),
+          IconButton(
+            icon: const Icon(Iconsax.trash, color: AppColors.error),
+            onPressed: _confirmDelete,
           ),
         ],
       ),
@@ -587,5 +605,185 @@ class _CustomerDetailsPageState extends State<CustomerDetailsPage> {
         ],
       ),
     ).animate().slideY(begin: 1.0, curve: Curves.easeOut);
+  }
+
+  void _showEditForm() {
+    final nameController = TextEditingController(text: _customerName);
+    final phoneController = TextEditingController(text: _customerPhone);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+            borderRadius: const BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
+            border: Border.all(color: isDark ? AppColors.darkGlassBorder : AppColors.lightGlassBorder),
+          ),
+          padding: const EdgeInsets.all(30),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Edit Customer Details",
+                    style: TextStyle(
+                      color: isDark ? Colors.white : AppColors.lightOnSurface,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: isDark ? Colors.white54 : Colors.black54),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Text("Customer Name *", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              GlassBox(
+                child: TextField(
+                  controller: nameController,
+                  style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface),
+                  decoration: InputDecoration(
+                    hintText: "Enter full name",
+                    hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text("Phone Number *", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              GlassBox(
+                child: TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface),
+                  decoration: InputDecoration(
+                    hintText: "Enter 10-digit number",
+                    hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 30),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final name = nameController.text.trim();
+                    final phone = phoneController.text.trim();
+                    if (name.isEmpty || phone.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Please fill all required fields"), backgroundColor: AppColors.warning),
+                      );
+                      return;
+                    }
+                    Navigator.pop(context);
+
+                    final shopId = UserSession().shopId ?? '';
+                    final newCustomer = Customer(
+                      id: widget.customer['id'],
+                      shopId: shopId,
+                      name: name,
+                      phone: phone,
+                      currentBalance: _currentBalance,
+                    );
+
+                    await ref.read(customersProvider.notifier).updateCustomer(newCustomer);
+                    setState(() {
+                      _customerName = name;
+                      _customerPhone = phone;
+                    });
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Customer details updated successfully!"), backgroundColor: AppColors.success),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text("Save Changes", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmDelete() {
+    final hasDues = _currentBalance > 0;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Iconsax.warning_2, color: AppColors.error),
+            const SizedBox(width: 10),
+            Text(
+              "Delete Customer?",
+              style: TextStyle(
+                color: isDark ? Colors.white : AppColors.lightOnSurface,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          hasDues
+              ? "Warning: This customer has outstanding dues of ₹${_currentBalance.toStringAsFixed(2)}. Deleting this customer will remove their profile and all active dues from your ledger. Are you sure you want to proceed?"
+              : "Are you sure you want to delete ${_customerName}? This action cannot be undone.",
+          style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Cancel", style: TextStyle(color: isDark ? Colors.white54 : Colors.black54)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context); // close dialog
+              final id = widget.customer['id'];
+              
+              // Clear selection in provider first (important for desktop layout)
+              ref.read(customersProvider.notifier).selectCustomer(null);
+              
+              await ref.read(customersProvider.notifier).deleteCustomer(id);
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Customer deleted successfully"), backgroundColor: AppColors.success),
+                );
+                if (!widget.isEmbedded) {
+                  Navigator.pop(context); // close profile page
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text("Delete", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 }

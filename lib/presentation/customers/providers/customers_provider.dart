@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../data/repositories/customer_repository.dart';
 import '../../../data/local/local_database.dart';
 import '../../../core/session.dart';
+import '../../../models/customer.dart';
 
 class CustomersState {
   final List<Map<String, dynamic>> customers;
@@ -164,6 +165,21 @@ class CustomersNotifier extends StateNotifier<CustomersState> {
       debugPrint('[Customers] Load more error: $e');
       state = state.copyWith(isLoadingMore: false);
     }
+  }
+
+  Future<void> addCustomer(Customer customer) async {
+    await _customerRepo.saveCustomer(customer);
+    await fetchCustomers();
+  }
+
+  Future<void> updateCustomer(Customer customer) async {
+    await _customerRepo.updateCustomer(customer);
+    await fetchCustomers();
+  }
+
+  Future<void> deleteCustomer(String id) async {
+    await _customerRepo.deleteCustomer(id);
+    await fetchCustomers();
   }
 }
 

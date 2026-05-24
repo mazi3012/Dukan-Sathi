@@ -233,6 +233,12 @@ class POSNotifier extends StateNotifier<POSInvoiceState> {
     recalculate();
   }
 
+  void updateCartItem(CartItem item) {
+    final updatedItems = state.items.map((i) => i.productId == item.productId ? item : i).toList();
+    state = state.copyWith(items: updatedItems);
+    recalculate();
+  }
+
   void removeItem(String productId) {
     final updatedItems = state.items.where((i) => i.productId != productId).toList();
     state = state.copyWith(items: updatedItems);
