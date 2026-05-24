@@ -1,11 +1,11 @@
 {
-    "name": "dukansathi_new",
-    "short_name": "dukansathi_new",
+    "name": "Dukan Sathi",
+    "short_name": "Dukan Sathi",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Dukan Sathi - Your premium AI-powered retail assistant.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

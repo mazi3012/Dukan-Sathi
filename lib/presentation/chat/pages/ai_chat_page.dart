@@ -25,6 +25,7 @@ import '../widgets/payment_confirmation_card.dart';
 import '../../../core/services/tts_service.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/widgets/barcode_scanner_dialog.dart';
+import '../../../core/config.dart';
 
 
 class AiChatPage extends ConsumerStatefulWidget {
@@ -205,6 +206,130 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
     );
   }
 
+  void _showApiUrlConfigDialog(BuildContext context) {
+    final controller = TextEditingController(text: AppConfig.apiUrl);
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.6),
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Iconsax.setting_2, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Text(
+              "Assistant Server Config",
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Configure the server URL that the Dukan Sathi AI assistant connects to.",
+                style: TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.darkGlassBorder),
+                ),
+                child: TextField(
+                  controller: controller,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  decoration: const InputDecoration(
+                    labelText: "API Server URL",
+                    labelStyle: TextStyle(color: Colors.white60, fontSize: 12),
+                    border: InputBorder.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                "Quick Presets:",
+                style: TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ActionChip(
+                    backgroundColor: Colors.white10,
+                    label: const Text("Localhost (USB)", style: TextStyle(color: Colors.white, fontSize: 11)),
+                    onPressed: () {
+                      controller.text = "http://localhost:3100";
+                    },
+                  ),
+                  ActionChip(
+                    backgroundColor: Colors.white10,
+                    label: const Text("Production (Render)", style: TextStyle(color: Colors.white, fontSize: 11)),
+                    onPressed: () {
+                      controller.text = "https://dukan-sathi-pro.onrender.com";
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Divider(color: Colors.white10),
+              const SizedBox(height: 8),
+              const Text(
+                "💡 Physical Vivo Phone Testing Tip:",
+                style: TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                "1. Connect your Vivo phone via USB cable.\n"
+                "2. Ensure USB Debugging is turned ON in developer options.\n"
+                "3. Select 'Localhost (USB)' preset.\n"
+                "4. Run this command on your computer terminal:\n"
+                "   adb reverse tcp:3100 tcp:3100\n"
+                "This links your physical phone directly to your computer's local Genkit server!",
+                style: TextStyle(color: Colors.white70, fontSize: 11, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.white60)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newUrl = controller.text.trim();
+              if (newUrl.isNotEmpty) {
+                await AppConfig.setApiUrl(newUrl);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("API URL updated to: $newUrl"),
+                      backgroundColor: AppColors.success,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text("Save"),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
@@ -277,6 +402,10 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: Icon(Iconsax.setting_2, color: Theme.of(context).iconTheme.color),
+            onPressed: () => _showApiUrlConfigDialog(context),
+          ),
           IconButton(
             icon: Icon(Iconsax.trash, color: Theme.of(context).iconTheme.color),
             onPressed: () => _confirmClearChat(context),
@@ -397,8 +526,8 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                       constraints: const BoxConstraints(maxWidth: 800),
                       child: ListView.builder(
                         controller: _scrollController,
-                        padding: EdgeInsets.all(20).copyWith(
-                          bottom: MediaQuery.of(context).viewInsets.bottom + 140,
+                        padding: const EdgeInsets.all(20).copyWith(
+                          bottom: 100,
                         ),
                         itemCount: messages.length,
                         itemBuilder: (context, index) {
@@ -633,16 +762,5 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
 }
 
 Uri _getApiUri(String path) {
-  if (kIsWeb) {
-    final baseUri = Uri.base;
-    if (baseUri.host == 'localhost' || baseUri.host == '127.0.0.1') {
-      return Uri.parse('http://localhost:3100').resolve(path);
-    }
-    return baseUri.resolve(path);
-  }
-  const baseUrl = String.fromEnvironment(
-    'API_URL',
-    defaultValue: 'https://dukan-sathi-pro.onrender.com',
-  );
-  return Uri.parse(baseUrl).resolve(path);
+  return AppConfig.getApiUri(path);
 }

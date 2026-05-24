@@ -5,12 +5,16 @@ import '../theme/app_colors.dart';
 
 class DukanSathiLogo extends StatelessWidget {
   final double size;
+  final double? width;
+  final double? height;
   final bool showGlow;
   final bool animate;
   final bool useSolidBg;
 
   const DukanSathiLogo({
     super.key,
+    this.width,
+    this.height,
     this.size = 80.0,
     this.showGlow = true,
     this.animate = true,
@@ -20,50 +24,26 @@ class DukanSathiLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    // If it's a small collapsed logo (e.g., in a narrow sidebar),
-    // use a beautifully polished, self-contained circular badge structure
-    // that fits perfectly without any overflow clipping.
-    final bool isSmall = size <= 48;
+    
+    // Dynamically load white text in dark mode and black text in light mode
+    final String logoAsset = isDark ? 'assets/logo_dark.png' : 'assets/logo_light.png';
+    
+    final bool isSmall = (height ?? size) <= 48;
+
+    double? targetWidth = width;
+    double? targetHeight = height ?? size;
+
+    if (isSmall && targetWidth == null) {
+      targetWidth = size;
+      targetHeight = size;
+    }
 
     Widget logoWidget = Image.asset(
-      'assets/logo.png',
-      width: isSmall ? size * 0.65 : size,
-      height: isSmall ? size * 0.65 : size,
+      logoAsset,
+      width: isSmall ? targetWidth! * 0.85 : targetWidth,
+      height: isSmall ? targetHeight! * 0.85 : targetHeight,
       fit: BoxFit.contain,
-      color: isDark ? Colors.white : null,
     );
-
-    if (isSmall) {
-      // Sleek collapsed design: enclosed glassmorphic circular emblem
-      Widget badge = Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withOpacity(0.04),
-          border: Border.all(
-            color: const Color(0xFF32E6FF).withOpacity(0.35),
-            width: 1.5,
-          ),
-        ),
-        child: Center(
-          child: logoWidget,
-        ),
-      );
-
-      if (animate) {
-        badge = badge
-            .animate()
-            .scale(
-              duration: 600.ms,
-              curve: Curves.elasticOut,
-              begin: const Offset(0.8, 0.8),
-              end: const Offset(1.0, 1.0),
-            )
-            .fadeIn(duration: 400.ms);
-      }
-      return badge;
-    }
 
     if (animate) {
       logoWidget = logoWidget
@@ -71,7 +51,7 @@ class DukanSathiLogo extends StatelessWidget {
           .scale(
             duration: 600.ms,
             curve: Curves.elasticOut,
-            begin: const Offset(0.7, 0.7),
+            begin: const Offset(0.8, 0.8),
             end: const Offset(1.0, 1.0),
           )
           .fadeIn(duration: 400.ms);
@@ -95,28 +75,10 @@ class DukanSathiHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    Widget headerWidget = Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        DukanSathiLogo(
-          size: height,
-          showGlow: showGlow,
-          animate: false, // Handle animation at the row level
-        ),
-        const SizedBox(width: 12),
-        Text(
-          'Dukan Sathi',
-          style: TextStyle(
-            color: isDark ? Colors.white : const Color(0xFF004D40),
-            fontSize: height * 0.7, // Scale text relative to height
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.5,
-          ),
-        ),
-      ],
+    Widget headerWidget = DukanSathiLogo(
+      height: height,
+      width: height * 3.3, // Preserves the exact 3.3 aspect ratio of the new logo
+      animate: false,      // Handle animation at the parent level
     );
 
     if (animate) {

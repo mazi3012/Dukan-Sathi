@@ -8,6 +8,7 @@ import 'presentation/auth/pages/welcome_auth_flow.dart';
 import 'presentation/auth/pages/shop_setup_page.dart';
 import 'presentation/auth/pages/email_verification_page.dart';
 
+import 'core/config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
@@ -26,6 +27,9 @@ void main() async {
     anonKey: supabaseAnonKey,
     debug: true,
   );
+
+  // Initialize config (checks SharedPreferences + defaults based on build mode)
+  await AppConfig.init();
 
   // Initialize session (checks SharedPreferences + validates with backend)
   await UserSession().init();

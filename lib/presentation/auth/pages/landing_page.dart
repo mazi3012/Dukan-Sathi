@@ -88,7 +88,7 @@ class _LandingPageState extends State<LandingPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const DukanSathiHeader(
-            height: 64,
+            height: 32,
             showGlow: false,
             animate: true,
           ),
@@ -246,7 +246,7 @@ class _LandingPageState extends State<LandingPage> {
                 duration: const Duration(milliseconds: 500),
                 width: double.infinity,
                 height: double.infinity,
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: isDark ? Colors.white.withOpacity(0.03) : Colors.white.withOpacity(0.4),
                   borderRadius: BorderRadius.circular(32),
@@ -254,7 +254,16 @@ class _LandingPageState extends State<LandingPage> {
                     color: isDark ? Colors.white.withOpacity(0.08) : AppColors.lightGlassBorder.withOpacity(0.2),
                   ),
                 ),
-                child: _buildIllustrationContent(context, _currentPage, isDark),
+                child: Center(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: SizedBox(
+                      width: 320,
+                      height: 250,
+                      child: _buildIllustrationContent(context, _currentPage, isDark),
+                    ),
+                  ),
+                ),
               ),
             ),
           ).animate(key: ValueKey(_currentPage)).fadeIn(duration: 400.ms).scale(begin: const Offset(0.95, 0.95)),
@@ -349,7 +358,7 @@ class _LandingPageState extends State<LandingPage> {
             ),
           ],
         ),
-        const Spacer(),
+        const SizedBox(height: 12),
         // Voice microphone pulse mock
         Center(
           child: Container(
@@ -445,7 +454,7 @@ class _LandingPageState extends State<LandingPage> {
         _buildStockAlertItem('Fortune Soyabean Oil 1L', 8, 40, 0.20, Colors.orange, 'Restock Recommended', isDark),
         const SizedBox(height: 16),
         _buildStockAlertItem('Tata Iodized Salt 1kg', 85, 100, 0.85, Colors.green, 'Stock Healthy', isDark),
-        const Spacer(),
+        const SizedBox(height: 12),
         Center(
           child: ElevatedButton.icon(
             onPressed: () {},

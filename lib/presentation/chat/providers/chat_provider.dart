@@ -8,6 +8,7 @@ import '../../../core/session.dart';
 import '../models/ai_intent.dart';
 import '../../../services/intent_executor.dart';
 import '../../../data/local/local_database.dart';
+import '../../../core/config.dart';
 
 final chatControllerProvider = StateNotifierProvider<ChatController, List<ChatMessage>>((ref) {
   return ChatController();
@@ -298,17 +299,6 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
 }
 
 Uri _getApiUri(String path) {
-  if (kIsWeb) {
-    final baseUri = Uri.base;
-    if (baseUri.host == 'localhost' || baseUri.host == '127.0.0.1') {
-      return Uri.parse('http://localhost:3100').resolve(path);
-    }
-    return baseUri.resolve(path);
-  }
-  const baseUrl = String.fromEnvironment(
-    'API_URL',
-    defaultValue: 'https://dukan-sathi-pro.onrender.com',
-  );
-  return Uri.parse(baseUrl).resolve(path);
+  return AppConfig.getApiUri(path);
 }
 

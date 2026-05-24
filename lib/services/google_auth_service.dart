@@ -12,6 +12,7 @@ class GoogleAuthService {
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     clientId: kIsWeb ? '648987320349-asplif3bmr9ai0k3lkp9ulth5gne9eru.apps.googleusercontent.com' : null,
+    serverClientId: '648987320349-asplif3bmr9ai0k3lkp9ulth5gne9eru.apps.googleusercontent.com',
     scopes: [
       'email',
       'profile',

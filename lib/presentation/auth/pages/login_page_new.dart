@@ -271,23 +271,18 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildLogo() {
     return Column(
       children: [
-        const DukanSathiLogo(size: 140),
-        const SizedBox(height: 20),
-        Text(
-          'Dukan Sathi',
-          style: TextStyle(
-            color: Theme.of(context).textTheme.displayLarge?.color,
-            fontSize: 36,
-            fontWeight: FontWeight.bold,
-            letterSpacing: -0.5,
-          ),
-        ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.3),
-        const SizedBox(height: 8),
+        const DukanSathiLogo(
+          height: 80,
+          width: 264,
+        ),
+        const SizedBox(height: 12),
         Text(
           'Your AI-Powered Shop Assistant',
           style: TextStyle(
             color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.6), 
-            fontSize: 15
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.2,
           ),
         ).animate().fadeIn(delay: 300.ms),
       ],

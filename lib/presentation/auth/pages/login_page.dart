@@ -593,27 +593,18 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     return Column(
       children: [
         const DukanSathiLogo(
-          size: 130,
-          showGlow: false,
+          height: 80,
+          width: 264,
           animate: true,
         ),
-        const SizedBox(height: 20),
-        Text(
-          'Dukan Sathi',
-          style: TextStyle(
-            color: isDark ? Colors.white : AppColors.lightOnSurface,
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            letterSpacing: -0.5,
-          ),
-        ).animate().fadeIn(delay: 150.ms).slideY(begin: 0.15),
-        const SizedBox(height: 6),
+        const SizedBox(height: 12),
         Text(
           'Enter your digital retail companion',
           style: TextStyle(
             color: isDark ? Colors.white38 : Colors.black45,
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: FontWeight.w500,
+            letterSpacing: 0.2,
           ),
         ).animate().fadeIn(delay: 250.ms),
       ],

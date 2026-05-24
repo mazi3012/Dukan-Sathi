@@ -68,3 +68,17 @@ __pycache__/
 # Freezed & JsonSerializable generated files
 *.freezed.dart
 *.g.dart
+
+# Backup files
+*.bak
+**/*.bak
+
+# Test files and folder
+test/
+**/*_test.dart
+
+# Artifacts and documentation
+artifacts/
+*.md
+!README.md
+
