@@ -719,9 +719,34 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
               final qty = (item['quantity'] as num).toInt();
               final unitPrice = (item['unitPrice'] as num).toDouble();
               final gstRate = (item['gstRate'] as num?)?.toDouble() ?? 18.0;
-              final taxableValue = qty * unitPrice;
-              final taxAmount = taxableValue * (gstRate / 100);
-              final totalWithTax = taxableValue + taxAmount;
+              final double lineTotal = qty * unitPrice;
+              
+              final breakdown = tax['breakdown'] as List<dynamic>?;
+              final useAdjusted = breakdown != null && breakdown.length == items.length;
+              
+              double taxableValue;
+              double taxAmount;
+              double totalWithTax;
+              bool isDiscounted = false;
+              
+              if (useAdjusted) {
+                final br = Map<String, dynamic>.from(breakdown[entry.key] as Map);
+                final cgst = (br['cgst'] as num?)?.toDouble() ?? 0.0;
+                final sgst = (br['sgst'] as num?)?.toDouble() ?? 0.0;
+                final igst = (br['igst'] as num?)?.toDouble() ?? 0.0;
+                
+                taxAmount = cgst + sgst + igst;
+                totalWithTax = (br['totalWithTax'] as num?)?.toDouble() ?? (lineTotal + taxAmount);
+                taxableValue = totalWithTax - taxAmount;
+                if (taxableValue < lineTotal) {
+                  isDiscounted = true;
+                }
+              } else {
+                taxableValue = lineTotal;
+                taxAmount = taxableValue * (gstRate / 100);
+                totalWithTax = taxableValue + taxAmount;
+              }
+              
               final gstRateStr = gstRate == gstRate.roundToDouble() ? '${gstRate.toInt()}%' : '${gstRate.toStringAsFixed(1)}%';
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
@@ -763,7 +788,9 @@ class _InvoiceDraftCardState extends State<InvoiceDraftCard> {
                       children: [
                         Expanded(
                           child: Text(
-                            '$qty × ₹${unitPrice.toStringAsFixed(2)} = ₹${taxableValue.toStringAsFixed(2)}',
+                            isDiscounted
+                                ? '$qty × ₹${unitPrice.toStringAsFixed(2)} = ₹${lineTotal.toStringAsFixed(2)} (Taxable: ₹${taxableValue.toStringAsFixed(2)})'
+                                : '$qty × ₹${unitPrice.toStringAsFixed(2)} = ₹${taxableValue.toStringAsFixed(2)}',
                             style: Theme.of(context).textTheme.labelSmall,
                           ),
                         ),

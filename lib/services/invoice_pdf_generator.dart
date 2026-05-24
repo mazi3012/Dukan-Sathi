@@ -366,6 +366,9 @@ class InvoicePdfGenerator {
     );
 
     // 3. ITEMS TABLE — Indian GST Invoice format
+    final tax = approval.proposedTaxBreakdown;
+    final useAdjusted = tax.breakdown.isNotEmpty && tax.breakdown.length == approval.proposedItems.length;
+
     final itemRows = approval.proposedItems.asMap().entries.map((entry) {
       final index = entry.key + 1;
       final item = entry.value;
@@ -374,9 +377,28 @@ class InvoicePdfGenerator {
       final hsn = details?['hsn_sac_code'] as String? ?? '-';
       final gstRate = item.gstRate;
       final rateStr = gstRate == gstRate.roundToDouble() ? '${gstRate.toInt()}%' : '${gstRate.toStringAsFixed(1)}%';
-      final taxableValue = item.quantity * item.unitPrice;
-      final taxAmount = taxableValue * (gstRate / 100);
-      final totalWithTax = taxableValue + taxAmount;
+      
+      final double lineTotal = item.quantity * item.unitPrice;
+      
+      double taxableValue;
+      double taxAmount;
+      double totalWithTax;
+      
+      if (useAdjusted) {
+        final br = tax.breakdown[entry.key];
+        final cgst = (br['cgst'] as num?)?.toDouble() ?? 0.0;
+        final sgst = (br['sgst'] as num?)?.toDouble() ?? 0.0;
+        final igst = (br['igst'] as num?)?.toDouble() ?? 0.0;
+        
+        taxAmount = cgst + sgst + igst;
+        totalWithTax = (br['totalWithTax'] as num?)?.toDouble() ?? (lineTotal + taxAmount);
+        taxableValue = totalWithTax - taxAmount;
+      } else {
+        taxableValue = lineTotal;
+        taxAmount = taxableValue * (gstRate / 100);
+        totalWithTax = taxableValue + taxAmount;
+      }
+
       return [
         index.toString(),
         itemName,
