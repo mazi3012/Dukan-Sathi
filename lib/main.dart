@@ -7,6 +7,7 @@ import 'presentation/main/pages/main_layout.dart';
 import 'presentation/auth/pages/welcome_auth_flow.dart';
 import 'presentation/auth/pages/shop_setup_page.dart';
 import 'presentation/auth/pages/email_verification_page.dart';
+import 'presentation/auth/pages/splash_page.dart';
 
 import 'core/config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -53,7 +54,7 @@ class DukanSathiApp extends ConsumerWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
-      home: const AuthGate(),
+      home: const SplashPage(),
       onGenerateRoute: _handleDeepLink,
     );
   }

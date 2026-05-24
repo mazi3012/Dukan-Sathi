@@ -56,8 +56,155 @@
       localStorage.setItem('flutter.ds_shop_business_type', '"retail"');
     }
   </script>
+
+  <style>
+    #loading-splash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: #0F111A;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 99999;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #ffffff;
+      overflow: hidden;
+      transition: opacity 0.5s ease-out;
+    }
+    #loading-splash .glow {
+      position: absolute;
+      width: 450px;
+      height: 450px;
+      background: radial-gradient(circle, rgba(5, 150, 105, 0.15) 0%, rgba(5, 150, 105, 0) 70%);
+      pointer-events: none;
+    }
+    #loading-splash .splash-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      z-index: 2;
+    }
+    #loading-splash .logo-wrapper {
+      width: 130px;
+      height: 130px;
+      border-radius: 50%;
+      box-shadow: 0 0 45px rgba(5, 150, 105, 0.3);
+      margin-bottom: 28px;
+      animation: logo-pop 0.9s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, logo-shimmer 2.5s infinite linear;
+      overflow: hidden;
+      border: 1px solid rgba(5, 150, 105, 0.2);
+    }
+    #loading-splash .logo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    #loading-splash .title {
+      font-size: 32px;
+      font-weight: 700;
+      margin: 0 0 8px 0;
+      letter-spacing: -0.5px;
+      animation: fade-slide-in 0.8s ease-out 0.4s both;
+    }
+    #loading-splash .tagline {
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.7);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin: 0 0 40px 0;
+      animation: fade-slide-in 0.8s ease-out 0.6s both;
+    }
+    #loading-splash .progress-bar {
+      width: 140px;
+      height: 4px;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      animation: fade-slide-in 0.8s ease-out 0.8s both;
+    }
+    #loading-splash .progress-inner {
+      width: 40%;
+      height: 100%;
+      background-color: #059669;
+      border-radius: 2px;
+      animation: loading-pulse 2s infinite ease-in-out;
+    }
+    @keyframes logo-pop {
+      from { transform: scale(0.4) rotate(-15deg); opacity: 0; }
+      to { transform: scale(1) rotate(0); opacity: 1; }
+    }
+    @keyframes logo-shimmer {
+      0% { filter: brightness(1); }
+      50% { filter: brightness(1.2) drop-shadow(0 0 12px rgba(5, 150, 105, 0.5)); }
+      100% { filter: brightness(1); }
+    }
+    @keyframes fade-slide-in {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes loading-pulse {
+      0% { transform: translateX(-100%); width: 30%; }
+      50% { width: 60%; }
+      100% { transform: translateX(330%); width: 30%; }
+    }
+  </style>
 </head>
 <body>
+  <!-- Startup Splash Screen -->
+  <div id="loading-splash">
+    <div class="glow"></div>
+    <div class="splash-content">
+      <div class="logo-wrapper">
+        <img src="favicon.png" alt="Dukan Sathi Logo" class="logo">
+      </div>
+      <h1 class="title">Dukan Sathi</h1>
+      <p class="tagline">Smart Retail Assistant</p>
+      <div class="progress-bar">
+        <div class="progress-inner"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('load', function() {
+      // Create MutationObserver to detect when Flutter mounts <flutter-view>
+      var observer = new MutationObserver(function(mutations) {
+        for (var i = 0; i < mutations.length; i++) {
+          var addedNodes = mutations[i].addedNodes;
+          for (var j = 0; j < addedNodes.length; j++) {
+            var node = addedNodes[j];
+            if (node.nodeName === 'FLUTTER-VIEW' || node.tagName === 'FLUTTER-VIEW') {
+              dismissSplash();
+              observer.disconnect();
+              return;
+            }
+          }
+        }
+      });
+      observer.observe(document.body, { childList: true });
+
+      function dismissSplash() {
+        var splash = document.getElementById('loading-splash');
+        if (splash) {
+          splash.style.opacity = '0';
+          setTimeout(function() {
+            if (splash.parentNode) {
+              splash.parentNode.removeChild(splash);
+            }
+          }, 500);
+        }
+      }
+
+      // Safety timeout: dismiss splash after 7.5 seconds in case of loading issues
+      setTimeout(dismissSplash, 7500);
+    });
+  </script>
+
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader

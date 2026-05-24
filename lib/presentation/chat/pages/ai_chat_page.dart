@@ -28,6 +28,8 @@ import '../../../core/widgets/barcode_scanner_dialog.dart';
 import '../../../core/config.dart';
 
 
+import '../../../core/widgets/dukan_sathi_logo.dart';
+
 class AiChatPage extends ConsumerStatefulWidget {
   const AiChatPage({super.key});
 
@@ -379,26 +381,10 @@ class _AiChatPageState extends ConsumerState<AiChatPage> {
                 icon: Icon(Iconsax.menu, color: Theme.of(context).iconTheme.color),
                 onPressed: () => mainScaffoldKey.currentState?.openDrawer(),
               ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Iconsax.magic_star, size: 16, color: Colors.white),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                "Dukan Sathi",
-                style: Theme.of(context).appBarTheme.titleTextStyle,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
+        title: const DukanSathiHeader(
+          height: 28,
+          showGlow: false,
+          animate: true,
         ),
         centerTitle: true,
         actions: [
