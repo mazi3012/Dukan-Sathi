@@ -605,7 +605,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                                   value: selectedGst,
                                   dropdownColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
                                   style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface, fontSize: 16),
-                                  icon: Icon(Icons.arrow_drop_down, color: isDark ? Colors.white70 : Colors.black70),
+                                  icon: Icon(Icons.arrow_drop_down, color: isDark ? Colors.white70 : Colors.black54),
                                   isExpanded: true,
                                   items: [0.0, 5.0, 12.0, 18.0, 28.0].map((rate) {
                                     return DropdownMenuItem<double>(

@@ -657,8 +657,6 @@ class _POSCheckoutDialogState extends ConsumerState<POSCheckoutDialog> {
       ),
     );
   }
-    );
-  }
 
   void _showCustomerSelectionDialog() {
     final customersState = ref.read(customersProvider);
