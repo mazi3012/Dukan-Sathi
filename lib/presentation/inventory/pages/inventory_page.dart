@@ -116,10 +116,25 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
               ),
             ],
           ),
-          IconButton(
-            onPressed: _fetchProducts,
-            icon: Icon(Iconsax.refresh, color: Theme.of(context).iconTheme.color),
-          ),
+          ref.watch(inventoryProvider).isLoading
+              ? SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).iconTheme.color ?? Colors.white),
+                      ),
+                    ),
+                  ),
+                )
+              : IconButton(
+                  onPressed: _fetchProducts,
+                  icon: Icon(Iconsax.refresh, color: Theme.of(context).iconTheme.color),
+                ),
         ],
       ),
     );

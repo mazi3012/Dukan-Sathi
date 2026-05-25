@@ -22,6 +22,7 @@ import '../../../models/tax_breakdown.dart';
 import 'invoice_pdf_preview_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
+import '../providers/sales_provider.dart';
 
 
 
@@ -33,23 +34,16 @@ class BillingPage extends ConsumerStatefulWidget {
 }
 
 class _BillingPageState extends ConsumerState<BillingPage> {
-  List<Map<String, dynamic>> _sales = [];
-  bool _isLoading = true;
-  double _todayRevenue = 0;
   int? _selectedSaleIndex;
-
-  int _currentPage = 0;
-  final int _pageSize = 20;
-  bool _hasMore = true;
-  bool _isLoadingMore = false;
   final ScrollController _scrollController = ScrollController();
-  final LocalDatabase _localDb = LocalDatabase.instance;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_scrollListener);
-    _fetchSales();
+    Future.microtask(() {
+      ref.read(salesProvider.notifier).fetchSales();
+    });
   }
 
   @override
@@ -67,92 +61,11 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   final SaleRepository _saleRepo = SaleRepository();
 
   Future<void> _fetchSales() async {
-    if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _currentPage = 0;
-      _hasMore = true;
-    });
-    
-    final shopId = UserSession().shopId;
-    if (shopId == null) {
-      if (mounted) setState(() => _isLoading = false);
-      return;
-    }
-
-    try {
-      final todayStart = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day).toIso8601String();
-
-      // Parallelize local database queries to maximize UI loading speeds
-      final results = await Future.wait([
-        _saleRepo.getSales(
-          shopId,
-          limit: _pageSize,
-          offset: 0,
-        ),
-        _localDb.queryAll(
-          'sales',
-          where: 'shop_id = ? AND timestamp >= ?',
-          whereArgs: [shopId, todayStart],
-        ),
-      ]);
-
-      final res = results[0] as List<dynamic>;
-      final todayRes = results[1] as List<Map<String, dynamic>>;
-
-      if (mounted) {
-        double today = 0;
-        for (var s in todayRes) {
-          today += ((s['amount_paid'] as num?)?.toDouble() ?? 0);
-        }
-
-        setState(() {
-          _sales = List<Map<String, dynamic>>.from(res);
-          _todayRevenue = today;
-          _isLoading = false;
-          _hasMore = res.length == _pageSize;
-          if (_sales.isNotEmpty && _selectedSaleIndex == null) {
-            _selectedSaleIndex = 0;
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint('[Billing] Fetch error: $e');
-      if (mounted) setState(() => _isLoading = false);
-    }
+    await ref.read(salesProvider.notifier).fetchSales(forceRefresh: true);
   }
 
   Future<void> _loadMoreSales() async {
-    if (_isLoadingMore || !_hasMore) return;
-
-    setState(() => _isLoadingMore = true);
-
-    final shopId = UserSession().shopId;
-    if (shopId == null) {
-      if (mounted) setState(() => _isLoadingMore = false);
-      return;
-    }
-
-    try {
-      final nextOffset = (_currentPage + 1) * _pageSize;
-      final res = await _saleRepo.getSales(
-        shopId,
-        limit: _pageSize,
-        offset: nextOffset,
-      );
-
-      if (mounted) {
-        setState(() {
-          _currentPage++;
-          _sales.addAll(List<Map<String, dynamic>>.from(res));
-          _hasMore = res.length == _pageSize;
-          _isLoadingMore = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('[Billing] Load more error: $e');
-      if (mounted) setState(() => _isLoadingMore = false);
-    }
+    await ref.read(salesProvider.notifier).loadMoreSales();
   }
 
   void _showMobileInvoiceDetail(BuildContext context, Map<String, dynamic> sale) {
@@ -414,8 +327,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
                       ? () async {
                           Navigator.pop(context); // close dialog
                           final id = sale['id'];
-                          await _saleRepo.deleteSale(id);
-                          ref.read(dashboardProvider.notifier).fetchDashboardData();
+                          await ref.read(salesProvider.notifier).deleteSale(id);
 
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -432,8 +344,6 @@ class _BillingPageState extends ConsumerState<BillingPage> {
                             setState(() {
                               _selectedSaleIndex = null;
                             });
-
-                            await _fetchSales();
                           }
                         }
                       : null,
@@ -468,6 +378,20 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   @override
   Widget build(BuildContext context) {
     final isDesktop = ResponsiveLayout.isDesktop(context) || ResponsiveLayout.isTablet(context);
+    final salesState = ref.watch(salesProvider);
+    final _sales = salesState.sales;
+    final _isLoading = salesState.isLoading;
+    final _isLoadingMore = salesState.isLoadingMore;
+    final _todayRevenue = salesState.todayRevenue;
+
+    // Reactive auto-selection and out-of-bounds safety logic
+    if (_sales.isEmpty) {
+      _selectedSaleIndex = null;
+    } else if (_selectedSaleIndex == null) {
+      _selectedSaleIndex = 0;
+    } else if (_selectedSaleIndex! >= _sales.length) {
+      _selectedSaleIndex = 0;
+    }
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -590,10 +514,25 @@ class _BillingPageState extends ConsumerState<BillingPage> {
               ),
             ],
           ),
-          IconButton(
-            onPressed: _fetchSales,
-            icon: Icon(Iconsax.refresh, color: Theme.of(context).iconTheme.color),
-          ),
+          ref.watch(salesProvider).isLoading
+              ? SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).iconTheme.color ?? Colors.white),
+                      ),
+                    ),
+                  ),
+                )
+              : IconButton(
+                  onPressed: _fetchSales,
+                  icon: Icon(Iconsax.refresh, color: Theme.of(context).iconTheme.color),
+                ),
         ],
       ),
     );

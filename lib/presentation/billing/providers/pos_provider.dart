@@ -14,6 +14,7 @@ import '../../../models/customer.dart';
 import '../../customers/providers/customers_provider.dart';
 import '../../inventory/providers/inventory_provider.dart';
 import '../../dashboard/providers/dashboard_provider.dart';
+import 'sales_provider.dart';
 
 class POSInvoiceState {
   final String approvalId;
@@ -453,6 +454,7 @@ class POSNotifier extends StateNotifier<POSInvoiceState> {
         _ref!.read(customersProvider.notifier).fetchCustomers();
         _ref!.read(inventoryProvider.notifier).fetchProducts(forceRefresh: true);
         _ref!.read(dashboardProvider.notifier).fetchDashboardData();
+        _ref!.read(salesProvider.notifier).fetchSales(forceRefresh: true);
       }
 
       return true;
