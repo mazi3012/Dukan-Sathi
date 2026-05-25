@@ -92,7 +92,6 @@ class _CustomerDetailsPageState extends ConsumerState<CustomerDetailsPage> {
           await LocalDatabase.instance.insert(
             'sales',
             saleMap,
-            conflictAlgorithm: ConflictAlgorithm.replace,
           );
         }
 
@@ -900,7 +899,7 @@ class _CustomerDetailsPageState extends ConsumerState<CustomerDetailsPage> {
                     style: TextStyle(
                       color: isConfirmed 
                           ? Colors.white 
-                          : (isDark ? Colors.white30 : Colors.black30),
+                          : (isDark ? Colors.white30 : Colors.black38),
                       fontWeight: FontWeight.bold,
                     ),
                   ),

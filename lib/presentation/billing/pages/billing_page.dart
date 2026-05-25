@@ -449,7 +449,7 @@ class _BillingPageState extends State<BillingPage> {
                     style: TextStyle(
                       color: isConfirmed 
                           ? Colors.white 
-                          : (isDark ? Colors.white30 : Colors.black30),
+                          : (isDark ? Colors.white30 : Colors.black38),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
