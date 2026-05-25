@@ -11,6 +11,9 @@ import '../../../data/repositories/product_repository.dart';
 import '../../../data/repositories/customer_repository.dart';
 import '../../../data/sync/sync_manager.dart';
 import '../../../models/customer.dart';
+import '../../customers/providers/customers_provider.dart';
+import '../../inventory/providers/inventory_provider.dart';
+import '../../dashboard/providers/dashboard_provider.dart';
 
 class POSInvoiceState {
   final String approvalId;
@@ -175,7 +178,8 @@ class POSInvoiceState {
 }
 
 class POSNotifier extends StateNotifier<POSInvoiceState> {
-  POSNotifier() : super(POSInvoiceState.empty());
+  final Ref? _ref;
+  POSNotifier([this._ref]) : super(POSInvoiceState.empty());
 
   void setDraft(Map<String, dynamic> payload) {
     state = POSInvoiceState.fromJson(payload);
@@ -443,6 +447,14 @@ class POSNotifier extends StateNotifier<POSInvoiceState> {
         invoiceNumber: invoiceNo,
         customerId: finalCustomerId,
       );
+
+      // Immediately refresh all related app UI providers for true real-time reactivity
+      if (_ref != null) {
+        _ref!.read(customersProvider.notifier).fetchCustomers();
+        _ref!.read(inventoryProvider.notifier).fetchProducts(forceRefresh: true);
+        _ref!.read(dashboardProvider.notifier).fetchDashboardData();
+      }
+
       return true;
     } catch (e) {
       return false;
@@ -451,5 +463,5 @@ class POSNotifier extends StateNotifier<POSInvoiceState> {
 }
 
 final posProvider = StateNotifierProvider<POSNotifier, POSInvoiceState>((ref) {
-  return POSNotifier();
+  return POSNotifier(ref);
 });

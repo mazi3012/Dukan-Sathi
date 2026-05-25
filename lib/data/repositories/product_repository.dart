@@ -49,8 +49,32 @@ class ProductRepository {
 
     // 2. Trigger background sync if online
     if (_connectivity.isOnline && (localProducts.isEmpty || forceRefresh)) {
-      // Perform background sync to refresh the local cache
-      syncProductsFromCloud(shopId);
+      if (forceRefresh) {
+        await syncProductsFromCloud(shopId);
+        // Fetch again to return the fully synchronized fresh list
+        final freshMaps = await _localDb.queryAll(
+          'products',
+          where: 'shop_id = ?',
+          whereArgs: [shopId],
+          orderBy: 'name ASC',
+          limit: limit,
+          offset: offset,
+        );
+        return freshMaps.map((m) {
+          final map = Map<String, dynamic>.from(m);
+          map['is_service'] = map['is_service'] == 1;
+          final metadataStr = map['metadata'] as String? ?? '{}';
+          final metadataMap = jsonDecode(metadataStr) as Map<String, dynamic>;
+          map['metadata'] = metadataMap;
+          if (metadataMap.containsKey('barcode')) {
+            map['barcode'] = metadataMap['barcode'];
+          }
+          return Product.fromJson(map);
+        }).toList();
+      } else {
+        // Perform background sync to refresh the local cache
+        syncProductsFromCloud(shopId);
+      }
     }
 
     return localProducts;

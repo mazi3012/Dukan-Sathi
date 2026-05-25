@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/repositories/product_repository.dart';
 import '../../../models/product.dart';
 import '../../../core/session.dart';
+import '../../dashboard/providers/dashboard_provider.dart';
 
 class InventoryState {
   final List<Product> allProducts;
@@ -66,10 +67,11 @@ class InventoryState {
 }
 
 class InventoryNotifier extends StateNotifier<InventoryState> {
+  final Ref? _ref;
   final ProductRepository _productRepo = ProductRepository();
   final int _pageSize = 20;
 
-  InventoryNotifier() : super(InventoryState.initial());
+  InventoryNotifier([this._ref]) : super(InventoryState.initial());
 
   Future<void> fetchProducts({bool forceRefresh = false}) async {
     final shopId = UserSession().shopId;
@@ -143,24 +145,36 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
   Future<void> addProduct(Product product) async {
     await _productRepo.saveProduct(product);
     await fetchProducts(forceRefresh: true);
+    if (_ref != null) {
+      _ref!.read(dashboardProvider.notifier).fetchDashboardData();
+    }
   }
 
   Future<void> updateProduct(Product product) async {
     await _productRepo.updateProduct(product);
     await fetchProducts(forceRefresh: true);
+    if (_ref != null) {
+      _ref!.read(dashboardProvider.notifier).fetchDashboardData();
+    }
   }
 
   Future<void> deleteProduct(String productId) async {
     await _productRepo.deleteProduct(productId);
     await fetchProducts(forceRefresh: true);
+    if (_ref != null) {
+      _ref!.read(dashboardProvider.notifier).fetchDashboardData();
+    }
   }
 
   Future<void> adjustStock(String productId, int delta) async {
     await _productRepo.adjustStock(productId, delta);
     await fetchProducts(forceRefresh: true);
+    if (_ref != null) {
+      _ref!.read(dashboardProvider.notifier).fetchDashboardData();
+    }
   }
 }
 
 final inventoryProvider = StateNotifierProvider<InventoryNotifier, InventoryState>((ref) {
-  return InventoryNotifier();
+  return InventoryNotifier(ref);
 });

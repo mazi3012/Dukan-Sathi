@@ -4,6 +4,7 @@ import '../../../data/repositories/customer_repository.dart';
 import '../../../data/local/local_database.dart';
 import '../../../core/session.dart';
 import '../../../models/customer.dart';
+import '../../dashboard/providers/dashboard_provider.dart';
 
 class CustomersState {
   final List<Map<String, dynamic>> customers;
@@ -69,11 +70,12 @@ class CustomersState {
 }
 
 class CustomersNotifier extends StateNotifier<CustomersState> {
+  final Ref? _ref;
   final CustomerRepository _customerRepo = CustomerRepository();
   final LocalDatabase _localDb = LocalDatabase.instance;
   final int _pageSize = 20;
 
-  CustomersNotifier() : super(CustomersState.initial());
+  CustomersNotifier([this._ref]) : super(CustomersState.initial());
 
   void setFilter(String filter) {
     state = state.copyWith(filter: filter);
@@ -170,19 +172,28 @@ class CustomersNotifier extends StateNotifier<CustomersState> {
   Future<void> addCustomer(Customer customer) async {
     await _customerRepo.saveCustomer(customer);
     await fetchCustomers();
+    if (_ref != null) {
+      _ref!.read(dashboardProvider.notifier).fetchDashboardData();
+    }
   }
 
   Future<void> updateCustomer(Customer customer) async {
     await _customerRepo.updateCustomer(customer);
     await fetchCustomers();
+    if (_ref != null) {
+      _ref!.read(dashboardProvider.notifier).fetchDashboardData();
+    }
   }
 
   Future<void> deleteCustomer(String id) async {
     await _customerRepo.deleteCustomer(id);
     await fetchCustomers();
+    if (_ref != null) {
+      _ref!.read(dashboardProvider.notifier).fetchDashboardData();
+    }
   }
 }
 
 final customersProvider = StateNotifierProvider<CustomersNotifier, CustomersState>((ref) {
-  return CustomersNotifier();
+  return CustomersNotifier(ref);
 });

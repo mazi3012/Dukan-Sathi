@@ -29,7 +29,21 @@ class SaleRepository {
 
     // 2. Trigger background sync if online
     if (_connectivity.isOnline && (localSales.isEmpty || forceRefresh)) {
-      syncSalesFromCloud(shopId);
+      if (forceRefresh) {
+        await syncSalesFromCloud(shopId);
+        // Fetch again to return the fully synchronized fresh list
+        final freshSales = await _localDb.queryAll(
+          'sales',
+          where: 'shop_id = ?',
+          whereArgs: [shopId],
+          orderBy: 'timestamp DESC',
+          limit: limit,
+          offset: offset,
+        );
+        return freshSales;
+      } else {
+        syncSalesFromCloud(shopId);
+      }
     }
 
     return localSales;

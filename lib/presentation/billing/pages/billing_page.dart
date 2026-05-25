@@ -20,17 +20,19 @@ import '../../../models/draft_approval.dart';
 import '../../../models/cart_item.dart';
 import '../../../models/tax_breakdown.dart';
 import 'invoice_pdf_preview_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../dashboard/providers/dashboard_provider.dart';
 
 
 
-class BillingPage extends StatefulWidget {
+class BillingPage extends ConsumerStatefulWidget {
   const BillingPage({super.key});
 
   @override
-  State<BillingPage> createState() => _BillingPageState();
+  ConsumerState<BillingPage> createState() => _BillingPageState();
 }
 
-class _BillingPageState extends State<BillingPage> {
+class _BillingPageState extends ConsumerState<BillingPage> {
   List<Map<String, dynamic>> _sales = [];
   bool _isLoading = true;
   double _todayRevenue = 0;
@@ -413,6 +415,7 @@ class _BillingPageState extends State<BillingPage> {
                           Navigator.pop(context); // close dialog
                           final id = sale['id'];
                           await _saleRepo.deleteSale(id);
+                          ref.read(dashboardProvider.notifier).fetchDashboardData();
 
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(

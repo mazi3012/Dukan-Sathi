@@ -32,7 +32,21 @@ class CustomerRepository {
 
     // 2. Trigger background sync if online
     if (_connectivity.isOnline && (localCustomers.isEmpty || forceRefresh)) {
-      syncCustomersFromCloud(shopId);
+      if (forceRefresh) {
+        await syncCustomersFromCloud(shopId);
+        // Fetch again to return the fully synchronized fresh list
+        final freshMaps = await _localDb.queryAll(
+          'customers',
+          where: 'shop_id = ?',
+          whereArgs: [shopId],
+          orderBy: 'name ASC',
+          limit: limit,
+          offset: offset,
+        );
+        return freshMaps.map((m) => Customer.fromJson(m)).toList();
+      } else {
+        syncCustomersFromCloud(shopId);
+      }
     }
 
     return localCustomers;
