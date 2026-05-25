@@ -149,12 +149,6 @@ class ProductRepository {
   /// Instantly saves product locally and queues background sync.
   /// On web, writes directly to Supabase to avoid AI stale-data issues.
   Future<void> saveProduct(Product product) async {
-    // Web fast-path: skip local queue, write directly to Supabase
-    if (kIsWeb) {
-      await supabase.from('products').upsert(product.toJson());
-      return;
-    }
-
     final map = product.toJson();
     map['is_service'] = product.isService ? 1 : 0;
 
@@ -164,6 +158,13 @@ class ProductRepository {
       metadataMap['barcode'] = product.barcode;
     }
     map['metadata'] = jsonEncode(metadataMap);
+
+    // Web fast-path: skip local queue, write directly to Supabase
+    if (kIsWeb) {
+      await supabase.from('products').upsert(product.toJson());
+      await _localDb.insert('products', map);
+      return;
+    }
 
     // 1. Write locally
     await _localDb.insert('products', map);
@@ -180,12 +181,6 @@ class ProductRepository {
   /// Instantly updates product locally and queues background sync.
   /// On web, writes directly to Supabase to avoid AI stale-data issues.
   Future<void> updateProduct(Product product) async {
-    // Web fast-path: skip local queue, write directly to Supabase
-    if (kIsWeb) {
-      await supabase.from('products').upsert(product.toJson());
-      return;
-    }
-
     final map = product.toJson();
     map['is_service'] = product.isService ? 1 : 0;
 
@@ -195,6 +190,18 @@ class ProductRepository {
       metadataMap['barcode'] = product.barcode;
     }
     map['metadata'] = jsonEncode(metadataMap);
+
+    // Web fast-path: skip local queue, write directly to Supabase
+    if (kIsWeb) {
+      await supabase.from('products').upsert(product.toJson());
+      await _localDb.update(
+        'products',
+        map,
+        where: 'id = ?',
+        whereArgs: [product.id],
+      );
+      return;
+    }
 
     // 1. Write locally
     await _localDb.update(
@@ -219,6 +226,11 @@ class ProductRepository {
     // Web fast-path: skip local queue, delete directly from Supabase
     if (kIsWeb) {
       await supabase.from('products').delete().eq('id', id);
+      await _localDb.delete(
+        'products',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
       return;
     }
 

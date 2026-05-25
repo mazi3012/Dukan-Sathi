@@ -78,6 +78,14 @@ class SaleRepository {
               .from('customers')
               .update({'current_balance': newBalance})
               .eq('id', customerId);
+
+          // Update local customer balance on web too
+          await _localDb.update(
+            'customers',
+            {'current_balance': newBalance},
+            where: 'id = ?',
+            whereArgs: [customerId],
+          );
         }
       } catch (e) {
         debugPrint("[SaleRepository] Error updating customer balance on web: $e");
@@ -129,6 +137,7 @@ class SaleRepository {
     // Web fast-path: skip local queue, write directly to Supabase
     if (kIsWeb) {
       await supabase.from('sales').upsert(sale);
+      await _localDb.insert('sales', sale);
       return;
     }
 
@@ -180,6 +189,11 @@ class SaleRepository {
     // Web fast-path: skip local queue, delete directly from Supabase
     if (kIsWeb) {
       await supabase.from('sales').delete().eq('id', id);
+      await _localDb.delete(
+        'sales',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
       return;
     }
 

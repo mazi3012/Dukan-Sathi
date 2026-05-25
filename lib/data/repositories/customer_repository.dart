@@ -67,6 +67,7 @@ class CustomerRepository {
     // Web fast-path: skip local queue, write directly to Supabase
     if (kIsWeb) {
       await supabase.from('customers').upsert(customer.toJson());
+      await _localDb.insert('customers', customer.toJson());
       return;
     }
 
@@ -88,6 +89,12 @@ class CustomerRepository {
     // Web fast-path: skip local queue, write directly to Supabase
     if (kIsWeb) {
       await supabase.from('customers').upsert(customer.toJson());
+      await _localDb.update(
+        'customers',
+        customer.toJson(),
+        where: 'id = ?',
+        whereArgs: [customer.id],
+      );
       return;
     }
 
@@ -114,6 +121,11 @@ class CustomerRepository {
     // Web fast-path: skip local queue, delete directly from Supabase
     if (kIsWeb) {
       await supabase.from('customers').delete().eq('id', id);
+      await _localDb.delete(
+        'customers',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
       return;
     }
 
