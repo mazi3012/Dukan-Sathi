@@ -16,11 +16,13 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // Initialize Supabase correctly for Flutter (handles session persistence and OAuth redirects)
-  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  String supabaseUrl = const String.fromEnvironment('SUPABASE_URL');
+  String supabaseAnonKey = const String.fromEnvironment('SUPABASE_ANON_KEY');
 
   if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-    debugPrint('WARNING: SUPABASE_URL or SUPABASE_ANON_KEY is missing! Use --dart-define=SUPABASE_URL=... during run.');
+    debugPrint('WARNING: SUPABASE_URL or SUPABASE_ANON_KEY is missing! Falling back to production credentials.');
+    supabaseUrl = 'https://owvtyqccmiurlwwpocoj.supabase.co';
+    supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93dnR5cWNjbWl1cmx3d3BvY29qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTYyMjQsImV4cCI6MjA5MjE3MjIyNH0.Ie4r9fPVgzftQNT1NZqb0RFpxjRU_1UpRfYQ0WodjxM';
   }
 
   await Supabase.initialize(
