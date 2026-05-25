@@ -59,24 +59,143 @@ class SaleRepository {
     }
   }
 
+  Future<void> _updateCustomerDue(String? customerId, double dueDelta) async {
+    if (customerId == null || customerId.isEmpty || customerId == 'null' || dueDelta == 0.0) {
+      return;
+    }
+
+    if (kIsWeb) {
+      try {
+        final res = await supabase
+            .from('customers')
+            .select('current_balance')
+            .eq('id', customerId)
+            .maybeSingle();
+        if (res != null) {
+          final double currentBalance = (res['current_balance'] as num?)?.toDouble() ?? 0.0;
+          final newBalance = (currentBalance + dueDelta) < 0.0 ? 0.0 : (currentBalance + dueDelta);
+          await supabase
+              .from('customers')
+              .update({'current_balance': newBalance})
+              .eq('id', customerId);
+        }
+      } catch (e) {
+        debugPrint("[SaleRepository] Error updating customer balance on web: $e");
+      }
+    } else {
+      try {
+        final customers = await _localDb.queryAll(
+          'customers',
+          where: 'id = ?',
+          whereArgs: [customerId],
+        );
+        if (customers.isNotEmpty) {
+          final double currentBalance = (customers.first['current_balance'] as num?)?.toDouble() ?? 0.0;
+          final newBalance = (currentBalance + dueDelta) < 0.0 ? 0.0 : (currentBalance + dueDelta);
+          
+          await _localDb.update(
+            'customers',
+            {'current_balance': newBalance},
+            where: 'id = ?',
+            whereArgs: [customerId],
+          );
+          
+          final updatedCustomerMap = Map<String, dynamic>.from(customers.first);
+          updatedCustomerMap['current_balance'] = newBalance;
+          
+          await _syncManager.queueOperation(
+            tableName: 'customers',
+            action: 'UPDATE',
+            recordId: customerId,
+            payload: updatedCustomerMap,
+          );
+        }
+      } catch (e) {
+        debugPrint("[SaleRepository] Error updating customer balance locally: $e");
+      }
+    }
+  }
+
   /// Saves sales record locally and queues background sync.
   /// On web, writes directly to Supabase to avoid AI stale-data issues.
   Future<void> saveSale(Map<String, dynamic> sale) async {
+    // 1. Update customer balance (Add due_amount)
+    final customerId = sale['customer_id']?.toString();
+    final double dueAmount = (sale['due_amount'] as num?)?.toDouble() ?? 0.0;
+    if (dueAmount > 0.0) {
+      await _updateCustomerDue(customerId, dueAmount);
+    }
+
     // Web fast-path: skip local queue, write directly to Supabase
     if (kIsWeb) {
       await supabase.from('sales').upsert(sale);
       return;
     }
 
-    // 1. Save locally
+    // 2. Save locally
     await _localDb.insert('sales', sale);
 
-    // 2. Queue for background sync
+    // 3. Queue for background sync
     await _syncManager.queueOperation(
       tableName: 'sales',
       action: 'INSERT',
       recordId: sale['id'] as String,
       payload: sale,
+    );
+  }
+
+  /// Instantly deletes a sale locally and queues background sync.
+  /// On web, deletes directly from Supabase to avoid AI stale-data issues.
+  Future<void> deleteSale(String id) async {
+    // 1. Fetch sale to deduct due_amount from customer
+    Map<String, dynamic>? sale;
+    if (kIsWeb) {
+      try {
+        final res = await supabase.from('sales').select('customer_id, due_amount').eq('id', id).maybeSingle();
+        if (res != null) {
+          sale = Map<String, dynamic>.from(res as Map);
+        }
+      } catch (e) {
+        debugPrint("Error fetching sale before delete on web: $e");
+      }
+    } else {
+      try {
+        final sales = await _localDb.queryAll('sales', where: 'id = ?', whereArgs: [id]);
+        if (sales.isNotEmpty) {
+          sale = sales.first;
+        }
+      } catch (e) {
+        debugPrint("Error fetching sale before delete locally: $e");
+      }
+    }
+
+    if (sale != null) {
+      final customerId = sale['customer_id']?.toString();
+      final double dueAmount = (sale['due_amount'] as num?)?.toDouble() ?? 0.0;
+      if (dueAmount > 0.0) {
+        await _updateCustomerDue(customerId, -dueAmount);
+      }
+    }
+
+    // Web fast-path: skip local queue, delete directly from Supabase
+    if (kIsWeb) {
+      await supabase.from('sales').delete().eq('id', id);
+      return;
+    }
+
+    // 2. Delete locally
+    await _localDb.delete(
+      'sales',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    // 3. Queue for background sync
+    await _syncManager.queueOperation(
+      tableName: 'sales',
+      action: 'DELETE',
+      recordId: id,
+      payload: {},
     );
   }
 }

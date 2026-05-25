@@ -88,6 +88,34 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
 
   DashboardNotifier() : super(DashboardState.initial());
 
+  Future<void> _updateLocalCustomerDues(String shopId) async {
+    // Helper to keep SQLite customer current_balance in-sync with actual sales due_amount
+    try {
+      final customers = await _localDb.queryAll('customers', where: 'shop_id = ?', whereArgs: [shopId]);
+      final sales = await _localDb.queryAll('sales', where: 'shop_id = ?', whereArgs: [shopId]);
+      
+      final customerDuesMap = <String, double>{};
+      for (var sale in sales) {
+        final customerId = sale['customer_id']?.toString();
+        final dueAmount = (sale['due_amount'] as num?)?.toDouble() ?? 0.0;
+        if (customerId != null && customerId.isNotEmpty && customerId != 'null') {
+          customerDuesMap[customerId] = (customerDuesMap[customerId] ?? 0.0) + dueAmount;
+        }
+      }
+
+      for (var customer in customers) {
+        final id = customer['id'] as String;
+        final expectedDue = customerDuesMap[id] ?? 0.0;
+        final currentBal = (customer['current_balance'] as num?)?.toDouble() ?? 0.0;
+        if ((currentBal - expectedDue).abs() > 0.01) {
+          await _localDb.update('customers', {'current_balance': expectedDue}, where: 'id = ?', whereArgs: [id]);
+        }
+      }
+    } catch (e) {
+      debugPrint('[DashboardNotifier] Error syncing local dues: $e');
+    }
+  }
+
   Future<void> fetchDashboardData() async {
     final shopId = UserSession().shopId;
     if (shopId == null || shopId.isEmpty) {
@@ -98,6 +126,9 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
     state = state.copyWith(isLoading: true, hasError: false);
 
     try {
+      // Proactively align any out-of-sync local balances to ensure perfect dashboard stats
+      await _updateLocalCustomerDues(shopId);
+
       // 1. Fetch Total Sales locally
       final salesRes = await _localDb.queryAll(
         'sales',
@@ -108,17 +139,34 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       double netRevenue = 0;
       double grossSales = 0;
       double gstCollected = 0;
+      
+      int invoiceCountToday = 0;
+      double netRevenueToday = 0;
+      final now = DateTime.now();
+      final startOfToday = DateTime(now.year, now.month, now.day);
+
       for (var row in salesRes) {
         final amount = (row['amount'] as num).toDouble();
-        final beforeDiscount = (row['subtotal_before_discount'] as num?)?.toDouble() ?? amount;
-        final afterDiscount = (row['subtotal_after_discount'] as num?)?.toDouble() ?? beforeDiscount;
+        
+        // Smart GST fallback for legacy/custom sales
+        final double beforeDiscount = (row['subtotal_before_discount'] as num?)?.toDouble() ?? (amount / 1.18);
+        final double discountAmount = (row['discount_amount'] as num?)?.toDouble() ?? 0.0;
+        final double afterDiscount = (row['subtotal_after_discount'] as num?)?.toDouble() ?? (beforeDiscount - discountAmount);
+        
         grossSales += beforeDiscount;
         netRevenue += afterDiscount;
         gstCollected += (amount - afterDiscount);
-      }
 
-      // 2. Fetch Invoice Count locally
-      final invoiceCount = salesRes.length;
+        // Check if sale belongs to today
+        final timestampStr = row['timestamp'] as String?;
+        if (timestampStr != null) {
+          final timestamp = DateTime.tryParse(timestampStr);
+          if (timestamp != null && !timestamp.isBefore(startOfToday)) {
+            invoiceCountToday++;
+            netRevenueToday += afterDiscount;
+          }
+        }
+      }
 
       // 3 & 4. Fetch Expenses and Pending Approvals (Online-only parallelized queries)
       double expenses = 0;
@@ -149,10 +197,10 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         }
       }
 
-      // 5. Fetch Low Stock Count (< 5 units) locally
+      // 5. Fetch Low Stock Count (< 5 units) locally (excluding services)
       final lowStockRes = await _localDb.queryAll(
         'products',
-        where: 'shop_id = ? AND stock_quantity < ?',
+        where: 'shop_id = ? AND stock_quantity < ? AND is_service = 0',
         whereArgs: [shopId, 5],
       );
       final lowStock = lowStockRes.length;
@@ -179,16 +227,21 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         limit: 6,
       );
 
-       final totalMarketDues = dues > 0 ? dues : 0.0;
+      final totalMarketDues = dues > 0 ? dues : 0.0;
       final aiRestockItemsCount = lowStock;
-      final expectedRevenueTomorrow = netRevenue * 1.05; // 5% growth projection
+      
+      // Calculate realistic projections based on today's/daily average performance
+      final expectedRevenueTomorrow = netRevenueToday > 0 
+          ? netRevenueToday * 1.05 
+          : (salesRes.isNotEmpty ? (netRevenue / salesRes.length) * 1.05 : 0.0);
+          
       final aiRestockItemName = restockItemName;
 
       state = state.copyWith(
         grossSales: grossSales,
         netRevenue: netRevenue,
         gstCollected: gstCollected,
-        invoiceCountToday: invoiceCount,
+        invoiceCountToday: invoiceCountToday,
         totalMarketDues: totalMarketDues,
         aiRestockItemsCount: aiRestockItemsCount,
         expectedRevenueTomorrow: expectedRevenueTomorrow,

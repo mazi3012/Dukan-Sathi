@@ -738,46 +738,124 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Iconsax.warning_2, color: AppColors.error),
-            const SizedBox(width: 10),
-            Text(
-              "Delete Product?",
-              style: TextStyle(
-                color: isDark ? Colors.white : AppColors.lightOnSurface,
-                fontWeight: FontWeight.bold,
+      builder: (context) {
+        bool isConfirmed = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: [
+                  const Icon(Iconsax.warning_2, color: AppColors.error, size: 28),
+                  const SizedBox(width: 12),
+                  Text(
+                    "Permanently Delete?",
+                    style: TextStyle(
+                      color: isDark ? Colors.white : AppColors.lightOnSurface,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
-        content: Text(
-          "Are you sure you want to delete ${product.name}? This will remove it completely from your stock list and sales database.",
-          style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.8)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text("Cancel", style: TextStyle(color: isDark ? Colors.white54 : Colors.black54)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context); // close dialog
-              await ref.read(inventoryProvider.notifier).deleteProduct(product.id);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Product deleted successfully"), backgroundColor: AppColors.success),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text("Delete", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Are you sure you want to delete ${product.name}? This will remove it completely from your stock list and sales database forever.",
+                    style: TextStyle(
+                      color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.8),
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  InkWell(
+                    onTap: () {
+                      setDialogState(() {
+                        isConfirmed = !isConfirmed;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
+                        children: [
+                          Checkbox(
+                            value: isConfirmed,
+                            activeColor: AppColors.error,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                            onChanged: (val) {
+                              setDialogState(() {
+                                isConfirmed = val ?? false;
+                              });
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "I confirm I want to permanently delete this product.",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.9),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    "Cancel",
+                    style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isConfirmed
+                      ? () async {
+                          Navigator.pop(context); // close dialog
+                          await ref.read(inventoryProvider.notifier).deleteProduct(product.id);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Product deleted successfully"),
+                                backgroundColor: AppColors.success,
+                              ),
+                            );
+                          }
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.error,
+                    disabledBackgroundColor: isDark 
+                        ? Colors.white.withOpacity(0.06) 
+                        : Colors.black.withOpacity(0.06),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                  child: Text(
+                    "Permanently Delete",
+                    style: TextStyle(
+                      color: isConfirmed 
+                          ? Colors.white 
+                          : (isDark ? Colors.white30 : Colors.black30),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

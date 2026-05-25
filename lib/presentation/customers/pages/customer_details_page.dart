@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import 'package:sqflite/sqflite.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
 import '../../../core/database.dart';
@@ -11,6 +12,10 @@ import '../../../core/session.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import '../../../models/customer.dart';
 import '../providers/customers_provider.dart';
+import '../../../data/repositories/customer_repository.dart';
+import '../../../data/repositories/sale_repository.dart';
+import '../../../data/local/local_database.dart';
+import '../../../core/services/connectivity_service.dart';
 
 class CustomerDetailsPage extends ConsumerStatefulWidget {
   final Map<String, dynamic> customer;
@@ -59,21 +64,50 @@ class _CustomerDetailsPageState extends ConsumerState<CustomerDetailsPage> {
   Future<void> _fetchTransactions() async {
     setState(() => _isLoading = true);
     try {
-      final res = await supabase
-          .from('sales')
-          .select('id, amount, amount_paid, payment_status, timestamp, invoice_number')
-          .eq('customer_id', widget.customer['id'])
-          .order('timestamp', ascending: false); // Newest first
-
+      // 1. Fetch from local database first (instant offline access)
+      final localSales = await LocalDatabase.instance.queryAll(
+        'sales',
+        where: 'customer_id = ?',
+        whereArgs: [widget.customer['id']],
+        orderBy: 'timestamp DESC',
+      );
+      
       if (mounted) {
         setState(() {
-          _transactions = List<Map<String, dynamic>>.from(res);
-          _isLoading = false;
+          _transactions = List<Map<String, dynamic>>.from(localSales);
         });
+      }
+
+      // 2. If online, fetch fresh data from cloud and update local cache
+      if (ConnectivityService.instance.isOnline) {
+        final cloudSales = await supabase
+            .from('sales')
+            .select('id, amount, amount_paid, payment_status, timestamp, invoice_number')
+            .eq('customer_id', widget.customer['id'])
+            .order('timestamp', ascending: false);
+
+        // Keep local cache updated for these specific records to ensure accuracy
+        for (var row in cloudSales) {
+          final saleMap = Map<String, dynamic>.from(row as Map);
+          await LocalDatabase.instance.insert(
+            'sales',
+            saleMap,
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+
+        if (mounted) {
+          setState(() {
+            _transactions = List<Map<String, dynamic>>.from(cloudSales);
+          });
+        }
       }
     } catch (e) {
       debugPrint('[CustomerDetails] Fetch error: $e');
-      if (mounted) setState(() => _isLoading = false);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -185,30 +219,44 @@ class _CustomerDetailsPageState extends ConsumerState<CustomerDetailsPage> {
     
     try {
       final newBalance = _currentBalance - amount;
+      final finalBalance = newBalance < 0 ? 0.0 : newBalance;
       
-      // 1. Update customer balance
-      await supabase.from('customers').update({
-        'current_balance': newBalance < 0 ? 0 : newBalance,
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', widget.customer['id']);
+      // 1. Update customer balance using CustomerRepository (handles local cache + sync manager + web fast path)
+      final customerData = Customer(
+        id: widget.customer['id'],
+        shopId: widget.customer['shop_id'] ?? UserSession().shopId ?? '',
+        name: _customerName,
+        phone: _customerPhone,
+        currentBalance: finalBalance,
+      );
+      await CustomerRepository().updateCustomer(customerData);
 
-      // 2. Create dummy sales record for timeline (Payment)
+      // 2. Create payment transaction record using SaleRepository (handles local cache + sync manager + web fast path)
       final newSaleId = const Uuid().v4();
-      await supabase.from('sales').insert({
+      final saleRecord = {
         'id': newSaleId,
-        'shop_id': UserSession().shopId,
+        'shop_id': widget.customer['shop_id'] ?? UserSession().shopId ?? '',
         'invoice_id': newSaleId,
         'invoice_number': 'PAY-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
         'customer_id': widget.customer['id'],
         'customer_name': widget.customer['name'],
-        'amount': 0, // Payment, not a sale
+        'amount': 0.0, // Payment, not a sale
         'amount_paid': amount,
-        'due_amount': 0,
+        'due_amount': 0.0, // Handled atomically by finalBalance update
         'payment_status': 'PAID',
-      });
+        'discount_amount': 0.0,
+        'timestamp': DateTime.now().toUtc().toIso8601String(),
+        'payment_method': 'cash',
+        'status': 'approved',
+      };
+      
+      await SaleRepository().saveSale(saleRecord);
 
-      setState(() => _currentBalance = newBalance < 0 ? 0 : newBalance);
+      setState(() => _currentBalance = finalBalance);
       _fetchTransactions(); // refresh timeline
+
+      // Update customers provider to ensure parent pages reflect the updated balances immediately
+      ref.read(customersProvider.notifier).fetchCustomers();
 
       if (widget.onPaymentProcessed != null) {
         widget.onPaymentProcessed!();
@@ -733,57 +781,135 @@ class _CustomerDetailsPageState extends ConsumerState<CustomerDetailsPage> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Iconsax.warning_2, color: AppColors.error),
-            const SizedBox(width: 10),
-            Text(
-              "Delete Customer?",
-              style: TextStyle(
-                color: isDark ? Colors.white : AppColors.lightOnSurface,
-                fontWeight: FontWeight.bold,
+      builder: (context) {
+        bool isConfirmed = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: [
+                  const Icon(Iconsax.warning_2, color: AppColors.error, size: 28),
+                  const SizedBox(width: 12),
+                  Text(
+                    "Permanently Delete?",
+                    style: TextStyle(
+                      color: isDark ? Colors.white : AppColors.lightOnSurface,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
-        content: Text(
-          hasDues
-              ? "Warning: This customer has outstanding dues of ₹${_currentBalance.toStringAsFixed(2)}. Deleting this customer will remove their profile and all active dues from your ledger. Are you sure you want to proceed?"
-              : "Are you sure you want to delete ${_customerName}? This action cannot be undone.",
-          style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.8)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text("Cancel", style: TextStyle(color: isDark ? Colors.white54 : Colors.black54)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context); // close dialog
-              final id = widget.customer['id'];
-              
-              // Clear selection in provider first (important for desktop layout)
-              ref.read(customersProvider.notifier).selectCustomer(null);
-              
-              await ref.read(customersProvider.notifier).deleteCustomer(id);
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    hasDues
+                        ? "Warning: This customer has outstanding dues of ₹${_currentBalance.toStringAsFixed(2)}. Deleting this customer will remove their profile and all active dues from your ledger forever."
+                        : "Are you sure you want to delete ${_customerName}? This action cannot be undone and all data will be permanently removed.",
+                    style: TextStyle(
+                      color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.8),
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  InkWell(
+                    onTap: () {
+                      setDialogState(() {
+                        isConfirmed = !isConfirmed;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
+                        children: [
+                          Checkbox(
+                            value: isConfirmed,
+                            activeColor: AppColors.error,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                            onChanged: (val) {
+                              setDialogState(() {
+                                isConfirmed = val ?? false;
+                              });
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "I confirm I want to permanently delete this customer.",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.9),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    "Cancel",
+                    style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isConfirmed
+                      ? () async {
+                          Navigator.pop(context); // close dialog
+                          final id = widget.customer['id'];
+                          
+                          // Clear selection in provider first (important for desktop layout)
+                          ref.read(customersProvider.notifier).selectCustomer(null);
+                          
+                          await ref.read(customersProvider.notifier).deleteCustomer(id);
 
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Customer deleted successfully"), backgroundColor: AppColors.success),
-                );
-                if (!widget.isEmbedded) {
-                  Navigator.pop(context); // close profile page
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text("Delete", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Customer deleted successfully"),
+                                backgroundColor: AppColors.success,
+                              ),
+                            );
+                            if (!widget.isEmbedded) {
+                              Navigator.pop(context); // close profile page
+                            }
+                          }
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.error,
+                    disabledBackgroundColor: isDark 
+                        ? Colors.white.withOpacity(0.06) 
+                        : Colors.black.withOpacity(0.06),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                  child: Text(
+                    "Permanently Delete",
+                    style: TextStyle(
+                      color: isConfirmed 
+                          ? Colors.white 
+                          : (isDark ? Colors.white30 : Colors.black30),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
