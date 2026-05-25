@@ -391,7 +391,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             ),
             _buildMetricsCard(
               "GST Collected",
-              "₹${_gstCollected.toStringAsFixed(0)}",
+              "₹${_gstCollected.toStringAsFixed(2)}",
               trendLabel: "Total tax set aside",
             ),
             _buildMetricsCard(

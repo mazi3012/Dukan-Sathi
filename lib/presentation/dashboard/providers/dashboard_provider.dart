@@ -107,11 +107,14 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       
       double netRevenue = 0;
       double grossSales = 0;
+      double gstCollected = 0;
       for (var row in salesRes) {
         final amount = (row['amount'] as num).toDouble();
         final beforeDiscount = (row['subtotal_before_discount'] as num?)?.toDouble() ?? amount;
-        netRevenue += amount;
+        final afterDiscount = (row['subtotal_after_discount'] as num?)?.toDouble() ?? beforeDiscount;
         grossSales += beforeDiscount;
+        netRevenue += afterDiscount;
+        gstCollected += (amount - afterDiscount);
       }
 
       // 2. Fetch Invoice Count locally
@@ -176,8 +179,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         limit: 6,
       );
 
-      final gstCollected = netRevenue * 0.18; // Keep 18% assumption if missing, or use actual
-      final totalMarketDues = dues > 0 ? dues : 0.0;
+       final totalMarketDues = dues > 0 ? dues : 0.0;
       final aiRestockItemsCount = lowStock;
       final expectedRevenueTomorrow = netRevenue * 1.05; // 5% growth projection
       final aiRestockItemName = restockItemName;
