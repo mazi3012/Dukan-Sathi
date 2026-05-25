@@ -566,6 +566,58 @@ class _POSCheckoutDialogState extends ConsumerState<POSCheckoutDialog> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 12),
+
+                // Payment Mode Selection
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Payment Mode:", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    Row(
+                      children: [
+                        _buildPaymentStatusTab(ref, "Paid", invoice.paymentStatus == 'PAID', 'PAID'),
+                        const SizedBox(width: 6),
+                        _buildPaymentStatusTab(ref, "Partial", invoice.paymentStatus == 'PARTIAL', 'PARTIAL'),
+                        const SizedBox(width: 6),
+                        _buildPaymentStatusTab(ref, "Unpaid", invoice.paymentStatus == 'UNPAID', 'UNPAID'),
+                      ],
+                    ),
+                  ],
+                ),
+                if (invoice.paymentStatus == 'PARTIAL') ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Text("Amount Paid:  ", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      Expanded(
+                        child: Container(
+                          height: 32,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.04),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.white10),
+                          ),
+                          child: TextField(
+                            controller: _paidAmountController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            style: const TextStyle(color: Colors.white, fontSize: 11),
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              hintText: "Enter amount received",
+                              hintStyle: TextStyle(color: Colors.white24, fontSize: 11),
+                              contentPadding: EdgeInsets.only(bottom: 12),
+                            ),
+                            onChanged: (val) {
+                              final amount = double.tryParse(val) ?? 0.0;
+                              ref.read(posProvider.notifier).updatePayment('PARTIAL', amount);
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 16),
 
                 // Bill Totals
@@ -573,6 +625,10 @@ class _POSCheckoutDialogState extends ConsumerState<POSCheckoutDialog> {
                 if (invoice.discountAmount > 0)
                   _buildSummaryRow("Discount", "-₹${invoice.discountAmount.toStringAsFixed(2)}", color: AppColors.success),
                 _buildSummaryRow("CGST + SGST (Tax)", "₹${(invoice.totalAmount - invoice.subtotalAfterDiscount).toStringAsFixed(2)}"),
+                if (invoice.paymentStatus != 'PAID') ...[
+                  _buildSummaryRow("Amount Paid", "₹${invoice.amountPaid.toStringAsFixed(2)}", color: AppColors.success),
+                  _buildSummaryRow("Outstanding Dues", "₹${invoice.dueAmount.toStringAsFixed(2)}", color: AppColors.error),
+                ],
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1092,6 +1148,58 @@ class _POSCheckoutDialogState extends ConsumerState<POSCheckoutDialog> {
                 ),
               ],
             ),
+            const SizedBox(height: 6),
+
+            // Payment Mode Option
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Payment Mode:", style: TextStyle(color: Colors.white70, fontSize: 11)),
+                Row(
+                  children: [
+                    _buildPaymentStatusTab(ref, "Paid", invoice.paymentStatus == 'PAID', 'PAID'),
+                    const SizedBox(width: 4),
+                    _buildPaymentStatusTab(ref, "Partial", invoice.paymentStatus == 'PARTIAL', 'PARTIAL'),
+                    const SizedBox(width: 4),
+                    _buildPaymentStatusTab(ref, "Unpaid", invoice.paymentStatus == 'UNPAID', 'UNPAID'),
+                  ],
+                ),
+              ],
+            ),
+            if (invoice.paymentStatus == 'PARTIAL') ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Text("Amount Paid:  ", style: TextStyle(color: Colors.white70, fontSize: 11)),
+                  Expanded(
+                    child: Container(
+                      height: 28,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.04),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: TextField(
+                        controller: _paidAmountController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: const TextStyle(color: Colors.white, fontSize: 10),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          hintText: "Enter amount received",
+                          hintStyle: TextStyle(color: Colors.white24, fontSize: 10),
+                          contentPadding: EdgeInsets.only(bottom: 14),
+                        ),
+                        onChanged: (val) {
+                          final amount = double.tryParse(val) ?? 0.0;
+                          ref.read(posProvider.notifier).updatePayment('PARTIAL', amount);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 8),
 
             // Bill Totals
@@ -1099,6 +1207,10 @@ class _POSCheckoutDialogState extends ConsumerState<POSCheckoutDialog> {
             if (invoice.discountAmount > 0)
               _buildSummaryRow("Discount", "-₹${invoice.discountAmount.toStringAsFixed(2)}", color: AppColors.success),
             _buildSummaryRow("Tax", "₹${(invoice.totalAmount - invoice.subtotalAfterDiscount).toStringAsFixed(2)}"),
+            if (invoice.paymentStatus != 'PAID') ...[
+              _buildSummaryRow("Amount Paid", "₹${invoice.amountPaid.toStringAsFixed(2)}", color: AppColors.success),
+              _buildSummaryRow("Outstanding Dues", "₹${invoice.dueAmount.toStringAsFixed(2)}", color: AppColors.error),
+            ],
             const SizedBox(height: 4),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1174,6 +1286,48 @@ class _POSCheckoutDialogState extends ConsumerState<POSCheckoutDialog> {
           label,
           style: TextStyle(
             color: active ? AppColors.primary : Colors.white60,
+            fontSize: 10,
+            fontWeight: active ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentStatusTab(WidgetRef ref, String label, bool active, String value) {
+    Color activeColor;
+    if (value == 'PAID') {
+      activeColor = AppColors.success;
+    } else if (value == 'PARTIAL') {
+      activeColor = Colors.orange;
+    } else {
+      activeColor = AppColors.error;
+    }
+
+    return InkWell(
+      onTap: () {
+        final invoice = ref.read(posProvider);
+        double initialPaid = 0.0;
+        if (value == 'PAID') {
+          initialPaid = invoice.totalAmount;
+        } else if (value == 'PARTIAL') {
+          initialPaid = invoice.totalAmount * 0.5; // Default to 50%
+          _paidAmountController.text = initialPaid.toStringAsFixed(2);
+        }
+        ref.read(posProvider.notifier).updatePayment(value, initialPaid);
+      },
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: active ? activeColor.withOpacity(0.2) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: active ? activeColor : Colors.white10),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? activeColor : Colors.white60,
             fontSize: 10,
             fontWeight: active ? FontWeight.bold : FontWeight.normal,
           ),
