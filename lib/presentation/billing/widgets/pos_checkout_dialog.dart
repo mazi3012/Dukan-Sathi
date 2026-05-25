@@ -35,6 +35,7 @@ class _POSCheckoutDialogState extends ConsumerState<POSCheckoutDialog> {
   List<Product> _filteredProducts = [];
   bool _isLoadingProducts = false;
   bool _isFinalizing = false;
+  int _activeMobileTab = 0;
 
   @override
   void initState() {
@@ -217,406 +218,942 @@ class _POSCheckoutDialogState extends ConsumerState<POSCheckoutDialog> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final invoice = ref.watch(posProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1000, maxHeight: 720),
-        child: GlassBox(
-          borderRadius: 24,
-          child: Row(
-            children: [
-              // Left Section: Products Search & Catalog
-              Expanded(
-                flex: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header Search Bar
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              height: 48,
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              decoration: BoxDecoration(
-                                color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Iconsax.search_normal_1, color: Colors.white54, size: 20),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _searchController,
-                                      style: const TextStyle(color: Colors.white, fontSize: 14),
-                                      onChanged: _filterProducts,
-                                      decoration: const InputDecoration(
-                                        border: InputBorder.none,
-                                        hintText: "Search products by name or barcode...",
-                                        hintStyle: TextStyle(color: Colors.white38, fontSize: 13),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          IconButton(
-                            icon: const Icon(Iconsax.scan, color: AppColors.primary, size: 28),
-                            onPressed: () => _openBarcodeScanner(context),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            "Product Catalog",
-                            style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
-                          ),
-                          TextButton.icon(
-                            icon: const Icon(Iconsax.add_circle, size: 16, color: AppColors.primary),
-                            label: const Text("Add Custom Item", style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
-                            onPressed: _showAddCustomItemDialog,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Products Grid/List
-                      Expanded(
-                        child: _isLoadingProducts
-                            ? const Center(child: CircularProgressIndicator())
-                            : _filteredProducts.isEmpty
-                                ? const Center(child: Text("No items match search filter.", style: TextStyle(color: Colors.white38)))
-                                : GridView.builder(
-                                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 2,
-                                      childAspectRatio: 2.2,
-                                      crossAxisSpacing: 12,
-                                      mainAxisSpacing: 12,
-                                    ),
-                                    itemCount: _filteredProducts.length,
-                                    itemBuilder: (context, index) {
-                                      final product = _filteredProducts[index];
-                                      return Container(
-                                        decoration: BoxDecoration(
-                                          color: isDark ? Colors.white.withOpacity(0.02) : Colors.black.withOpacity(0.02),
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
-                                        ),
-                                        child: InkWell(
-                                          onTap: () {
-                                            ref.read(posProvider.notifier).addItem(
-                                              CartItem(
-                                                productId: product.id,
-                                                productName: product.name,
-                                                quantity: 1,
-                                                unitPrice: product.price,
-                                                gstRate: product.gstRate,
-                                              ),
-                                            );
-                                          },
-                                          borderRadius: BorderRadius.circular(12),
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(12.0),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                Text(
-                                                  product.name,
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                                ),
-                                                Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                  children: [
-                                                    Text(
-                                                      "₹${product.price.toStringAsFixed(2)}",
-                                                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13),
-                                                    ),
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.white.withOpacity(0.05),
-                                                        borderRadius: BorderRadius.circular(4),
-                                                      ),
-                                                      child: Text(
-                                                        "${product.stockQuantity} Left",
-                                                        style: TextStyle(
-                                                          color: product.stockQuantity <= 5 ? Colors.redAccent : Colors.white70,
-                                                          fontSize: 10,
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Right Divider
-              Container(width: 1, color: isDark ? Colors.white12 : Colors.black12),
-
-              // Right Section: Cart and Checkout
-              Expanded(
-                flex: 3,
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            "POS Cart",
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-                          ),
-                          TextButton(
-                            onPressed: () => ref.read(posProvider.notifier).reset(),
-                            child: const Text("Clear All", style: TextStyle(color: Colors.redAccent, fontSize: 12)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Customer Selection Row
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+  Widget _buildDesktopPos(POSInvoiceState invoice, bool isDark) {
+    return Row(
+      children: [
+        // Left Section: Products Search & Catalog
+        Expanded(
+          flex: 4,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header Search Bar
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        height: 48,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.03),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.white10),
+                          color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Iconsax.user, color: Colors.white70, size: 18),
-                            const SizedBox(width: 8),
+                            const Icon(Iconsax.search_normal_1, color: Colors.white54, size: 20),
+                            const SizedBox(width: 12),
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    invoice.customerName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                                  ),
-                                  Text(
-                                    invoice.customerId == null ? "Walk-in" : "Dukan Customer",
-                                    style: const TextStyle(color: Colors.white38, fontSize: 9),
-                                  ),
-                                ],
+                              child: TextField(
+                                controller: _searchController,
+                                style: const TextStyle(color: Colors.white, fontSize: 14),
+                                onChanged: _filterProducts,
+                                decoration: const InputDecoration(
+                                  border: InputBorder.none,
+                                  hintText: "Search products by name or barcode...",
+                                  hintStyle: TextStyle(color: Colors.white38, fontSize: 13),
+                                ),
                               ),
-                            ),
-                            TextButton.icon(
-                              icon: const Icon(Iconsax.edit, size: 12, color: AppColors.primary),
-                              label: const Text("Change", style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
-                              onPressed: _showCustomerSelectionDialog,
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 12),
+                    ),
+                    const SizedBox(width: 12),
+                    IconButton(
+                      icon: const Icon(Iconsax.scan, color: AppColors.primary, size: 28),
+                      onPressed: () => _openBarcodeScanner(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
 
-                      // Cart Items list
-                      Expanded(
-                        child: invoice.items.isEmpty
-                            ? const Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Iconsax.shopping_cart, color: Colors.white24, size: 40),
-                                    SizedBox(height: 12),
-                                    Text("POS Cart is empty.", style: TextStyle(color: Colors.white38, fontSize: 13)),
-                                  ],
-                                ),
-                              )
-                            : ListView.builder(
-                                itemCount: invoice.items.length,
-                                itemBuilder: (context, index) {
-                                  final item = invoice.items[index];
-                                  return InkWell(
-                                    onTap: () => _showEditCartItemDialog(item),
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: Container(
-                                      margin: const EdgeInsets.only(bottom: 8),
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.03),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: Colors.white10),
-                                      ),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Product Catalog",
+                      style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(Iconsax.add_circle, size: 16, color: AppColors.primary),
+                      label: const Text("Add Custom Item", style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                      onPressed: _showAddCustomItemDialog,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Products Grid/List
+                Expanded(
+                  child: _isLoadingProducts
+                      ? const Center(child: CircularProgressIndicator())
+                      : _filteredProducts.isEmpty
+                          ? const Center(child: Text("No items match search filter.", style: TextStyle(color: Colors.white38)))
+                          : GridView.builder(
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 2.2,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                              ),
+                              itemCount: _filteredProducts.length,
+                              itemBuilder: (context, index) {
+                                final product = _filteredProducts[index];
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.white.withOpacity(0.02) : Colors.black.withOpacity(0.02),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
+                                  ),
+                                  child: InkWell(
+                                    onTap: () {
+                                      ref.read(posProvider.notifier).addItem(
+                                        CartItem(
+                                          productId: product.id,
+                                          productName: product.name,
+                                          quantity: 1,
+                                          unitPrice: product.price,
+                                          gstRate: product.gstRate,
+                                        ),
+                                      );
+                                    },
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12.0),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            product.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                          ),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
                                               Text(
-                                                item.productName ?? 'Product',
-                                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
+                                                "₹${product.price.toStringAsFixed(2)}",
+                                                style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13),
                                               ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                "₹${item.unitPrice.toStringAsFixed(2)} each",
-                                                style: const TextStyle(color: Colors.white38, fontSize: 11),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white.withOpacity(0.05),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  "${product.stockQuantity} Left",
+                                                  style: TextStyle(
+                                                    color: product.stockQuantity <= 5 ? Colors.redAccent : Colors.white70,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
                                               ),
                                             ],
                                           ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Right Divider
+        Container(width: 1, color: isDark ? Colors.white12 : Colors.black12),
+
+        // Right Section: Cart and Checkout
+        Expanded(
+          flex: 3,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "POS Cart",
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                    TextButton(
+                      onPressed: () => ref.read(posProvider.notifier).reset(),
+                      child: const Text("Clear All", style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Customer Selection Row
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.03),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Iconsax.user, color: Colors.white70, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              invoice.customerName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                            Text(
+                              invoice.customerId == null ? "Walk-in" : "Dukan Customer",
+                              style: const TextStyle(color: Colors.white38, fontSize: 9),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton.icon(
+                        icon: const Icon(Iconsax.edit, size: 12, color: AppColors.primary),
+                        label: const Text("Change", style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
+                        onPressed: _showCustomerSelectionDialog,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Cart Items list
+                Expanded(
+                  child: invoice.items.isEmpty
+                      ? const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Iconsax.shopping_cart, color: Colors.white24, size: 40),
+                              SizedBox(height: 12),
+                              Text("POS Cart is empty.", style: TextStyle(color: Colors.white38, fontSize: 13)),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: invoice.items.length,
+                          itemBuilder: (context, index) {
+                            final item = invoice.items[index];
+                            return InkWell(
+                              onTap: () => _showEditCartItemDialog(item),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.03),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.white10),
+                                ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item.productName ?? 'Product',
+                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
                                         ),
-                                        // Quantity adjusts
-                                        Row(
-                                          children: [
-                                            IconButton(
-                                              icon: const Icon(Icons.remove, color: Colors.white70, size: 16),
-                                              onPressed: () {
-                                                ref.read(posProvider.notifier).updateItemQuantity(
-                                                  item.productId,
-                                                  item.quantity - 1,
-                                                );
-                                              },
-                                            ),
-                                            Text(
-                                              "${item.quantity}",
-                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(Icons.add, color: Colors.white70, size: 16),
-                                              onPressed: () {
-                                                ref.read(posProvider.notifier).updateItemQuantity(
-                                                  item.productId,
-                                                  item.quantity + 1,
-                                                );
-                                              },
-                                            ),
-                                          ],
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          "₹${item.unitPrice.toStringAsFixed(2)} each",
+                                          style: const TextStyle(color: Colors.white38, fontSize: 11),
                                         ),
                                       ],
                                     ),
-                                  ));
-                                },
+                                  ),
+                                  // Quantity adjusts
+                                  Row(
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.remove, color: Colors.white70, size: 16),
+                                        onPressed: () {
+                                          ref.read(posProvider.notifier).updateItemQuantity(
+                                            item.productId,
+                                            item.quantity - 1,
+                                          );
+                                        },
+                                      ),
+                                      Text(
+                                        "${item.quantity}",
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.add, color: Colors.white70, size: 16),
+                                        onPressed: () {
+                                          ref.read(posProvider.notifier).updateItemQuantity(
+                                            item.productId,
+                                            item.quantity + 1,
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                      ),
-                      const Divider(color: Colors.white10, height: 24),
+                            ));
+                          },
+                        ),
+                ),
+                const Divider(color: Colors.white10, height: 24),
 
-                      // GST Type & Tax Summary
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text("GST Option:", style: TextStyle(color: Colors.white70, fontSize: 12)),
-                          Row(
-                            children: [
-                              _buildGstTab(ref, "Intra (CGST+SGST)", invoice.gstType == 'CGST_SGST', 'CGST_SGST'),
-                              const SizedBox(width: 8),
-                              _buildGstTab(ref, "Inter (IGST)", invoice.gstType == 'IGST', 'IGST'),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
+                // GST Type & Tax Summary
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("GST Option:", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    Row(
+                      children: [
+                        _buildGstTab(ref, "Intra (CGST+SGST)", invoice.gstType == 'CGST_SGST', 'CGST_SGST'),
+                        const SizedBox(width: 8),
+                        _buildGstTab(ref, "Inter (IGST)", invoice.gstType == 'IGST', 'IGST'),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
 
-                      // Discount Option
-                      Row(
-                        children: [
-                          const Text("Discount:  ", style: TextStyle(color: Colors.white70, fontSize: 12)),
-                          Expanded(
-                            child: Container(
-                              height: 32,
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.04),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: Colors.white10),
-                              ),
-                              child: TextField(
-                                controller: _discountController,
-                                style: const TextStyle(color: Colors.white, fontSize: 11),
-                                decoration: const InputDecoration(
-                                  border: InputBorder.none,
-                                  hintText: "e.g. 10% or 50",
-                                  hintStyle: TextStyle(color: Colors.white24, fontSize: 11),
-                                ),
-                                onSubmitted: (val) {
-                                  final isPercent = val.contains('%');
-                                  final value = double.tryParse(val.replaceAll('%', '').trim()) ?? 0;
-                                  ref.read(posProvider.notifier).updateDiscount(
-                                    isPercent ? 'PERCENT' : 'AMOUNT',
-                                    value,
-                                  );
-                                },
-                              ),
-                            ),
+                // Discount Option
+                Row(
+                  children: [
+                    const Text("Discount:  ", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    Expanded(
+                      child: Container(
+                        height: 32,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: TextField(
+                          controller: _discountController,
+                          style: const TextStyle(color: Colors.white, fontSize: 11),
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            hintText: "e.g. 10% or 50",
+                            hintStyle: TextStyle(color: Colors.white24, fontSize: 11),
                           ),
-                        ],
+                          onSubmitted: (val) {
+                            final isPercent = val.contains('%');
+                            final value = double.tryParse(val.replaceAll('%', '').trim()) ?? 0;
+                            ref.read(posProvider.notifier).updateDiscount(
+                              isPercent ? 'PERCENT' : 'AMOUNT',
+                              value,
+                            );
+                          },
+                        ),
                       ),
-                      const SizedBox(height: 16),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
 
-                      // Bill Totals
-                      _buildSummaryRow("Subtotal", "₹${invoice.subtotalBeforeDiscount.toStringAsFixed(2)}"),
-                      if (invoice.discountAmount > 0)
-                        _buildSummaryRow("Discount", "-₹${invoice.discountAmount.toStringAsFixed(2)}", color: AppColors.success),
-                      _buildSummaryRow("CGST + SGST (Tax)", "₹${(invoice.totalAmount - invoice.subtotalAfterDiscount).toStringAsFixed(2)}"),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text("Total Amount", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                          Text(
-                            "₹${invoice.totalAmount.toStringAsFixed(2)}",
-                            style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900, fontSize: 20),
-                          ),
-                        ],
+                // Bill Totals
+                _buildSummaryRow("Subtotal", "₹${invoice.subtotalBeforeDiscount.toStringAsFixed(2)}"),
+                if (invoice.discountAmount > 0)
+                  _buildSummaryRow("Discount", "-₹${invoice.discountAmount.toStringAsFixed(2)}", color: AppColors.success),
+                _buildSummaryRow("CGST + SGST (Tax)", "₹${(invoice.totalAmount - invoice.subtotalAfterDiscount).toStringAsFixed(2)}"),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Total Amount", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    Text(
+                      "₹${invoice.totalAmount.toStringAsFixed(2)}",
+                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900, fontSize: 20),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Checkout button
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _isFinalizing ? null : () => _finalizeAndPrint(invoice),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: _isFinalizing
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white))
+                        : const Text("Approve & Print Invoice", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobilePos(POSInvoiceState invoice, bool isDark) {
+    return Column(
+      children: [
+        // Mobile Header with Title and Close button
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Manual POS Billing",
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.white70),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        ),
+        
+        // Tab switcher
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Container(
+            height: 40,
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.04),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _activeMobileTab = 0),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: _activeMobileTab == 0 
+                            ? AppColors.primary 
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      const SizedBox(height: 20),
+                      child: Text(
+                        "Catalog",
+                        style: TextStyle(
+                          color: _activeMobileTab == 0 ? Colors.white : Colors.white60,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _activeMobileTab = 1),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: _activeMobileTab == 1 
+                            ? AppColors.primary 
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        "Cart (${invoice.items.length})",
+                        style: TextStyle(
+                          color: _activeMobileTab == 1 ? Colors.white : Colors.white60,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
 
-                      // Checkout button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          onPressed: _isFinalizing ? null : () => _finalizeAndPrint(invoice),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        // Active tab body
+        Expanded(
+          child: _activeMobileTab == 0 
+              ? _buildMobileCatalogTab(isDark)
+              : _buildMobileCartTab(invoice, isDark),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileCatalogTab(bool isDark) {
+    final invoice = ref.watch(posProvider);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Search Bar
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Iconsax.search_normal_1, color: Colors.white54, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          onChanged: _filterProducts,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            hintText: "Search products/barcodes...",
+                            hintStyle: TextStyle(color: Colors.white38, fontSize: 12),
                           ),
-                          child: _isFinalizing
-                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white))
-                              : const Text("Approve & Print Invoice", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Iconsax.scan, color: AppColors.primary, size: 24),
+                onPressed: () => _openBarcodeScanner(context),
+              ),
             ],
           ),
+          const SizedBox(height: 8),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Product Catalog",
+                style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+              TextButton.icon(
+                icon: const Icon(Iconsax.add_circle, size: 14, color: AppColors.primary),
+                label: const Text("Add Custom", style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
+                onPressed: _showAddCustomItemDialog,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+
+          // Products Grid/List
+          Expanded(
+            child: _isLoadingProducts
+                ? const Center(child: CircularProgressIndicator())
+                : _filteredProducts.isEmpty
+                    ? const Center(child: Text("No items match search filter.", style: TextStyle(color: Colors.white38)))
+                    : GridView.builder(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: MediaQuery.of(context).size.width < 400 ? 1 : 2,
+                          childAspectRatio: MediaQuery.of(context).size.width < 400 ? 3.8 : 2.0,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
+                        itemCount: _filteredProducts.length,
+                        itemBuilder: (context, index) {
+                          final product = _filteredProducts[index];
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.white.withOpacity(0.02) : Colors.black.withOpacity(0.02),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
+                            ),
+                            child: InkWell(
+                              onTap: () {
+                                ref.read(posProvider.notifier).addItem(
+                                  CartItem(
+                                    productId: product.id,
+                                    productName: product.name,
+                                    quantity: 1,
+                                    unitPrice: product.price,
+                                    gstRate: product.gstRate,
+                                  ),
+                                );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text("Added ${product.name} to cart!"),
+                                    duration: const Duration(milliseconds: 600),
+                                    backgroundColor: AppColors.primary,
+                                  ),
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      product.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                    ),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          "₹${product.price.toStringAsFixed(2)}",
+                                          style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 12),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.05),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            "${product.stockQuantity} Left",
+                                            style: TextStyle(
+                                              color: product.stockQuantity <= 5 ? Colors.redAccent : Colors.white70,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+          
+          // Sticky go to checkout bar if items in cart
+          if (invoice.items.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton.icon(
+                  onPressed: () => setState(() => _activeMobileTab = 1),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Iconsax.shopping_cart, color: Colors.white, size: 18),
+                  label: Text(
+                    "Checkout ${invoice.items.length} items (₹${invoice.totalAmount.toStringAsFixed(2)}) →",
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ),
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 10),
+          ]
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileCartTab(POSInvoiceState invoice, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Customer selection card
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.03),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: Row(
+              children: [
+                const Icon(Iconsax.user, color: Colors.white70, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        invoice.customerName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                      ),
+                      Text(
+                        invoice.customerId == null ? "Walk-in" : "Dukan Customer",
+                        style: const TextStyle(color: Colors.white38, fontSize: 8),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton.icon(
+                  icon: const Icon(Iconsax.edit, size: 10, color: AppColors.primary),
+                  label: const Text("Change", style: TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold)),
+                  onPressed: _showCustomerSelectionDialog,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Clear cart link if not empty
+          if (invoice.items.isNotEmpty)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    ref.read(posProvider.notifier).reset();
+                    setState(() => _activeMobileTab = 0);
+                  },
+                  style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(50, 20)),
+                  child: const Text("Clear All Items", style: TextStyle(color: Colors.redAccent, fontSize: 11)),
+                ),
+              ],
+            ),
+
+          // Cart Items List
+          Expanded(
+            child: invoice.items.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Iconsax.shopping_cart, color: Colors.white24, size: 36),
+                        const SizedBox(height: 8),
+                        const Text("Cart is empty.", style: TextStyle(color: Colors.white38, fontSize: 12)),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: () => setState(() => _activeMobileTab = 0),
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, minimumSize: const Size(120, 36)),
+                          child: const Text("Browse Catalog", style: TextStyle(color: Colors.white, fontSize: 12)),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: invoice.items.length,
+                    itemBuilder: (context, index) {
+                      final item = invoice.items[index];
+                      return InkWell(
+                        onTap: () => _showEditCartItemDialog(item),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.03),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white10),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.productName ?? 'Product',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      "₹${item.unitPrice.toStringAsFixed(2)} each",
+                                      style: const TextStyle(color: Colors.white38, fontSize: 10),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.remove, color: Colors.white70, size: 14),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    onPressed: () {
+                                      ref.read(posProvider.notifier).updateItemQuantity(
+                                        item.productId,
+                                        item.quantity - 1,
+                                      );
+                                    },
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6.0),
+                                    child: Text(
+                                      "${item.quantity}",
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.add, color: Colors.white70, size: 14),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    onPressed: () {
+                                      ref.read(posProvider.notifier).updateItemQuantity(
+                                        item.productId,
+                                        item.quantity + 1,
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          const Divider(color: Colors.white10, height: 16),
+
+          if (invoice.items.isNotEmpty) ...[
+            // GST Type & Tax Summary
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("GST Option:", style: TextStyle(color: Colors.white70, fontSize: 11)),
+                Row(
+                  children: [
+                    _buildGstTab(ref, "Intra", invoice.gstType == 'CGST_SGST', 'CGST_SGST'),
+                    const SizedBox(width: 6),
+                    _buildGstTab(ref, "Inter", invoice.gstType == 'IGST', 'IGST'),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+
+            // Discount Option
+            Row(
+              children: [
+                const Text("Discount:  ", style: TextStyle(color: Colors.white70, fontSize: 11)),
+                Expanded(
+                  child: Container(
+                    height: 28,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.04),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    child: TextField(
+                      controller: _discountController,
+                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        hintText: "e.g. 10% or 50",
+                        hintStyle: TextStyle(color: Colors.white24, fontSize: 10),
+                        contentPadding: EdgeInsets.only(bottom: 14),
+                      ),
+                      onSubmitted: (val) {
+                        final isPercent = val.contains('%');
+                        final value = double.tryParse(val.replaceAll('%', '').trim()) ?? 0;
+                        ref.read(posProvider.notifier).updateDiscount(
+                          isPercent ? 'PERCENT' : 'AMOUNT',
+                          value,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Bill Totals
+            _buildSummaryRow("Subtotal", "₹${invoice.subtotalBeforeDiscount.toStringAsFixed(2)}"),
+            if (invoice.discountAmount > 0)
+              _buildSummaryRow("Discount", "-₹${invoice.discountAmount.toStringAsFixed(2)}", color: AppColors.success),
+            _buildSummaryRow("Tax", "₹${(invoice.totalAmount - invoice.subtotalAfterDiscount).toStringAsFixed(2)}"),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Total Amount", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                Text(
+                  "₹${invoice.totalAmount.toStringAsFixed(2)}",
+                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900, fontSize: 16),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Checkout button
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                onPressed: _isFinalizing ? null : () => _finalizeAndPrint(invoice),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _isFinalizing
+                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text("Approve & Print Invoice", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final invoice = ref.watch(posProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isMobile = MediaQuery.of(context).size.width < 768;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 8 : 16,
+        vertical: isMobile ? 12 : 20,
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: isMobile ? 480 : 1000,
+          maxHeight: isMobile ? MediaQuery.of(context).size.height * 0.88 : 720,
+        ),
+        child: GlassBox(
+          borderRadius: 24,
+          child: isMobile ? _buildMobilePos(invoice, isDark) : _buildDesktopPos(invoice, isDark),
         ),
       ),
     );

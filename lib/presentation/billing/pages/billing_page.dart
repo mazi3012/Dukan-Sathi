@@ -196,18 +196,21 @@ class _BillingPageState extends State<BillingPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          showDialog(
-            context: context,
-            barrierColor: Colors.black.withOpacity(0.55),
-            builder: (context) => const POSCheckoutDialog(),
-          ).then((_) => _fetchSales()); // Refresh sales list when closed!
-        },
-        backgroundColor: AppColors.primary,
-        icon: const Icon(Iconsax.add, color: Colors.white),
-        label: const Text("New Bill", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      ).animate().scale(delay: 500.ms),
+      floatingActionButton: Container(
+        margin: EdgeInsets.only(bottom: isDesktop ? 0 : 90),
+        child: FloatingActionButton.extended(
+          onPressed: () {
+            showDialog(
+              context: context,
+              barrierColor: Colors.black.withOpacity(0.55),
+              builder: (context) => const POSCheckoutDialog(),
+            ).then((_) => _fetchSales()); // Refresh sales list when closed!
+          },
+          backgroundColor: AppColors.primary,
+          icon: const Icon(Iconsax.add, color: Colors.white),
+          label: const Text("New Bill", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        ).animate().scale(delay: 500.ms),
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
