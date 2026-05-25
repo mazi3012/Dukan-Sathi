@@ -37,6 +37,11 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   int? _selectedSaleIndex;
   final ScrollController _scrollController = ScrollController();
 
+  List<Map<String, dynamic>> _sales = [];
+  bool _isLoading = false;
+  bool _isLoadingMore = false;
+  double _todayRevenue = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -59,6 +64,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   }
 
   final SaleRepository _saleRepo = SaleRepository();
+  final LocalDatabase _localDb = LocalDatabase.instance;
 
   Future<void> _fetchSales() async {
     await ref.read(salesProvider.notifier).fetchSales(forceRefresh: true);
@@ -379,10 +385,10 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   Widget build(BuildContext context) {
     final isDesktop = ResponsiveLayout.isDesktop(context) || ResponsiveLayout.isTablet(context);
     final salesState = ref.watch(salesProvider);
-    final _sales = salesState.sales;
-    final _isLoading = salesState.isLoading;
-    final _isLoadingMore = salesState.isLoadingMore;
-    final _todayRevenue = salesState.todayRevenue;
+    _sales = salesState.sales;
+    _isLoading = salesState.isLoading;
+    _isLoadingMore = salesState.isLoadingMore;
+    _todayRevenue = salesState.todayRevenue;
 
     // Reactive auto-selection and out-of-bounds safety logic
     if (_sales.isEmpty) {
