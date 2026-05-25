@@ -403,6 +403,40 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   ),
           ),
         ).animate().scale(delay: 150.ms),
+        const SizedBox(height: 20),
+        Center(
+          child: TextButton.icon(
+            onPressed: _isLoading
+                ? null
+                : () async {
+                    setState(() {
+                      _isLoading = true;
+                      _error = null;
+                      _infoMessage = null;
+                    });
+                    final result = await UserSession().loginBypass();
+                    if (!mounted) return;
+                    setState(() => _isLoading = false);
+                    if (result['success'] == false) {
+                      setState(() => _error = result['error']?.toString());
+                    }
+                  },
+            icon: Icon(
+              Iconsax.code,
+              size: 16,
+              color: isDark ? Colors.white60 : AppColors.primary,
+            ),
+            label: Text(
+              'Bypass Sign-In (Developer Demo)',
+              style: TextStyle(
+                color: isDark ? Colors.white60 : AppColors.primary,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

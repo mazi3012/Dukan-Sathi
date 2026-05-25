@@ -107,6 +107,8 @@ class _LoginPageState extends State<LoginPage> {
 
               const SizedBox(height: 32),
               _buildGoogleSignInButton(),
+              const SizedBox(height: 16),
+              _buildBypassButton(),
               
               const SizedBox(height: 16),
               _buildInfoText(),
@@ -186,7 +188,46 @@ class _LoginPageState extends State<LoginPage> {
                 ],
               ),
       ),
+      ),
     ).animate().fadeIn(delay: 300.ms);
+  }
+
+  Widget _buildBypassButton() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Center(
+      child: TextButton.icon(
+        onPressed: _isLoading
+            ? null
+            : () async {
+                setState(() {
+                  _isLoading = true;
+                  _error = null;
+                });
+                final result = await UserSession().loginBypass();
+                if (!mounted) return;
+                setState(() => _isLoading = false);
+                if (result['success'] == true) {
+                  _navigateToDashboard();
+                } else {
+                  setState(() => _error = result['error']?.toString());
+                }
+              },
+        icon: Icon(
+          Iconsax.code,
+          size: 16,
+          color: isDark ? Colors.white70 : Theme.of(context).primaryColor,
+        ),
+        label: Text(
+          'Bypass Sign-In (Developer Demo)',
+          style: TextStyle(
+            color: isDark ? Colors.white70 : Theme.of(context).primaryColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            decoration: TextDecoration.underline,
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildInfoText() {

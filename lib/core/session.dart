@@ -192,6 +192,43 @@ class UserSession extends ChangeNotifier {
     return result;
   }
 
+  /// Developer bypass to log in without Google OAuth in debug environments.
+  Future<Map<String, dynamic>> loginBypass() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('ds_debug_bypass', true);
+
+      _userId = 'debug_user_id';
+      _userName = 'Developer Guest';
+      _emailVerified = true;
+
+      await _storage.saveUser(_userId!, _userName ?? '');
+
+      // Assign a mock shop so the user immediately lands on MainLayout
+      _shopId = 'debug_shop_id';
+      _shopName = 'Dukan Sathi Demo';
+      _shopState = 'DL';
+      _shopGstMode = 'UNREGISTERED';
+      _shopBusinessType = 'Retail';
+
+      await _storage.saveShop(
+        id: _shopId!,
+        name: _shopName ?? 'My Shop',
+        state: _shopState ?? 'DL',
+        gstMode: _shopGstMode ?? 'UNREGISTERED',
+        gstNum: null,
+        businessType: _shopBusinessType ?? 'Retail',
+      );
+
+      triggerCacheWarmup();
+      notifyListeners();
+      return {'success': true};
+    } catch (e) {
+      debugPrint('[UserSession] loginBypass error: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
   /// Create a new shop for the user
   Future<Map<String, dynamic>> createShop({
     required String name,
