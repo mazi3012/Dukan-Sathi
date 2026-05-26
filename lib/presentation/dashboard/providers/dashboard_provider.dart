@@ -154,7 +154,8 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       return;
     }
 
-    state = state.copyWith(isLoading: true, hasError: false);
+    final bool isInitialLoad = state.past7DaysSales.isEmpty || state.grossSales == 0;
+    state = state.copyWith(isLoading: isInitialLoad, hasError: false);
 
     try {
       // 1. Proactively align any out-of-sync local balances to ensure perfect dashboard stats

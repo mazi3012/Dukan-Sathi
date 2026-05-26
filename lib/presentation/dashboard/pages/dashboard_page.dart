@@ -21,6 +21,8 @@ class DashboardPage extends ConsumerStatefulWidget {
 }
 
 class _DashboardPageState extends ConsumerState<DashboardPage> {
+  int? _selectedChartIndex;
+
   @override
   void initState() {
     super.initState();
@@ -206,17 +208,18 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   Widget _buildDesktopLayout(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildWelcomeSection(context),
-          const SizedBox(height: 24),
-          _isLoading ? _buildStatsSkeleton() : _buildStatsGrid(),
-          const SizedBox(height: 28),
-          Expanded(
-            child: Row(
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildWelcomeSection(context),
+            const SizedBox(height: 24),
+            _isLoading ? _buildStatsSkeleton() : _buildStatsGrid(),
+            const SizedBox(height: 28),
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Left Column: AI Forecast Wave & Activity logs
@@ -229,15 +232,15 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                       children: [
                         _buildSectionTitle(context, "AI Sales Prediction & Forecast"),
                         const SizedBox(height: 12),
-                        Expanded(
-                          flex: 45,
+                        SizedBox(
+                          height: 380, // Spacious fixed height of 380 on desktop!
                           child: _isLoading ? _buildChartSkeleton() : _buildSalesChart(),
                         ),
                         const SizedBox(height: 24),
                         _buildSectionTitle(context, "Recent Invoices & Activity"),
                         const SizedBox(height: 12),
-                        Expanded(
-                          flex: 55,
+                        SizedBox(
+                          height: 480, // Spacious fixed height of 480 on desktop!
                           child: _isLoading ? _buildActivitySkeleton() : _buildActivityCard(),
                         ),
                       ],
@@ -255,7 +258,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                       children: [
                         _buildSectionTitle(context, "AI Critical Notify & Smart Feed"),
                         const SizedBox(height: 12),
-                        Expanded(
+                        SizedBox(
+                          height: 880, // Spacious fixed height of 880 to show all alerts without squeeze!
                           child: _isLoading ? _buildInsightsSkeleton() : _buildAIAlertsFeed(isDesktop: true),
                         ),
                       ],
@@ -264,8 +268,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                 ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 100), // Navigation spacer
+          ],
+        ),
       ),
     );
   }
@@ -613,14 +618,67 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         Expanded(
           child: SizedBox(
             width: double.infinity,
-            child: CustomPaint(
-              painter: ProfessionalMLComboPainter(
-                currentData: _past7DaysSales,
-                predictedData: _predicted7DaysSales,
-                currentColor: const Color(0xFF10B981),
-                predictedColor: const Color(0xFF06B6D4),
-                isDark: isDark,
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final double width = constraints.maxWidth;
+                const double leftPadding = 20.0;
+                const double rightPadding = 45.0;
+                final double drawableWidth = width - leftPadding - rightPadding;
+                final int totalPoints = _past7DaysSales.length + _predicted7DaysSales.length;
+                final double dx = drawableWidth / (totalPoints - 1);
+
+                return GestureDetector(
+                  onTapDown: (details) {
+                    final double localX = details.localPosition.dx;
+                    final int index = ((localX - leftPadding) / dx).round().clamp(0, totalPoints - 1);
+                    setState(() {
+                      _selectedChartIndex = index;
+                    });
+                  },
+                  onPanDown: (details) {
+                    final double localX = details.localPosition.dx;
+                    final int index = ((localX - leftPadding) / dx).round().clamp(0, totalPoints - 1);
+                    setState(() {
+                      _selectedChartIndex = index;
+                    });
+                  },
+                  onPanUpdate: (details) {
+                    final double localX = details.localPosition.dx;
+                    final int index = ((localX - leftPadding) / dx).round().clamp(0, totalPoints - 1);
+                    setState(() {
+                      _selectedChartIndex = index;
+                    });
+                  },
+                  onPanEnd: (_) {
+                    Future.delayed(const Duration(seconds: 3), () {
+                      if (mounted) {
+                        setState(() {
+                          _selectedChartIndex = null;
+                        });
+                      }
+                    });
+                  },
+                  onTapUp: (_) {
+                    Future.delayed(const Duration(seconds: 3), () {
+                      if (mounted) {
+                        setState(() {
+                          _selectedChartIndex = null;
+                        });
+                      }
+                    });
+                  },
+                  child: CustomPaint(
+                    painter: ProfessionalMLComboPainter(
+                      currentData: _past7DaysSales,
+                      predictedData: _predicted7DaysSales,
+                      currentColor: const Color(0xFF10B981),
+                      predictedColor: const Color(0xFF06B6D4),
+                      isDark: isDark,
+                      selectedIndex: _selectedChartIndex,
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ),
@@ -660,7 +718,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         padding: const EdgeInsets.all(18),
         child: isDesktop 
             ? chartContent 
-            : SizedBox(height: 260, child: chartContent),
+            : SizedBox(height: 315, child: chartContent),
       ),
     );
   }
@@ -1089,6 +1147,7 @@ class ProfessionalMLComboPainter extends CustomPainter {
   final Color currentColor;
   final Color predictedColor;
   final bool isDark;
+  final int? selectedIndex;
 
   ProfessionalMLComboPainter({
     required this.currentData,
@@ -1096,6 +1155,7 @@ class ProfessionalMLComboPainter extends CustomPainter {
     required this.currentColor,
     required this.predictedColor,
     required this.isDark,
+    this.selectedIndex,
   });
 
   @override
@@ -1326,6 +1386,83 @@ class ProfessionalMLComboPainter extends CustomPainter {
         _drawText(canvas, label, Offset(x, baseline + 8.0), predictedColor.withOpacity(0.8), fontSize: 8.0, fontWeight: FontWeight.bold);
       }
     }
+
+    // 8. Draw Touch Interaction Tooltip
+    if (selectedIndex != null && selectedIndex! >= 0 && selectedIndex! < totalPoints) {
+      final double x = getX(selectedIndex!);
+      final double val = selectedIndex! < currentData.length 
+          ? currentData[selectedIndex!] 
+          : predictedData[selectedIndex! - currentData.length];
+      final double y = getY(val);
+
+      final Color activeColor = selectedIndex! < currentData.length ? currentColor : predictedColor;
+
+      // Draw vertical guide line
+      final guidePaint = Paint()
+        ..color = activeColor.withOpacity(0.18)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2;
+      canvas.drawLine(Offset(x, topPadding), Offset(x, baseline), guidePaint);
+
+      // Draw highlighted circle
+      final highlightPaint = Paint()..color = activeColor;
+      final highlightGlowPaint = Paint()..color = activeColor.withOpacity(0.35);
+      canvas.drawCircle(Offset(x, y), 8.0, highlightGlowPaint);
+      canvas.drawCircle(Offset(x, y), 4.0, highlightPaint);
+
+      // Draw floating Glassmorphic Tooltip bubble
+      double tooltipX = x;
+      if (tooltipX < 65.0) tooltipX = 65.0;
+      if (tooltipX > size.width - 65.0) tooltipX = size.width - 65.0;
+
+      // Adjust tooltip position vertically to avoid clipping at the top
+      double tooltipY = y - 48.0;
+      if (tooltipY < 5.0) tooltipY = y + 16.0; // show below point if too high
+
+      final Rect tooltipRect = Rect.fromLTWH(tooltipX - 60.0, tooltipY, 120.0, 36.0);
+      final RRect tooltipRRect = RRect.fromRectAndRadius(tooltipRect, const Radius.circular(8.0));
+
+      final tooltipBgPaint = Paint()
+        ..color = isDark ? const Color(0xFF1E293B).withOpacity(0.92) : Colors.white.withOpacity(0.96);
+      
+      final tooltipBorderPaint = Paint()
+        ..color = activeColor.withOpacity(0.4)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0;
+
+      canvas.drawRRect(tooltipRRect, tooltipBgPaint);
+      canvas.drawRRect(tooltipRRect, tooltipBorderPaint);
+
+      // Determine label text
+      String dayName = selectedIndex! < currentData.length ? "Past Sale" : "AI Forecast";
+      if (selectedIndex! == currentData.length - 1) {
+        dayName = "Today";
+      } else if (selectedIndex! < currentData.length - 1) {
+        dayName = "d-${currentData.length - 1 - selectedIndex!}";
+      } else {
+        dayName = "AI +${selectedIndex! - currentData.length + 1}d";
+      }
+
+      final String valText = "₹${val.toStringAsFixed(0)}";
+
+      // Draw text values
+      _drawText(
+        canvas, 
+        dayName, 
+        Offset(tooltipX, tooltipY + 4.0), 
+        isDark ? Colors.grey.shade400 : Colors.grey.shade600, 
+        fontSize: 7.5, 
+        fontWeight: FontWeight.bold
+      );
+      _drawText(
+        canvas, 
+        valText, 
+        Offset(tooltipX, tooltipY + 16.0), 
+        activeColor, 
+        fontSize: 10.5, 
+        fontWeight: FontWeight.w900
+      );
+    }
   }
 
   void _drawText(Canvas canvas, String text, Offset position, Color color, {double fontSize = 8.0, FontWeight fontWeight = FontWeight.normal, Alignment alignment = Alignment.topCenter}) {
@@ -1377,5 +1514,6 @@ class ProfessionalMLComboPainter extends CustomPainter {
       oldDelegate.predictedData != predictedData ||
       oldDelegate.currentColor != currentColor ||
       oldDelegate.predictedColor != predictedColor ||
-      oldDelegate.isDark != isDark;
+      oldDelegate.isDark != isDark ||
+      oldDelegate.selectedIndex != selectedIndex;
 }
