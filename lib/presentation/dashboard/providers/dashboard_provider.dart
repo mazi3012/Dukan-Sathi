@@ -263,16 +263,36 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       final netProfitMargin = averageShopMargin * 100;
       final averageOrderValue = salesRes.isNotEmpty ? netRevenue / salesRes.length : 0.0;
 
-      // 4. Generate AI 7-Day Forecast Wave based on historical moving average
+      // 4. Linear Regression Trend Forecast (Machine Learning Regression)
       final predicted7DaysSales = List<double>.filled(7, 0.0);
-      double histSum = past7DaysSales.reduce((a, b) => a + b);
-      double histAvg = histSum / 7.0;
-      if (histAvg <= 0.0) histAvg = 1500.0; // fallback standard day
+      double sumX = 0;
+      double sumY = 0;
+      double sumXY = 0;
+      double sumXX = 0;
 
       for (int i = 0; i < 7; i++) {
-        final dayGrowth = 1.0 + (i + 1) * 0.025; // 2.5% daily compound forecast
-        final waveFactor = (i % 2 == 0 ? 0.06 : -0.04);
-        predicted7DaysSales[i] = histAvg * dayGrowth * (1.0 + waveFactor);
+        sumX += i;
+        sumY += past7DaysSales[i];
+        sumXY += i * past7DaysSales[i];
+        sumXX += i * i;
+      }
+
+      double m = (7 * sumXY - sumX * sumY) / (7 * sumXX - sumX * sumX);
+      double c = (sumY - m * sumX) / 7;
+
+      if (m.isNaN || c.isNaN || (m == 0 && c == 0)) {
+        double avg = sumY / 7;
+        if (avg <= 0) avg = 1500.0;
+        m = avg * 0.035; // default 3.5% organic daily slope
+        c = avg;
+      }
+
+      for (int i = 0; i < 7; i++) {
+        final double projectedDay = 7.0 + i;
+        double predictedVal = m * projectedDay + c;
+        final double seasonality = 1.0 + (i % 2 == 0 ? 0.05 : -0.03); // add natural wave variation
+        predictedVal *= seasonality;
+        predicted7DaysSales[i] = predictedVal.clamp(100.0, 1000000.0);
       }
 
       // 5. Fetch Online-only data (Pending Approvals)
