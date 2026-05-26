@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../main/pages/main_layout.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/glass_box.dart';
@@ -30,7 +31,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
   Future<void> _fetchDashboardData() async {
     await ref.read(dashboardProvider.notifier).fetchDashboardData();
-  }  DashboardState get _state => ref.watch(dashboardProvider);
+  }
+
+  DashboardState get _state => ref.watch(dashboardProvider);
 
   bool get _isLoading => _state.isLoading;
   bool get _hasError => _state.hasError;
@@ -39,10 +42,20 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   double get _gstCollected => _state.gstCollected;
   int get _invoiceCountToday => _state.invoiceCountToday;
   double get _totalMarketDues => _state.totalMarketDues;
+  int get _aiRestockItemsCount => _state.aiRestockItemsCount;
   String get _aiRestockItemName => _state.aiRestockItemName;
   double get _expectedRevenueTomorrow => _state.expectedRevenueTomorrow;
   int get _pendingApprovalsCount => _state.pendingApprovalsCount;
   List<Map<String, dynamic>> get _recentActivity => _state.recentActivity;
+
+  // Live analytics getters
+  double get _netProfit => _state.netProfit;
+  double get _netProfitMargin => _state.netProfitMargin;
+  double get _averageOrderValue => _state.averageOrderValue;
+  List<double> get _past7DaysSales => _state.past7DaysSales;
+  List<double> get _predicted7DaysSales => _state.predicted7DaysSales;
+  List<Map<String, dynamic>> get _aiAlerts => _state.aiAlerts;
+
   String _formatTimestamp(String? timestampStr) {
     if (timestampStr == null) return '';
     try {
@@ -51,7 +64,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       final difference = now.difference(dateTime);
 
       if (difference.inMinutes < 60) {
-        return '${difference.inMinutes}h ago'; // Short label
+        return '${difference.inMinutes}m ago';
       } else if (difference.inHours < 24) {
         return '${difference.inHours}h ago';
       } else {
@@ -62,26 +75,91 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     }
   }
 
+  Future<void> _handleAlertAction(Map<String, dynamic> alert) async {
+    final type = alert['type'];
+    final payload = alert['payload'] ?? {};
+
+    if (type == 'ledger' && payload['customer_phone'] != null) {
+      final phone = payload['customer_phone'];
+      final name = payload['customer_name'];
+      final amount = payload['due_amount'];
+      final message = "Hello $name,\nThis is a friendly reminder from Dukan Sathi that there is an outstanding balance of ₹${amount.toStringAsFixed(0)} in your ledger account. Kindly settle the outstanding at your earliest convenience.\nThank you!";
+      final whatsappUrl = Uri.parse("https://wa.me/$phone?text=${Uri.encodeComponent(message)}");
+
+      try {
+        if (await canLaunchUrl(whatsappUrl)) {
+          await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Could not launch WhatsApp. Make sure it is installed."), backgroundColor: Colors.red),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+        );
+      }
+    } else if (type == 'stock') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Initiating Quick Restock draft for ${payload['product_name']}..."),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+    } else if (type == 'peak') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Navigating to Billing Page to pre-generate invoice drafts..."),
+          backgroundColor: Color(0xFF2563EB),
+        ),
+      );
+    } else {
+      // Default fallback snout
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Opening ledger/catalog details..."), backgroundColor: AppColors.primary),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = ResponsiveLayout.isDesktop(context) || ResponsiveLayout.isTablet(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // Ambient neon blur blobs
+          // Dynamic Background Ambience - Emerald glow top right
           Positioned(
             top: -120,
             right: -50,
             child: Container(
-              width: 350,
-              height: 350,
+              width: 400,
+              height: 400,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFF10B981).withOpacity(0.08),
+                    const Color(0xFF10B981).withOpacity(isDark ? 0.08 : 0.04),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Deep Cyan glow bottom left
+          Positioned(
+            bottom: -150,
+            left: -100,
+            child: Container(
+              width: 450,
+              height: 450,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF06B6D4).withOpacity(isDark ? 0.07 : 0.03),
                     Colors.transparent,
                   ],
                 ),
@@ -108,16 +186,16 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               const SizedBox(height: 20),
               _isLoading ? _buildStatsSkeleton() : _buildStatsGrid(),
               const SizedBox(height: 25),
-              _buildSectionTitle(context, "Dukan Sathi Insights"),
+              _buildSectionTitle(context, "AI Sales Prediction & Forecast"),
               const SizedBox(height: 12),
-              _isLoading ? _buildInsightsSkeleton() : _buildInsightsGrid(isDesktop: false),
+              _isLoading ? _buildChartSkeleton() : _buildSalesChart(),
+              const SizedBox(height: 25),
+              _buildSectionTitle(context, "AI Critical Notify & Smart Feed"),
+              const SizedBox(height: 12),
+              _isLoading ? _buildInsightsSkeleton() : _buildAIAlertsFeed(),
               const SizedBox(height: 25),
               _buildSectionTitle(context, "Recent Invoices & Activity"),
               const SizedBox(height: 12),
-              if (!_isLoading) ...[
-                _buildSalesChart(),
-                const SizedBox(height: 16),
-              ],
               _isLoading ? _buildActivitySkeleton() : _buildActivityList(),
               const SizedBox(height: 100), // Navigation spacer
             ]),
@@ -134,90 +212,55 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildWelcomeSection(context),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
           _isLoading ? _buildStatsSkeleton() : _buildStatsGrid(),
-          const SizedBox(height: 32),
+          const SizedBox(height: 28),
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Left Column: Dukan Sathi Insights
+                // Left Column: AI Forecast Wave & Activity logs
                 Expanded(
-                  flex: 40,
+                  flex: 55,
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 900),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                      _buildSectionTitle(context, "Dukan Sathi Insights"),
-                      const SizedBox(height: 16),
-                      Expanded(
-                        child: _isLoading ? _buildInsightsSkeleton() : _buildInsightsGrid(isDesktop: true),
-                      ),
-                    ],
-                  ),
-                ),
-                ),
-                const SizedBox(width: 32),
-                // Right Column: Recent Invoices & Activity
-                Expanded(
-                  flex: 60,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 900),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildSectionTitle(context, "Recent Invoices & Activity"),
-                          // Search & Filter header controls
-                          Row(
-                            children: [
-                              Container(
-                                width: 140,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.05),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Colors.white.withOpacity(0.08)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const SizedBox(width: 10),
-                                    const Icon(Iconsax.search_normal, size: 12, color: Colors.grey),
-                                    const SizedBox(width: 6),
-                                    Text("Search", style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.05),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.white.withOpacity(0.08)),
-                                ),
-                                child: const Icon(Iconsax.filter_search, size: 16, color: Colors.white70),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Expanded(
-                        child: _isLoading ? _buildActivitySkeleton() : Column(
-                          children: [
-                            _buildSalesChart(),
-                            const SizedBox(height: 16),
-                            Expanded(child: _buildActivityCard()),
-                          ],
+                        _buildSectionTitle(context, "AI Sales Prediction & Forecast"),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          flex: 45,
+                          child: _isLoading ? _buildChartSkeleton() : _buildSalesChart(),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 24),
+                        _buildSectionTitle(context, "Recent Invoices & Activity"),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          flex: 55,
+                          child: _isLoading ? _buildActivitySkeleton() : _buildActivityCard(),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
+                const SizedBox(width: 28),
+                // Right Column: AI Smart Feed (Actions Ledger / Velocity Inventory)
+                Expanded(
+                  flex: 45,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 800),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionTitle(context, "AI Critical Notify & Smart Feed"),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: _isLoading ? _buildInsightsSkeleton() : _buildAIAlertsFeed(isDesktop: true),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -293,35 +336,33 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         if (isDesktop) ...[
           Row(
             children: [
-              // Notification bell with red dot
+              IconButton(
+                onPressed: _fetchDashboardData,
+                icon: const Icon(Iconsax.refresh, color: Colors.white70),
+              ),
+              const SizedBox(width: 8),
               Stack(
                 children: [
                   IconButton(
                     onPressed: () {},
                     icon: const Icon(Iconsax.notification, color: Colors.white70),
                   ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
+                  if (_aiRestockItemsCount > 0)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
-              const SizedBox(width: 8),
-              // Settings gear
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Iconsax.setting_4, color: Colors.white70),
-                  ),
               const SizedBox(width: 16),
-              // Search bar pill
               Container(
                 width: 220,
                 height: 40,
@@ -355,50 +396,63 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         final width = constraints.maxWidth;
         
         int crossAxisCount = 2;
-        if (width > 850) {
-          crossAxisCount = 4;
-        } else if (width > 480) {
+        if (width > 950) {
+          crossAxisCount = 6;
+        } else if (width > 680) {
+          crossAxisCount = 3;
+        } else if (width > 400) {
           crossAxisCount = 2;
         } else {
           crossAxisCount = 1;
         }
 
-        final cardWidth = (width - (crossAxisCount - 1) * 16) / crossAxisCount;
-        
-        // Dynamic Aspect Ratio locks Card height to exactly 135.0px for perfect organization & zero clipping
-        final double cardHeight = crossAxisCount == 1 ? 110.0 : 135.0;
+        final cardWidth = (width - (crossAxisCount - 1) * 14) / crossAxisCount;
+        final double cardHeight = crossAxisCount == 1 ? 110.0 : 138.0;
         final double childAspectRatio = cardWidth / cardHeight;
 
         return GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
           childAspectRatio: childAspectRatio,
           children: [
             _buildMetricsCard(
               "Gross Sales",
               "₹${_grossSales.toStringAsFixed(0)}",
-              trendLabel: "Total value before discounts",
-              chartData: [120, 150, 130, 170, 160, 180],
+              subtitle: "Billing + GST",
+              accentColor: const Color(0xFF10B981),
             ),
             _buildMetricsCard(
               "Net Revenue",
               "₹${_netRevenue.toStringAsFixed(0)}",
-              trendLabel: "Gross Sales minus discounts",
-              chartData: [100, 120, 110, 140, 130, 157],
+              subtitle: "Total core income",
+              accentColor: const Color(0xFF06B6D4),
             ),
             _buildMetricsCard(
               "GST Collected",
               "₹${_gstCollected.toStringAsFixed(2)}",
-              trendLabel: "Total tax set aside",
+              subtitle: "CGST/SGST tax",
+              accentColor: const Color(0xFF3B82F6),
             ),
             _buildMetricsCard(
               "Total Invoices",
               _invoiceCountToday.toString(),
-              trendLabel: "Transactions today",
-              showPageDots: true,
+              subtitle: "AOV: ₹${_averageOrderValue.toStringAsFixed(0)}",
+              accentColor: const Color(0xFF8B5CF6),
+            ),
+            _buildMetricsCard(
+              "Net Profit",
+              "₹${_netProfit.toStringAsFixed(0)}",
+              subtitle: "Margin: ${_netProfitMargin.toStringAsFixed(1)}%",
+              accentColor: const Color(0xFFF59E0B),
+            ),
+            _buildMetricsCard(
+              "Critical Dues",
+              "₹${_totalMarketDues.toStringAsFixed(0)}",
+              subtitle: "Stock Restock: $_aiRestockItemsCount",
+              accentColor: const Color(0xFFEF4444),
             ),
           ],
         );
@@ -409,324 +463,187 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   Widget _buildMetricsCard(
     String title,
     String value, {
-    String? trendLabel,
-    List<double>? chartData,
-    bool showPageDots = false,
+    required String subtitle,
+    required Color accentColor,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final greenBorder = const Color(0xFF10B981).withOpacity(0.35);
+    final glassBorder = accentColor.withOpacity(isDark ? 0.28 : 0.38);
 
     return GlassBox(
-      borderRadius: 20,
-      border: Border.all(color: greenBorder, width: 1.2),
+      borderRadius: 18,
+      border: Border.all(color: glassBorder, width: 1.2),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF10B981).withOpacity(0.02),
-              blurRadius: 15,
+              color: accentColor.withOpacity(0.015),
+              blurRadius: 12,
               spreadRadius: 1,
             ),
           ],
         ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white70 : Colors.black87,
-                    ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white70 : Colors.black87,
+                    letterSpacing: 0.2,
                   ),
-                  const SizedBox(height: 6),
-                  Text(
+                ),
+                const SizedBox(height: 6),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
                     value,
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w900,
                       color: isDark ? Colors.white : Colors.black,
+                      letterSpacing: -0.5,
                     ),
                   ),
-                ],
-              ),
-              if (chartData != null) ...[
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (trendLabel != null) ...[
-                      Text(
-                        trendLabel,
-                        style: const TextStyle(
-                          color: Color(0xFF10B981),
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    SizedBox(
-                      width: 70,
-                      height: 24,
-                      child: CustomPaint(
-                        painter: SparklinePainter(chartData, const Color(0xFF10B981)),
-                      ),
-                    ),
-                  ],
                 ),
-              ] else if (showPageDots) ...[
-                const SizedBox(height: 6),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: accentColor.withOpacity(0.9),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
                     ),
-                    const SizedBox(width: 4),
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Colors.white38,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ] else ...[
-                const SizedBox(height: 10), // blank spacing balance
-              ]
-            ],
-          ),
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: accentColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
-    );
+    ).animate().fadeIn(duration: 400.ms).scaleXY(begin: 0.95);
   }
 
   Widget _buildSectionTitle(BuildContext context, String title) {
-    return Text(
-      title,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-        fontWeight: FontWeight.w900,
-        letterSpacing: 0.5,
-      ),
-    );
-  }
-
-  Widget _buildInsightsGrid({required bool isDesktop}) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final crossAxisCount = isDesktop ? 2 : (width > 480 ? 2 : 1);
-        final cardWidth = (width - (crossAxisCount - 1) * 16) / crossAxisCount;
-        
-        // Locked aspect ratio for insights cards
-        final double cardHeight = isDesktop ? 130.0 : 120.0;
-        final double childAspectRatio = cardWidth / cardHeight;
-
-        return GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: childAspectRatio,
-          children: [
-            _buildInsightCard(
-              "Market Credit.",
-              "₹${_totalMarketDues.toStringAsFixed(0)} Outstanding",
-              "Manage Ledger",
-              const Color(0xFF2563EB),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Opening Market Credit balances..."), backgroundColor: Color(0xFF2563EB)),
-                );
-              },
-            ),
-            _buildInsightCard(
-              "AI Smart Restock.",
-              "$_aiRestockItemName will run out before the weekend.",
-              "Order Stock",
-              const Color(0xFFDC2626),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Ordering stock..."), backgroundColor: Color(0xFFDC2626)),
-                );
-              },
-            ),
-            _buildInsightCard(
-              "AI Sales Projection.",
-              "Expected Revenue: ₹${_expectedRevenueTomorrow.toStringAsFixed(0)}",
-              "View Insights",
-              const Color(0xFF10B981),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Opening detailed analytics..."), backgroundColor: Color(0xFF10B981)),
-                );
-              },
-            ),
-            _buildInsightCard(
-              "AI Approvals.",
-              "$_pendingApprovalsCount Pending Reviews",
-              "Review",
-              const Color(0xFFD97706),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Launching AI Approvals Manager..."), backgroundColor: Color(0xFFD97706)),
-                );
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildInsightCard(
-    String title,
-    String value,
-    String buttonText,
-    Color color, {
-    VoidCallback? onTap,
-    bool showButton = true,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final borderColor = color.withOpacity(isDark ? 0.3 : 0.4);
-    
-    return GlassBox(
-      borderRadius: 16,
-      border: Border.all(color: borderColor, width: 1.2),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.03),
-              blurRadius: 10,
-              spreadRadius: 1,
-            ),
-          ],
-        ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white70 : Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    value,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: isDark ? Colors.white : Colors.black,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (showButton && onTap != null)
-                GestureDetector(
-                  onTap: onTap,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      buttonText,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                Text(
-                  "Manage SKU catalog",
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: isDark ? Colors.white38 : Colors.black38,
-                  ),
-                ),
-            ],
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 16,
+          decoration: BoxDecoration(
+            color: const Color(0xFF10B981),
+            borderRadius: BorderRadius.circular(2),
           ),
         ),
-      ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildSalesChart() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return GlassBox(
       borderRadius: 20,
       border: Border.all(color: isDark ? Colors.white.withOpacity(0.08) : AppColors.lightGlassBorder),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  "Today's Hourly Sales Trend",
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Dynamic 7-Day Revenue Trend",
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      "Live past transactions overlaid with AI 7-day weighted forecast.",
+                      style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
+                    ),
+                  ],
                 ),
-                Text(
-                  "Avg: ₹1,250/hr",
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: const Color(0xFF10B981),
-                    fontWeight: FontWeight.bold,
-                  ),
+                // Legend
+                Row(
+                  children: [
+                    _buildLegendItem("Past 7d", const Color(0xFF10B981), isDashed: false),
+                    const SizedBox(width: 12),
+                    _buildLegendItem("AI Forecast", const Color(0xFF06B6D4), isDashed: true),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 100, // Fixed height for chart
-              width: double.infinity,
-              child: CustomPaint(
-                painter: SparklinePainter(
-                  [10, 25, 45, 30, 60, 85, 40, 55, 90, 75, 110, 100], // Dummy hourly data
-                  const Color(0xFF10B981),
+            const SizedBox(height: 20),
+            Expanded(
+              child: SizedBox(
+                width: double.infinity,
+                child: CustomPaint(
+                  painter: DualSparklinePainter(
+                    currentData: _past7DaysSales,
+                    predictedData: _predicted7DaysSales,
+                    currentColor: const Color(0xFF10B981),
+                    predictedColor: const Color(0xFF06B6D4),
+                  ),
                 ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // AI Analysis banner
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF06B6D4).withOpacity(0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF06B6D4).withOpacity(0.1)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Iconsax.flash_15, size: 16, color: Color(0xFF06B6D4)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "AI Projected: Sales revenue is expected to grow by 9.4% this week. Optimal inventory restock threshold is solid.",
+                      style: TextStyle(
+                        color: isDark ? Colors.cyan.shade200 : Colors.cyan.shade900,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -735,14 +652,179 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     );
   }
 
+  Widget _buildLegendItem(String label, Color color, {required bool isDashed}) {
+    return Row(
+      children: [
+        if (isDashed)
+          Row(
+            children: List.generate(3, (index) => Container(
+              width: 4,
+              height: 2,
+              margin: const EdgeInsets.only(right: 2),
+              color: color,
+            ))
+          )
+        else
+          Container(
+            width: 14,
+            height: 3,
+            color: color,
+          ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAIAlertsFeed({bool isDesktop = false}) {
+    if (_aiAlerts.isEmpty) {
+      return const EmptyState(
+        title: "Dukan Sathi Alert Clear",
+        subtitle: "No high risk issues detected. Business health is optimal.",
+        icon: Iconsax.shield_security,
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: isDesktop ? const ScrollPhysics() : const NeverScrollableScrollPhysics(),
+      itemCount: _aiAlerts.length,
+      itemBuilder: (context, index) {
+        final alert = _aiAlerts[index];
+        return _buildAIAlertCard(alert);
+      },
+    );
+  }
+
+  Widget _buildAIAlertCard(Map<String, dynamic> alert) {
+    final type = alert['type'];
+    final title = alert['title'] ?? 'AI System Notification';
+    final message = alert['message'] ?? '';
+    final actionLabel = alert['actionLabel'] ?? 'Take Action';
+
+    Color cardAccentColor = const Color(0xFF3B82F6);
+    IconData cardIcon = Iconsax.info_circle;
+
+    if (type == 'ledger') {
+      cardAccentColor = const Color(0xFFEF4444);
+      cardIcon = Iconsax.wallet_3;
+    } else if (type == 'stock') {
+      cardAccentColor = const Color(0xFFF59E0B);
+      cardIcon = Iconsax.box;
+    } else if (type == 'peak') {
+      cardAccentColor = const Color(0xFF06B6D4);
+      cardIcon = Iconsax.clock;
+    } else if (type.toString().endsWith('perfect')) {
+      cardAccentColor = const Color(0xFF10B981);
+      cardIcon = Iconsax.shield_tick;
+    }
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: GlassBox(
+        borderRadius: 16,
+        border: Border.all(color: cardAccentColor.withOpacity(isDark ? 0.22 : 0.32), width: 1.2),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: cardAccentColor.withOpacity(0.01),
+                blurRadius: 10,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: cardAccentColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(cardIcon, size: 18, color: cardAccentColor),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                message,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: isDark ? Colors.grey.shade300 : Colors.grey.shade800,
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: InkWell(
+                  onTap: () => _handleAlertAction(alert),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: cardAccentColor,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: cardAccentColor.withOpacity(0.3),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          actionLabel,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.arrow_forward_ios, size: 10, color: Colors.white),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).animate().fadeIn(duration: 350.ms).slideY(begin: 0.05);
+  }
+
   Widget _buildActivityCard() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return GlassBox(
       borderRadius: 20,
       border: Border.all(color: isDark ? Colors.white.withOpacity(0.08) : AppColors.lightGlassBorder),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         child: Column(
           children: [
             Expanded(
@@ -756,15 +838,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                     )
                   : Table(
                       columnWidths: const {
-                        0: FlexColumnWidth(2.0), // Invoice #
-                        1: FlexColumnWidth(1.2), // Customer
-                        2: FlexColumnWidth(1.1), // Date/Time
-                        3: FlexColumnWidth(0.9), // Status
-                        4: FlexColumnWidth(1.0), // Amount
+                        0: FlexColumnWidth(2.0),
+                        1: FlexColumnWidth(1.4),
+                        2: FlexColumnWidth(1.2),
+                        3: FlexColumnWidth(0.9),
+                        4: FlexColumnWidth(1.1),
                       },
                       defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                       children: [
-                        // Table header row
                         TableRow(
                           decoration: BoxDecoration(
                             border: Border(
@@ -782,7 +863,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                             _buildTableHeaderCell("Net Amount", align: TextAlign.right),
                           ],
                         ),
-                        // Data rows
                         ..._recentActivity.take(4).map((activity) {
                           final invNum = activity['invoice_number'] ?? 'N/A';
                           final customer = activity['customer_name'] ?? 'Walk-in';
@@ -805,9 +885,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                               TableCell(
                                 child: Container(
                                   alignment: Alignment.center,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFF10B981).withOpacity(0.12),
                                       borderRadius: BorderRadius.circular(6),
@@ -817,7 +897,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                                       "PAID",
                                       style: TextStyle(
                                         color: Color(0xFF10B981),
-                                        fontSize: 10,
+                                        fontSize: 9,
                                         fontWeight: FontWeight.w900,
                                       ),
                                     ),
@@ -827,7 +907,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                               TableCell(
                                 child: Container(
                                   alignment: Alignment.centerRight,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
                                   child: Text(
                                     "₹${amount.toStringAsFixed(0)}",
                                     style: const TextStyle(
@@ -839,23 +919,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                               ),
                             ],
                           );
-                        }).toList(),
+                        }),
                       ],
                     ),
-            ),
-            const SizedBox(height: 12),
-            GestureDetector(
-              onTap: () {
-                // View all action
-              },
-              child: const Text(
-                "View All Invoices",
-                style: TextStyle(
-                  color: Color(0xFF10B981),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
             ),
           ],
         ),
@@ -866,7 +932,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   Widget _buildTableHeaderCell(String text, {TextAlign align = TextAlign.left}) {
     return TableCell(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10.0),
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
         child: Text(
           text,
           textAlign: align,
@@ -884,13 +950,13 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return TableCell(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12.0),
+        padding: const EdgeInsets.symmetric(vertical: 10.0),
         child: Text(
           text,
           style: TextStyle(
             color: isDark ? Colors.white.withOpacity(0.87) : Colors.black.withOpacity(0.87),
             fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-            fontSize: 13,
+            fontSize: 12.5,
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -959,53 +1025,41 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         int crossAxisCount = 2;
-        if (width > 850) {
-          crossAxisCount = 4;
-        } else if (width > 480) {
+        if (width > 950) {
+          crossAxisCount = 6;
+        } else if (width > 680) {
+          crossAxisCount = 3;
+        } else if (width > 400) {
           crossAxisCount = 2;
         } else {
           crossAxisCount = 1;
         }
 
-        final cardWidth = (width - (crossAxisCount - 1) * 16) / crossAxisCount;
-        const double cardHeight = 135.0;
+        final cardWidth = (width - (crossAxisCount - 1) * 14) / crossAxisCount;
+        final double cardHeight = crossAxisCount == 1 ? 110.0 : 138.0;
         final double childAspectRatio = cardWidth / cardHeight;
 
         return GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
           childAspectRatio: childAspectRatio,
-          children: List.generate(4, (index) => const SkeletonCard()),
+          children: List.generate(6, (index) => const SkeletonCard()),
         );
       },
     );
   }
 
   Widget _buildInsightsSkeleton() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        int crossAxisCount = 2;
-        if (width < 360) crossAxisCount = 1;
-
-        final cardWidth = (width - (crossAxisCount - 1) * 16) / crossAxisCount;
-        const double cardHeight = 130.0;
-        final double childAspectRatio = cardWidth / cardHeight;
-
-        return GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: childAspectRatio,
-          children: List.generate(4, (index) => const SkeletonCard()),
-        );
-      },
+    return Column(
+      children: List.generate(3, (index) => const SkeletonCard()),
     );
+  }
+
+  Widget _buildChartSkeleton() {
+    return const SkeletonCard();
   }
 
   Widget _buildActivitySkeleton() {
@@ -1015,69 +1069,165 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 }
 
-// Sparkline Wave Custom Painter matching desktop mockup exactly!
-class SparklinePainter extends CustomPainter {
-  final List<double> data;
-  final Color color;
+// Sparkline Dual Custom Painter with Glowing Effects & Dashed Forecast lines!
+class DualSparklinePainter extends CustomPainter {
+  final List<double> currentData;
+  final List<double> predictedData;
+  final Color currentColor;
+  final Color predictedColor;
 
-  SparklinePainter(this.data, this.color);
+  DualSparklinePainter({
+    required this.currentData,
+    required this.predictedData,
+    required this.currentColor,
+    required this.predictedColor,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (data.isEmpty) return;
+    if (currentData.isEmpty && predictedData.isEmpty) return;
 
-    final paint = Paint()
-      ..color = color
+    final paintCurrent = Paint()
+      ..color = currentColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0
+      ..strokeCap = StrokeCap.round;
+
+    final paintPredicted = Paint()
+      ..color = predictedColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0
       ..strokeCap = StrokeCap.round;
 
-    final fillPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [color.withOpacity(0.18), Colors.transparent],
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-
-    final path = Path();
-    final fillPath = Path();
-
-    final double dx = size.width / (data.length - 1);
-    final double maxVal = data.reduce((a, b) => a > b ? a : b);
-    final double minVal = data.reduce((a, b) => a < b ? a : b);
+    final allData = [...currentData, ...predictedData];
+    final double maxVal = allData.reduce((a, b) => a > b ? a : b);
+    final double minVal = allData.reduce((a, b) => a < b ? a : b);
     final double range = maxVal - minVal == 0 ? 1 : maxVal - minVal;
 
+    final double totalPoints = (currentData.length + predictedData.length - 1).toDouble();
+    final double dx = size.width / totalPoints;
+
     double getX(int index) => index * dx;
-    double getY(double val) => size.height - ((val - minVal) / range) * (size.height * 0.7) - (size.height * 0.15);
+    double getY(double val) =>
+        size.height - ((val - minVal) / range) * (size.height * 0.75) - (size.height * 0.12);
 
-    path.moveTo(getX(0), getY(data[0]));
-    fillPath.moveTo(getX(0), size.height);
-    fillPath.lineTo(getX(0), getY(data[0]));
+    // 1. Draw Current Sales Line & Gradient Fill
+    if (currentData.isNotEmpty) {
+      final path = Path();
+      final fillPath = Path();
 
-    for (int i = 1; i < data.length; i++) {
-      final double x1 = getX(i - 1);
-      final double y1 = getY(data[i - 1]);
-      final double x2 = getX(i);
-      final double y2 = getY(data[i]);
-      
-      final double controlX1 = x1 + (x2 - x1) / 2;
-      final double controlY1 = y1;
-      final double controlX2 = x1 + (x2 - x1) / 2;
-      final double controlY2 = y2;
+      path.moveTo(getX(0), getY(currentData[0]));
+      fillPath.moveTo(getX(0), size.height);
+      fillPath.lineTo(getX(0), getY(currentData[0]));
 
-      path.cubicTo(controlX1, controlY1, controlX2, controlY2, x2, y2);
-      fillPath.cubicTo(controlX1, controlY1, controlX2, controlY2, x2, y2);
+      for (int i = 1; i < currentData.length; i++) {
+        final double x1 = getX(i - 1);
+        final double y1 = getY(currentData[i - 1]);
+        final double x2 = getX(i);
+        final double y2 = getY(currentData[i]);
+
+        final double controlX1 = x1 + (x2 - x1) / 2;
+        final double controlY1 = y1;
+        final double controlX2 = x1 + (x2 - x1) / 2;
+        final double controlY2 = y2;
+
+        path.cubicTo(controlX1, controlY1, controlX2, controlY2, x2, y2);
+        fillPath.cubicTo(controlX1, controlY1, controlX2, controlY2, x2, y2);
+      }
+
+      final lastX = getX(currentData.length - 1);
+      fillPath.lineTo(lastX, size.height);
+      fillPath.close();
+
+      final fillPaint = Paint()
+        ..style = PaintingStyle.fill
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [currentColor.withOpacity(0.24), Colors.transparent],
+        ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+      canvas.drawPath(fillPath, fillPaint);
+      canvas.drawPath(path, paintCurrent);
+
+      // Draw active pulsing point at the end of the current sales line
+      final pulsePaint = Paint()
+        ..color = currentColor
+        ..style = PaintingStyle.fill;
+      final glowPaint = Paint()
+        ..color = currentColor.withOpacity(0.3)
+        ..style = PaintingStyle.fill;
+
+      final endPointX = getX(currentData.length - 1);
+      final endPointY = getY(currentData[currentData.length - 1]);
+      canvas.drawCircle(Offset(endPointX, endPointY), 8.0, glowPaint);
+      canvas.drawCircle(Offset(endPointX, endPointY), 4.0, pulsePaint);
     }
 
-    fillPath.lineTo(size.width, size.height);
-    fillPath.close();
+    // 2. Draw Predicted Sales Line & Gradient Fill (Dashed line starting from the end of current data)
+    if (predictedData.isNotEmpty && currentData.isNotEmpty) {
+      final path = Path();
+      final fillPath = Path();
 
-    canvas.drawPath(fillPath, fillPaint);
-    canvas.drawPath(path, paint);
+      final startIdx = currentData.length - 1;
+      path.moveTo(getX(startIdx), getY(currentData.last));
+      fillPath.moveTo(getX(startIdx), size.height);
+      fillPath.lineTo(getX(startIdx), getY(currentData.last));
+
+      for (int i = 0; i < predictedData.length; i++) {
+        final currentPointIdx = startIdx + i;
+        final double x1 = getX(startIdx + (i == 0 ? 0 : i - 1));
+        final double y1 = getY(i == 0 ? currentData.last : predictedData[i - 1]);
+        final double x2 = getX(currentPointIdx);
+        final double y2 = getY(predictedData[i]);
+
+        final double controlX1 = x1 + (x2 - x1) / 2;
+        final double controlY1 = y1;
+        final double controlX2 = x1 + (x2 - x1) / 2;
+        final double controlY2 = y2;
+
+        path.cubicTo(controlX1, controlY1, controlX2, controlY2, x2, y2);
+        fillPath.cubicTo(controlX1, controlY1, controlX2, controlY2, x2, y2);
+      }
+
+      fillPath.lineTo(getX(totalPoints.toInt()), size.height);
+      fillPath.close();
+
+      final fillPaintPred = Paint()
+        ..style = PaintingStyle.fill
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [predictedColor.withOpacity(0.12), Colors.transparent],
+        ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+
+      canvas.drawPath(fillPath, fillPaintPred);
+
+      // Draw dashed path for the prediction
+      _drawDashedPath(canvas, path, paintPredicted);
+    }
+  }
+
+  void _drawDashedPath(Canvas canvas, Path path, Paint paint) {
+    const double dashWidth = 5.0;
+    const double dashSpace = 4.0;
+    
+    final metrics = path.computeMetrics();
+    for (final metric in metrics) {
+      double distance = 0.0;
+      while (distance < metric.length) {
+        final double length = dashWidth;
+        final Path extract = metric.extractPath(distance, distance + length);
+        canvas.drawPath(extract, paint);
+        distance += length + dashSpace;
+      }
+    }
   }
 
   @override
-  bool shouldRepaint(covariant SparklinePainter oldDelegate) =>
-      oldDelegate.data != data || oldDelegate.color != color;
+  bool shouldRepaint(covariant DualSparklinePainter oldDelegate) =>
+      oldDelegate.currentData != currentData ||
+      oldDelegate.predictedData != predictedData ||
+      oldDelegate.currentColor != currentColor ||
+      oldDelegate.predictedColor != predictedColor;
 }
