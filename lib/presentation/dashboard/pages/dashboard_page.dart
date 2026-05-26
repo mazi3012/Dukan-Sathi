@@ -573,86 +573,94 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
   Widget _buildSalesChart() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    final isDesktop = ResponsiveLayout.isDesktop(context) || ResponsiveLayout.isTablet(context);
+
+    Widget chartContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Dynamic 7-Day Revenue Trend",
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    "Live past transactions overlaid with AI 7-day weighted forecast.",
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
+            // Legend
+            Row(
+              children: [
+                _buildLegendItem("Past 7d", const Color(0xFF10B981), isDashed: false),
+                const SizedBox(width: 12),
+                _buildLegendItem("AI Forecast", const Color(0xFF06B6D4), isDashed: true),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Expanded(
+          child: SizedBox(
+            width: double.infinity,
+            child: CustomPaint(
+              painter: ProfessionalMLComboPainter(
+                currentData: _past7DaysSales,
+                predictedData: _predicted7DaysSales,
+                currentColor: const Color(0xFF10B981),
+                predictedColor: const Color(0xFF06B6D4),
+                isDark: isDark,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // AI Analysis banner
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF06B6D4).withOpacity(0.05),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFF06B6D4).withOpacity(0.1)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Iconsax.flash_15, size: 16, color: Color(0xFF06B6D4)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "AI Projected: Sales revenue is expected to grow by 9.4% this week. Optimal inventory restock threshold is solid.",
+                  style: TextStyle(
+                    color: isDark ? Colors.cyan.shade200 : Colors.cyan.shade900,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
     return GlassBox(
       borderRadius: 20,
       border: Border.all(color: isDark ? Colors.white.withOpacity(0.08) : AppColors.lightGlassBorder),
       child: Padding(
         padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Dynamic 7-Day Revenue Trend",
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      "Live past transactions overlaid with AI 7-day weighted forecast.",
-                      style: TextStyle(color: Colors.grey.shade500, fontSize: 10),
-                    ),
-                  ],
-                ),
-                // Legend
-                Row(
-                  children: [
-                    _buildLegendItem("Past 7d", const Color(0xFF10B981), isDashed: false),
-                    const SizedBox(width: 12),
-                    _buildLegendItem("AI Forecast", const Color(0xFF06B6D4), isDashed: true),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: SizedBox(
-                width: double.infinity,
-                child: CustomPaint(
-                  painter: DualSparklinePainter(
-                    currentData: _past7DaysSales,
-                    predictedData: _predicted7DaysSales,
-                    currentColor: const Color(0xFF10B981),
-                    predictedColor: const Color(0xFF06B6D4),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            // AI Analysis banner
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF06B6D4).withOpacity(0.05),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF06B6D4).withOpacity(0.1)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Iconsax.flash_15, size: 16, color: Color(0xFF06B6D4)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      "AI Projected: Sales revenue is expected to grow by 9.4% this week. Optimal inventory restock threshold is solid.",
-                      style: TextStyle(
-                        color: isDark ? Colors.cyan.shade200 : Colors.cyan.shade900,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+        child: isDesktop 
+            ? chartContent 
+            : SizedBox(height: 260, child: chartContent),
       ),
     );
   }
@@ -1074,115 +1082,162 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 }
 
-// Sparkline Dual Custom Painter with Glowing Effects & Dashed Forecast lines!
-class DualSparklinePainter extends CustomPainter {
+// Professional Combo ML Painter with Glowing filled bars for past sales, empty dashed bars for forecast, standard error envelope, gridlines and X/Y labels!
+class ProfessionalMLComboPainter extends CustomPainter {
   final List<double> currentData;
   final List<double> predictedData;
   final Color currentColor;
   final Color predictedColor;
+  final bool isDark;
 
-  DualSparklinePainter({
+  ProfessionalMLComboPainter({
     required this.currentData,
     required this.predictedData,
     required this.currentColor,
     required this.predictedColor,
+    required this.isDark,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (currentData.isEmpty && predictedData.isEmpty) return;
 
-    final paintCurrent = Paint()
-      ..color = currentColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
-      ..strokeCap = StrokeCap.round;
+    const double topPadding = 15.0;
+    const double bottomPadding = 25.0;
+    const double leftPadding = 20.0;
+    const double rightPadding = 45.0; // wider right padding to fit Y-axis labels like ₹15,000
 
-    final paintPredicted = Paint()
-      ..color = predictedColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..strokeCap = StrokeCap.round;
+    final double drawableWidth = size.width - leftPadding - rightPadding;
+    final double drawableHeight = size.height - topPadding - bottomPadding;
+    final double baseline = size.height - bottomPadding;
 
     final allData = [...currentData, ...predictedData];
     
     // Calculate upper and lower bounds for the ML confidence envelope!
-    // The uncertainty expands dynamically as the prediction range increases into future days.
     final List<double> upperBounds = [];
     final List<double> lowerBounds = [];
-    
     for (int i = 0; i < predictedData.length; i++) {
-      final double uncertaintyFactor = 0.04 + (i * 0.03); // starts at 4% and expands to 22% uncertainty
+      final double uncertaintyFactor = 0.04 + (i * 0.03); // expanding uncertainty
       upperBounds.add(predictedData[i] * (1.0 + uncertaintyFactor));
       lowerBounds.add(predictedData[i] * (1.0 - uncertaintyFactor));
     }
 
     final double maxVal = [...allData, ...upperBounds].reduce((a, b) => a > b ? a : b);
-    final double minVal = [...allData, ...lowerBounds].reduce((a, b) => a < b ? a : b);
+    const double minVal = 0.0; // force baseline to start from 0 for realistic bar scale!
     final double range = maxVal - minVal == 0 ? 1 : maxVal - minVal;
 
-    final double totalPoints = (currentData.length + predictedData.length - 1).toDouble();
-    final double dx = size.width / totalPoints;
+    final int totalPoints = currentData.length + predictedData.length;
+    final double dx = drawableWidth / (totalPoints - 1);
 
-    double getX(int index) => index * dx;
-    double getY(double val) =>
-        size.height - ((val - minVal) / range) * (size.height * 0.72) - (size.height * 0.12);
+    double getX(int index) => leftPadding + index * dx;
+    double getY(double val) => baseline - ((val - minVal) / range) * drawableHeight;
 
-    // 1. Draw Shaded ML Confidence Band (Standard Error boundary envelope)
+    // 1. Draw Grid Lines and Y-Axis Labels
+    const int gridLineCount = 4;
+    final gridPaint = Paint()
+      ..color = isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    for (int i = 0; i <= gridLineCount; i++) {
+      final double fraction = i / gridLineCount;
+      final double y = baseline - fraction * drawableHeight;
+      final double val = minVal + fraction * (maxVal - minVal);
+      
+      // Draw gridline
+      canvas.drawLine(Offset(leftPadding, y), Offset(leftPadding + drawableWidth, y), gridPaint);
+      
+      // Draw Y-axis value label
+      final String label = "₹${val >= 1000 ? '${(val / 1000).toStringAsFixed(1)}k' : val.toStringAsFixed(0)}";
+      _drawText(
+        canvas, 
+        label, 
+        Offset(leftPadding + drawableWidth + 6.0, y - 4.0), 
+        isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+        fontSize: 8.0,
+        alignment: Alignment.centerLeft,
+      );
+    }
+
+    // 2. Draw Historical Bars (Past 7 days)
+    final double barWidth = dx * 0.38; // dynamic bar thickness
+    final barFillPaint = Paint()..style = PaintingStyle.fill;
+    final Color barColor = currentColor;
+
+    for (int i = 0; i < currentData.length; i++) {
+      final double x = getX(i);
+      final double y = getY(currentData[i]);
+
+      // Create a gradient for the historical bar fill
+      barFillPaint.shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [barColor.withOpacity(0.24), barColor.withOpacity(0.03)],
+      ).createShader(Rect.fromLTWH(x - barWidth / 2, y, barWidth, baseline - y));
+
+      final RRect rrect = RRect.fromRectAndCorners(
+        Rect.fromLTWH(x - barWidth / 2, y, barWidth, baseline - y),
+        topLeft: const Radius.circular(5),
+        topRight: const Radius.circular(5),
+      );
+      canvas.drawRRect(rrect, barFillPaint);
+
+      // Draw active solid border lines on the top face of the bars to make them extremely distinct!
+      final borderTopPaint = Paint()
+        ..color = barColor.withOpacity(0.35)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+      canvas.drawLine(Offset(x - barWidth / 2, y), Offset(x + barWidth / 2, y), borderTopPaint);
+    }
+
+    // 3. Draw ML Confidence Envelope Shading & Outlines (Predicted 7 days)
     if (predictedData.isNotEmpty && currentData.isNotEmpty) {
       final envelopePath = Path();
       final startIdx = currentData.length - 1;
 
-      // Start path at current data junction point
       envelopePath.moveTo(getX(startIdx), getY(currentData.last));
 
-      // Upper bound outline going forward
+      // Upper bounds
       for (int i = 0; i < predictedData.length; i++) {
-        final double x = getX(startIdx + i);
-        envelopePath.lineTo(x, getY(upperBounds[i]));
+        envelopePath.lineTo(getX(startIdx + i), getY(upperBounds[i]));
       }
-
-      // Lower bound outline going backward
+      // Lower bounds
       for (int i = predictedData.length - 1; i >= 0; i--) {
-        final double x = getX(startIdx + i);
-        envelopePath.lineTo(x, getY(lowerBounds[i]));
+        envelopePath.lineTo(getX(startIdx + i), getY(lowerBounds[i]));
       }
-
-      envelopePath.lineTo(getX(startIdx), getY(currentData.last));
       envelopePath.close();
 
       final envelopePaint = Paint()
         ..style = PaintingStyle.fill
-        ..color = predictedColor.withOpacity(0.07);
-
+        ..color = predictedColor.withOpacity(0.06);
       canvas.drawPath(envelopePath, envelopePaint);
-
-      // Draw standard deviation borderline indicators
-      final borderPaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.8
-        ..color = predictedColor.withOpacity(0.18);
-
-      final upperBorderPath = Path()..moveTo(getX(startIdx), getY(currentData.last));
-      final lowerBorderPath = Path()..moveTo(getX(startIdx), getY(currentData.last));
-
-      for (int i = 0; i < predictedData.length; i++) {
-        upperBorderPath.lineTo(getX(startIdx + i), getY(upperBounds[i]));
-        lowerBorderPath.lineTo(getX(startIdx + i), getY(lowerBounds[i]));
-      }
-
-      _drawDashedPath(canvas, upperBorderPath, borderPaint, dashWidth: 3.0, dashSpace: 3.0);
-      _drawDashedPath(canvas, lowerBorderPath, borderPaint, dashWidth: 3.0, dashSpace: 3.0);
     }
 
-    // 2. Draw Current Sales Line & Gradient Fill
+    // 4. Draw Projected Dashed Bars (AI Forecast 7 days)
+    final Paint predictedBarPaint = Paint()
+      ..color = predictedColor.withOpacity(0.2)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8;
+
+    for (int i = 0; i < predictedData.length; i++) {
+      final int idx = currentData.length + i;
+      final double x = getX(idx);
+      final double y = getY(predictedData[i]);
+
+      final RRect rrect = RRect.fromRectAndCorners(
+        Rect.fromLTWH(x - barWidth / 2, y, barWidth, baseline - y),
+        topLeft: const Radius.circular(5),
+        topRight: const Radius.circular(5),
+      );
+      
+      // Draw standard predicted bar outline with dashes!
+      _drawDashedRRect(canvas, rrect, predictedBarPaint, dashWidth: 3.0, dashSpace: 3.0);
+    }
+
+    // 5. Draw Historical Connecting Trend Curve Line
     if (currentData.isNotEmpty) {
       final path = Path();
-      final fillPath = Path();
-
       path.moveTo(getX(0), getY(currentData[0]));
-      fillPath.moveTo(getX(0), size.height);
-      fillPath.lineTo(getX(0), getY(currentData[0]));
 
       for (int i = 1; i < currentData.length; i++) {
         final double x1 = getX(i - 1);
@@ -1196,49 +1251,36 @@ class DualSparklinePainter extends CustomPainter {
         final double controlY2 = y2;
 
         path.cubicTo(controlX1, controlY1, controlX2, controlY2, x2, y2);
-        fillPath.cubicTo(controlX1, controlY1, controlX2, controlY2, x2, y2);
       }
 
-      final lastX = getX(currentData.length - 1);
-      fillPath.lineTo(lastX, size.height);
-      fillPath.close();
+      final paintCurrent = Paint()
+        ..color = currentColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.0
+        ..strokeCap = StrokeCap.round;
 
-      final fillPaint = Paint()
-        ..style = PaintingStyle.fill
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [currentColor.withOpacity(0.22), Colors.transparent],
-        ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-
-      canvas.drawPath(fillPath, fillPaint);
       canvas.drawPath(path, paintCurrent);
 
-      // Draw active pulsing point at the end of the current sales line
-      final pulsePaint = Paint()
-        ..color = currentColor
-        ..style = PaintingStyle.fill;
-      final glowPaint = Paint()
-        ..color = currentColor.withOpacity(0.3)
-        ..style = PaintingStyle.fill;
+      // Pulse indicator at current data junction point (Today)
+      final pulsePaint = Paint()..color = currentColor;
+      final glowPaint = Paint()..color = currentColor.withOpacity(0.35);
+      final endX = getX(currentData.length - 1);
+      final endY = getY(currentData.last);
 
-      final endPointX = getX(currentData.length - 1);
-      final endPointY = getY(currentData[currentData.length - 1]);
-      canvas.drawCircle(Offset(endPointX, endPointY), 8.0, glowPaint);
-      canvas.drawCircle(Offset(endPointX, endPointY), 4.0, pulsePaint);
+      canvas.drawCircle(Offset(endX, endY), 7.0, glowPaint);
+      canvas.drawCircle(Offset(endX, endY), 3.5, pulsePaint);
     }
 
-    // 3. Draw Predicted Sales Line (Dashed starting from end of current data)
+    // 6. Draw AI Projected Connecting Trend Curve Line (Dashed)
     if (predictedData.isNotEmpty && currentData.isNotEmpty) {
       final path = Path();
       final startIdx = currentData.length - 1;
       path.moveTo(getX(startIdx), getY(currentData.last));
 
       for (int i = 0; i < predictedData.length; i++) {
-        final currentPointIdx = startIdx + i;
         final double x1 = getX(startIdx + (i == 0 ? 0 : i - 1));
         final double y1 = getY(i == 0 ? currentData.last : predictedData[i - 1]);
-        final double x2 = getX(currentPointIdx);
+        final double x2 = getX(startIdx + i);
         final double y2 = getY(predictedData[i]);
 
         final double controlX1 = x1 + (x2 - x1) / 2;
@@ -1249,8 +1291,66 @@ class DualSparklinePainter extends CustomPainter {
         path.cubicTo(controlX1, controlY1, controlX2, controlY2, x2, y2);
       }
 
+      final paintPredicted = Paint()
+        ..color = predictedColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0
+        ..strokeCap = StrokeCap.round;
+
       _drawDashedPath(canvas, path, paintPredicted, dashWidth: 5.0, dashSpace: 4.0);
     }
+
+    // 7. Draw X-Axis Labels (Day 1 - 7, and AI +1d - +7d)
+    final labelColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    
+    // Draw Past 7 days X labels
+    for (int i = 0; i < currentData.length; i++) {
+      final double x = getX(i);
+      final String label = i == currentData.length - 1 ? "Today" : "d-${currentData.length - 1 - i}";
+      _drawText(
+        canvas, 
+        label, 
+        Offset(x, baseline + 8.0), 
+        labelColor, 
+        fontSize: 8.0,
+        fontWeight: i == currentData.length - 1 ? FontWeight.bold : FontWeight.normal,
+      );
+    }
+
+    // Draw AI Forecast 7 days X labels
+    for (int i = 1; i < predictedData.length; i++) {
+      final int idx = currentData.length - 1 + i;
+      if (idx % 2 == 0) { // show every alternate prediction label to keep it neat
+        final double x = getX(idx);
+        final String label = "AI+${i}d";
+        _drawText(canvas, label, Offset(x, baseline + 8.0), predictedColor.withOpacity(0.8), fontSize: 8.0, fontWeight: FontWeight.bold);
+      }
+    }
+  }
+
+  void _drawText(Canvas canvas, String text, Offset position, Color color, {double fontSize = 8.0, FontWeight fontWeight = FontWeight.normal, Alignment alignment = Alignment.topCenter}) {
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          fontFamily: 'Inter',
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    
+    Offset paintPos;
+    if (alignment == Alignment.centerLeft) {
+      paintPos = position;
+    } else {
+      paintPos = position - Offset(textPainter.width / 2, 0);
+    }
+    
+    textPainter.paint(canvas, paintPos);
   }
 
   void _drawDashedPath(Canvas canvas, Path path, Paint paint, {double dashWidth = 5.0, double dashSpace = 4.0}) {
@@ -1266,10 +1366,16 @@ class DualSparklinePainter extends CustomPainter {
     }
   }
 
+  void _drawDashedRRect(Canvas canvas, RRect rrect, Paint paint, {double dashWidth = 4.0, double dashSpace = 3.0}) {
+    final Path path = Path()..addRRect(rrect);
+    _drawDashedPath(canvas, path, paint, dashWidth: dashWidth, dashSpace: dashSpace);
+  }
+
   @override
-  bool shouldRepaint(covariant DualSparklinePainter oldDelegate) =>
+  bool shouldRepaint(covariant ProfessionalMLComboPainter oldDelegate) =>
       oldDelegate.currentData != currentData ||
       oldDelegate.predictedData != predictedData ||
       oldDelegate.currentColor != currentColor ||
-      oldDelegate.predictedColor != predictedColor;
+      oldDelegate.predictedColor != predictedColor ||
+      oldDelegate.isDark != isDark;
 }
