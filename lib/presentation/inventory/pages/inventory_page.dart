@@ -3,6 +3,8 @@ import 'package:iconsax/iconsax.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../../../core/session.dart';
 import '../../main/pages/main_layout.dart';
 import '../../../core/theme/app_colors.dart';
@@ -12,6 +14,8 @@ import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/responsive_layout.dart';
 import 'package:dukansathi_new/models/product.dart';
 import '../providers/inventory_provider.dart';
+import '../../../core/config.dart';
+import '../../chat/widgets/inventory_draft_card.dart';
 
 class InventoryPage extends ConsumerStatefulWidget {
   const InventoryPage({super.key});
@@ -80,12 +84,35 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
       ),
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 80.0), // Above bottom nav
-        child: FloatingActionButton.extended(
-          onPressed: () => _showProductForm(),
-          backgroundColor: AppColors.primary,
-          icon: const Icon(Iconsax.add, color: Colors.white),
-          label: const Text("Add Product", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        ).animate().scale(delay: 500.ms, curve: Curves.easeOutBack),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // Bulk Import FAB
+            FloatingActionButton.extended(
+              heroTag: 'btnBulkImport',
+              onPressed: () => _showBulkImportOptions(),
+              backgroundColor: AppColors.warning,
+              icon: const Icon(Iconsax.document_upload, color: Colors.white),
+              label: const Text(
+                "Bulk Import", 
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ).animate().scale(delay: 400.ms, curve: Curves.easeOutBack),
+            const SizedBox(height: 12),
+            // Manual Add FAB
+            FloatingActionButton.extended(
+              heroTag: 'btnManualAdd',
+              onPressed: () => _showProductForm(),
+              backgroundColor: AppColors.primary,
+              icon: const Icon(Iconsax.add, color: Colors.white),
+              label: const Text(
+                "Add Product", 
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ).animate().scale(delay: 500.ms, curve: Curves.easeOutBack),
+          ],
+        ),
       ),
     );
   }
@@ -873,4 +900,505 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
       },
     );
   }
+  void _showBulkImportOptions() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+          border: Border.all(
+            color: isDark ? AppColors.darkGlassBorder : AppColors.lightGlassBorder,
+          ),
+        ),
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "Bulk Inventory Import",
+                  style: TextStyle(
+                    color: isDark ? Colors.white : AppColors.lightOnSurface,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.close, color: isDark ? Colors.white54 : Colors.black54),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "Ingest dozens of products instantly. Choose your import source below to begin.",
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.black87,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 24),
+            _buildImportOption(
+              icon: Iconsax.document_text,
+              title: "Import Excel / CSV Sheets",
+              subtitle: "Perfect for distributor spreadsheets and catalog files.",
+              color: AppColors.warning,
+              onTap: () {
+                Navigator.pop(context);
+                _showImportPresetSelection("Excel / CSV Sheet");
+              },
+            ),
+            const SizedBox(height: 14),
+            _buildImportOption(
+              icon: Iconsax.document,
+              title: "Import PDF Invoices",
+              subtitle: "Ingest products directly from structured vendor bills.",
+              color: AppColors.primary,
+              onTap: () {
+                Navigator.pop(context);
+                _showImportPresetSelection("PDF Invoice");
+              },
+            ),
+            const SizedBox(height: 14),
+            _buildImportOption(
+              icon: Iconsax.camera,
+              title: "Scan Photo of Invoice",
+              subtitle: "Extract product records from physical printed bills.",
+              color: AppColors.success,
+              onTap: () {
+                Navigator.pop(context);
+                _showImportPresetSelection("Wholesale Bill Photo");
+              },
+            ),
+            const SizedBox(height: 14),
+            _buildImportOption(
+              icon: Iconsax.folder_open,
+              title: "Browse Local Storage...",
+              subtitle: "Select files directly from your physical device storage.",
+              color: Colors.grey,
+              onTap: () {
+                Navigator.pop(context);
+                _showImportPresetSelection("Custom Device File");
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImportOption({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: GlassBox(
+        blur: 10,
+        opacity: 0.05,
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.lightOnSurface,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: isDark ? Colors.white54 : Colors.black54,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Iconsax.arrow_right_1, color: isDark ? Colors.white30 : Colors.black38, size: 18),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showImportPresetSelection(String sourceType) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+          border: Border.all(
+            color: isDark ? AppColors.darkGlassBorder : AppColors.lightGlassBorder,
+          ),
+        ),
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "Select Import Sample",
+                  style: TextStyle(
+                    color: isDark ? Colors.white : AppColors.lightOnSurface,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Outfit',
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.close, color: isDark ? Colors.white54 : Colors.black54),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "Select a preset file template to demo Dukan Sathi's intelligent parser & restock detection system instantly.",
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.black87,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 20),
+            _buildPresetOption(
+              title: "Distributor CSV Catalog (4 items)",
+              subtitle: "Simulates importing an Excel/CSV spreadsheet from a hygiene distributor.",
+              items: [
+                {"name": "Dettol Liquid Handwash", "price": 99.0, "cost_price": 75.0, "stock_quantity": 50, "category": "Hygiene"},
+                {"name": "Paracetamol 650mg", "price": 30.0, "cost_price": 18.0, "stock_quantity": 120, "category": "Pharmacy"},
+                {"name": "Tata Salt 1kg", "price": 28.0, "cost_price": 22.0, "stock_quantity": 40, "category": "Grocery"},
+                {"name": "Maggi Noodles 2-Min", "price": 14.0, "cost_price": 11.0, "stock_quantity": 100, "category": "Grocery"},
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildPresetOption(
+              title: "Wholesaler Grocery Invoice PDF (4 items)",
+              subtitle: "Simulates scanning structured billing records from a local wholesale vendor.",
+              items: [
+                {"name": "Fortune Soyabean Oil 1L", "price": 165.0, "cost_price": 140.0, "stock_quantity": 30, "category": "Grocery"},
+                {"name": "Aashirvaad Atta 5kg", "price": 260.0, "cost_price": 215.0, "stock_quantity": 25, "category": "Grocery"},
+                {"name": "Dettol Liquid Handwash", "price": 99.0, "cost_price": 75.0, "stock_quantity": 20, "category": "Hygiene"},
+                {"name": "Colgate MaxFresh 150g", "price": 112.0, "cost_price": 90.0, "stock_quantity": 50, "category": "Hygiene"},
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildPresetOption(
+              title: "Electronics Invoice Photo OCR (3 items)",
+              subtitle: "Simulates using camera OCR to ingest electrical catalog items.",
+              items: [
+                {"name": "Syska LED Bulb 9W", "price": 140.0, "cost_price": 100.0, "stock_quantity": 60, "category": "Electronics"},
+                {"name": "Syska LED Bulb 12W", "price": 180.0, "cost_price": 130.0, "stock_quantity": 40, "category": "Electronics"},
+                {"name": "SanDisk 64GB Flash Drive", "price": 450.0, "cost_price": 320.0, "stock_quantity": 15, "category": "Electronics"},
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPresetOption({
+    required String title,
+    required String subtitle,
+    required List<Map<String, dynamic>> items,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return InkWell(
+      onTap: () {
+        Navigator.pop(context); // Close selection sheet
+        _runImportSimulation(title, items);
+      },
+      borderRadius: BorderRadius.circular(14),
+      child: GlassBox(
+        blur: 5,
+        opacity: 0.04,
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.lightOnSurface,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: isDark ? Colors.white54 : Colors.black54,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  "${items.length} Items",
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _runImportSimulation(String presetName, List<Map<String, dynamic>> sampleProducts) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    String currentStep = "Uploading file to server...";
+    double progress = 0.2;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          // Simulate steps in sequence
+          Future.delayed(const Duration(milliseconds: 800), () {
+            if (context.mounted && currentStep == "Uploading file to server...") {
+              setDialogState(() {
+                currentStep = "Analyzing layout & extracting tabular data...";
+                progress = 0.5;
+              });
+            }
+          });
+
+          Future.delayed(const Duration(milliseconds: 1600), () {
+            if (context.mounted && currentStep == "Analyzing layout & extracting tabular data...") {
+              setDialogState(() {
+                currentStep = "Performing restock check against catalog...";
+                progress = 0.8;
+              });
+            }
+          });
+
+          Future.delayed(const Duration(milliseconds: 2300), () async {
+            if (context.mounted && currentStep == "Performing restock check against catalog...") {
+              setDialogState(() {
+                currentStep = "Finalizing draft product batch...";
+                progress = 1.0;
+              });
+
+              // Make the actual call to Server to propose this product batch
+              final client = http.Client();
+              try {
+                final response = await client.post(
+                  AppConfig.getApiUri('/api/propose-batch'),
+                  headers: {'Content-Type': 'application/json'},
+                  body: jsonEncode({
+                    'products': sampleProducts,
+                    'userIdentifier': UserSession().userId ?? 'web-user',
+                    'shopId': UserSession().shopId ?? 'default_shop',
+                  }),
+                );
+
+                Navigator.pop(context); // Close loader dialog
+
+                if (response.statusCode == 200) {
+                  final resData = jsonDecode(response.body);
+                  if (resData['success'] == true) {
+                    _showConfirmationDraftSheet(resData);
+                  } else {
+                    throw Exception(resData['message'] ?? 'Failed to propose batch');
+                  }
+                } else {
+                  throw Exception('Server returned ${response.statusCode}');
+                }
+              } catch (e) {
+                Navigator.pop(context); // Close loader dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text("Error proposing batch: $e"),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              } finally {
+                client.close();
+              }
+            }
+          });
+
+          return AlertDialog(
+            backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            content: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    height: 60,
+                    width: 60,
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      strokeWidth: 4,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    "Parsing Import Source",
+                    style: TextStyle(
+                      color: isDark ? Colors.white : AppColors.lightOnSurface,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    presetName,
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  LinearProgressIndicator(
+                    value: progress,
+                    backgroundColor: isDark ? Colors.white10 : Colors.black12,
+                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    minHeight: 6,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    currentStep,
+                    style: TextStyle(
+                      color: isDark ? Colors.white70 : Colors.black54,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showConfirmationDraftSheet(Map<String, dynamic> batchPayload) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+          border: Border.all(
+            color: isDark ? AppColors.darkGlassBorder : AppColors.lightGlassBorder,
+          ),
+        ),
+        padding: const EdgeInsets.only(top: 24, left: 24, right: 24, bottom: 12),
+        child: Column(
+          children: [
+            // Drawer line handle
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white24 : Colors.black26,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: SingleChildScrollView(
+                child: InventoryDraftCard(
+                  payload: batchPayload,
+                  onApproved: () {
+                    // Trigger inventory refresh immediately
+                    ref.read(inventoryProvider.notifier).fetchProducts(forceRefresh: true);
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+

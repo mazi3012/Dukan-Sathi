@@ -189,6 +189,53 @@ final SchemanticType<Map<String, dynamic>> proposeProductsInputSchema =
   parse: (json) => Map<String, dynamic>.from(json as Map),
 );
 
+Future<List<Map<String, dynamic>>> enrichProposedProductsWithRestock({
+  required String shopId,
+  required List<Map<String, dynamic>> products,
+}) async {
+  try {
+    final existingProductRows = await supabase
+        .from('products')
+        .select('id, name, price, cost_price, stock_quantity, category')
+        .eq('shop_id', shopId);
+
+    final existingProducts = (existingProductRows as List<dynamic>)
+        .map((row) => Map<String, dynamic>.from(row as Map))
+        .toList();
+
+    final List<Map<String, dynamic>> enriched = [];
+
+    for (final p in products) {
+      final name = (p['name'] as String?)?.trim() ?? '';
+      
+      final match = existingProducts.firstWhere(
+        (ep) => (ep['name'] as String).trim().toLowerCase() == name.toLowerCase(),
+        orElse: () => <String, dynamic>{},
+      );
+
+      if (match.isNotEmpty) {
+        enriched.add({
+          ...p,
+          'is_restock': true,
+          'existing_product_id': match['id'],
+          'existing_stock': match['stock_quantity'] ?? 0,
+          'existing_price': (match['price'] as num?)?.toDouble() ?? 0.0,
+        });
+      } else {
+        enriched.add({
+          ...p,
+          'is_restock': false,
+        });
+      }
+    }
+
+    return enriched;
+  } catch (e) {
+    print('Error enriching proposed products: $e');
+    return products;
+  }
+}
+
 final proposeProductsTool =
     ai.defineTool<Map<String, dynamic>, Map<String, dynamic>>(
   name: 'proposeProducts',
@@ -206,9 +253,14 @@ final proposeProductsTool =
                    await getShopIdForUser(context.context?['userIdentifier'] as String?);
 
     try {
+      final enriched = await enrichProposedProductsWithRestock(
+        shopId: shopId,
+        products: products,
+      );
+
       final response = await supabase.from('draft_product_batches').insert({
         'shop_id': shopId,
-        'proposed_products': products,
+        'proposed_products': enriched,
         'status': 'PENDING',
       }).select('id').single();
 
@@ -216,8 +268,8 @@ final proposeProductsTool =
         'message':
             'Product draft created. Human approval is required to finalize.',
         'batchId': response['id'],
-        'itemCount': products.length,
-        'products': products,
+        'itemCount': enriched.length,
+        'products': enriched,
       };
     } catch (e) {
       return {
@@ -244,17 +296,22 @@ Future<Map<String, dynamic>> createProductBatchRequest({
 
   try {
     final effectiveShopId = shopId ?? await getShopIdForUser(userIdentifier);
+    final enriched = await enrichProposedProductsWithRestock(
+      shopId: effectiveShopId,
+      products: products,
+    );
+
     final response = await supabase.from('draft_product_batches').insert({
       'shop_id': effectiveShopId,
-      'proposed_products': products,
+      'proposed_products': enriched,
       'status': 'PENDING',
     }).select('id').single();
 
     return {
       'success': true,
       'batchId': response['id'],
-      'itemCount': products.length,
-      'products': products,
+      'itemCount': enriched.length,
+      'products': enriched,
     };
   } catch (e) {
     return {

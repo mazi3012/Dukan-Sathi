@@ -15,6 +15,7 @@ import 'package:dukansathi_server/tools/expense_tools.dart';
 import 'package:dukansathi_server/tools/invoice_lookup_tools.dart';
 import 'package:dukansathi_server/tools/utility_tools.dart';
 import 'package:dukansathi_server/shared/services/invoice_pdf_generator.dart';
+import 'package:dukansathi_server/agents/master_manager.dart';
 import 'package:genkit/genkit.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -161,8 +162,11 @@ Future<void> main(List<String> arguments) async {
   print('');
 
 
-  // ─── WEB CHAT SESSION ──────────────────────────────────────────────────
+  // ─── WEB CHAT SESSION (Legacy — kept as fallback for MasterManager) ──
   final Map<String, WebChatSession> webSessions = {};
+
+  // ─── MULTI-AGENT MASTER MANAGER (Phase 1: wraps legacy as fallback) ──
+  final Map<String, MasterManager> managerSessions = {};
   
   // Rate limiter instance
   final rateLimiter = RateLimiter();
@@ -333,7 +337,7 @@ Future<void> main(List<String> arguments) async {
             ..close();
         }
       } else if (request.method == 'POST' && request.uri.path == '/api/chat') {
-        // ─── SMART CHAT ENDPOINT ────────────────────────────────────────
+        // ─── MULTI-AGENT CHAT ENDPOINT ──────────────────────────────────
         var body = await utf8.decodeStream(request);
         try {
           final data = jsonDecode(body) as Map<String, dynamic>;
@@ -341,6 +345,7 @@ Future<void> main(List<String> arguments) async {
 
           if (data['clearHistory'] == true) {
             webSessions.remove(sessionId);
+            managerSessions.remove(sessionId);
             request.response
               ..statusCode = 200
               ..headers.contentType = ContentType.json
@@ -362,10 +367,18 @@ Future<void> main(List<String> arguments) async {
             return;
           }
 
-          // Get or create session
-          final session = webSessions.putIfAbsent(sessionId, () => WebChatSession());
+          // Get or create the legacy session (kept as fallback)
+          final legacySession = webSessions.putIfAbsent(sessionId, () => WebChatSession());
 
-          final result = await session.processMessage(input, shopId: shopId, userId: userId);
+          // Get or create the MasterManager session (wraps legacy as fallback)
+          final manager = managerSessions.putIfAbsent(sessionId, () => MasterManager(
+            registry: agentRegistry,
+            legacyFallback: (input, {shopId, userId}) =>
+                legacySession.processMessage(input, shopId: shopId, userId: userId),
+          ));
+
+          // Route through the MasterManager — it delegates to sub-agents or falls back to legacy
+          final result = await manager.processMessage(input, shopId: shopId, userId: userId);
 
           request.response
             ..statusCode = 200
@@ -577,6 +590,52 @@ Future<void> main(List<String> arguments) async {
             ..close();
         } catch (e) {
           request.response..statusCode = 500..write(e.toString())..close();
+        }
+      } else if (request.method == 'POST' && request.uri.path == '/api/update-batch') {
+        // ─── UPDATE PRODUCT BATCH DRAFT ─────────────────────────────────
+        var body = await utf8.decodeStream(request);
+        try {
+          final data = jsonDecode(body) as Map<String, dynamic>;
+          final batchId = data['batchId']?.toString();
+          if (batchId == null) throw Exception("Missing batchId");
+          
+          final products = data['products'] as List<dynamic>;
+          
+          final result = await updateProductBatchDraft(
+            batchId: batchId,
+            products: products.map((p) => Map<String, dynamic>.from(p as Map)).toList(),
+          );
+          
+          request.response
+            ..statusCode = 200
+            ..headers.contentType = ContentType.json
+            ..write(jsonEncode(result))
+            ..close();
+        } catch (e) {
+          request.response..statusCode = 500..write("Server Error: ${e.toString()}")..close();
+        }
+      } else if (request.method == 'POST' && request.uri.path == '/api/propose-batch') {
+        // ─── PROPOSE PRODUCT BATCH ──────────────────────────────────────
+        var body = await utf8.decodeStream(request);
+        try {
+          final data = jsonDecode(body) as Map<String, dynamic>;
+          final products = data['products'] as List<dynamic>;
+          final userIdentifier = data['userIdentifier']?.toString() ?? 'web-user';
+          final shopId = data['shopId']?.toString();
+          
+          final result = await createProductBatchRequest(
+            userIdentifier: userIdentifier,
+            products: products.map((p) => Map<String, dynamic>.from(p as Map)).toList(),
+            shopId: shopId,
+          );
+          
+          request.response
+            ..statusCode = 200
+            ..headers.contentType = ContentType.json
+            ..write(jsonEncode(result))
+            ..close();
+        } catch (e) {
+          request.response..statusCode = 500..write("Server Error: ${e.toString()}")..close();
         }
       } else if (request.method == 'GET' && request.uri.path == '/api/get-batch') {
         // ─── GET BATCH DETAILS ───────────────────────────────────────────

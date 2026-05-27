@@ -296,6 +296,96 @@ class ChatController extends StateNotifier<List<ChatMessage>> {
       ];
     }
   }
+
+  Future<void> proposeBatchUpload(String fileName, List<Map<String, dynamic>> products, [String? instruction]) async {
+    // 1. Add User Message
+    final userText = instruction != null && instruction.trim().isNotEmpty
+        ? "📁 Uploaded file: $fileName\n💬 Instruction: $instruction"
+        : "📁 Uploaded file: $fileName";
+
+    final userMsg = ChatMessage(
+      id: _uuid.v4(),
+      text: userText,
+      type: MessageType.user,
+    );
+    state = [...state, userMsg];
+    _saveMessageToDb(userMsg);
+
+    // 2. Add "Typing" Indicator
+    final typingId = _uuid.v4();
+    state = [
+      ...state,
+      ChatMessage(
+        id: typingId,
+        text: "...",
+        type: MessageType.aiText,
+        isTyping: true,
+      ),
+    ];
+
+    try {
+      final response = await http.post(
+        _getApiUri('/api/propose-batch'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'products': products,
+          'userIdentifier': UserSession().userId ?? 'web-user',
+          'shopId': UserSession().shopId ?? 'default_shop',
+          'instruction': instruction,
+        }),
+      );
+
+      // Remove typing indicator
+      state = state.where((m) => m.id != typingId).toList();
+
+      if (response.statusCode == 200) {
+        final resData = jsonDecode(response.body);
+        if (resData['success'] == true) {
+          String aiText = "I've successfully scanned $fileName and extracted the product table. Here is your draft batch confirmation: Matches with active catalog have been highlighted as restocks.";
+          
+          if (instruction != null && instruction.trim().isNotEmpty) {
+            final instructionLower = instruction.toLowerCase();
+            if (instructionLower.contains("tax") || instructionLower.contains("gst") || instructionLower.contains("calculate")) {
+              aiText = "I've processed $fileName and performed the tax calculation & GST breakdown as you requested. Here is the draft batch showing restocks and calculated pricing:";
+            } else if (instructionLower.contains("verify") || instructionLower.contains("price") || instructionLower.contains("check")) {
+              aiText = "I've scanned $fileName and cross-referenced all catalog prices and restock statuses. Here is the verified product draft:";
+            } else {
+              aiText = "I've successfully scanned $fileName and extracted the products aligning with your request: \"$instruction\". Here is the generated inventory draft card:";
+            }
+          }
+
+          final aiTextMsg = ChatMessage(
+            id: _uuid.v4(),
+            text: aiText,
+            type: MessageType.aiText,
+          );
+          
+          final aiCardMsg = ChatMessage(
+            id: _uuid.v4(),
+            text: "",
+            type: MessageType.aiDraftInventory,
+            payload: resData,
+          );
+
+          state = [...state, aiTextMsg, aiCardMsg];
+          _saveMessageToDb(aiTextMsg);
+          _saveMessageToDb(aiCardMsg);
+        } else {
+          throw Exception(resData['message'] ?? 'Failed to propose batch');
+        }
+      } else {
+        throw Exception('Server returned ${response.statusCode}');
+      }
+    } catch (e) {
+      state = state.where((m) => m.id != typingId).toList();
+      final err = ChatMessage(
+        id: _uuid.v4(),
+        text: "Sorry, I ran into an error parsing $fileName: $e",
+        type: MessageType.aiText,
+      );
+      state = [...state, err];
+    }
+  }
 }
 
 Uri _getApiUri(String path) {

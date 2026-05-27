@@ -3,6 +3,7 @@ import '../core/database.dart';
 import '../shared/models/cart_item.dart';
 import '../shared/services/gst_calculator.dart';
 import '../shared/models/shop_config.dart';
+import 'inventory_tools.dart';
 
 double _roundToTwoDecimals(double value) => (value * 100).round() / 100;
 
@@ -944,7 +945,9 @@ Future<Map<String, dynamic>?> getProductDeletionRequestDetails(String requestId)
   }
 }
 
-/// Approve a product batch and insert items into the products table
+/// Approve a product batch and insert/update items in the products table atomically.
+/// It detects whether a product is marked as a restock and performs an update (stock increment),
+/// or a new product insertion.
 Future<Map<String, dynamic>> approveProductBatch({
   required String batchId,
   required String reviewedBy,
@@ -962,24 +965,61 @@ Future<Map<String, dynamic>> approveProductBatch({
     final proposedProducts = batchData['proposed_products'] as List;
 
     final List<Map<String, dynamic>> productsToInsert = [];
+    final List<Map<String, dynamic>> productsToUpdate = [];
+
     for (final p in proposedProducts) {
       final data = Map<String, dynamic>.from(p as Map);
-      productsToInsert.add({
-        'id': const Uuid().v4(),
-        'shop_id': shopId,
-        'name': data['name'],
-        'price': data['price'],
-        'stock_quantity': data['stock_quantity'] ?? 0,
-        'category': data['category'],
-        'description': data['description'],
-        'is_service': data['is_service'] ?? false,
-        'gst_rate': data['gst_rate'] ?? 0,
-        'hsn_sac_code': data['hsn_sac_code'],
-        'metadata': data['metadata'] ?? {},
-      });
+      final isRestock = data['is_restock'] == true;
+      final existingProductId = data['existing_product_id']?.toString();
+
+      if (isRestock && existingProductId != null && existingProductId.isNotEmpty) {
+        // Fetch current stock quantity to add atomically
+        final currentProd = await supabase
+            .from('products')
+            .select('stock_quantity')
+            .eq('id', existingProductId)
+            .maybeSingle();
+
+        final currentStock = currentProd != null
+            ? (currentProd['stock_quantity'] as num?)?.toInt() ?? 0
+            : 0;
+
+        productsToUpdate.add({
+          'id': existingProductId,
+          'shop_id': shopId,
+          'stock_quantity': currentStock + ((data['stock_quantity'] as num?)?.toInt() ?? 0),
+          'price': (data['price'] as num?)?.toDouble() ?? 0.0,
+          if (data['cost_price'] != null)
+            'cost_price': (data['cost_price'] as num?)?.toDouble() ?? 0.0,
+          if (data['category'] != null)
+            'category': data['category'],
+        });
+      } else {
+        // New Product
+        productsToInsert.add({
+          'id': const Uuid().v4(),
+          'shop_id': shopId,
+          'name': data['name'],
+          'price': (data['price'] as num?)?.toDouble() ?? 0.0,
+          'stock_quantity': (data['stock_quantity'] as num?)?.toInt() ?? 0,
+          'category': data['category'],
+          'description': data['description'],
+          'is_service': data['is_service'] ?? false,
+          'gst_rate': (data['gst_rate'] as num?)?.toDouble() ?? 0.0,
+          'hsn_sac_code': data['hsn_sac_code'],
+          'metadata': data['metadata'] ?? {},
+          if (data['cost_price'] != null)
+            'cost_price': (data['cost_price'] as num?)?.toDouble() ?? 0.0,
+        });
+      }
     }
 
-    await supabase.from('products').insert(productsToInsert);
+    if (productsToInsert.isNotEmpty) {
+      await supabase.from('products').insert(productsToInsert);
+    }
+    if (productsToUpdate.isNotEmpty) {
+      await supabase.from('products').upsert(productsToUpdate);
+    }
 
     await supabase
         .from('draft_product_batches')
@@ -992,11 +1032,51 @@ Future<Map<String, dynamic>> approveProductBatch({
 
     return {
       'success': true,
-      'message': '✅ *Inventory Updated!*\n\n${proposedProducts.length} items added to your catalog.',
+      'message': '✅ *Inventory Updated!*\n\n${proposedProducts.length} items added or restocked in your catalog.',
     };
   } catch (e) {
     print('Error in approveProductBatch: $e');
     return {'success': false, 'error': 'Failed to approve batch: $e'};
+  }
+}
+
+/// Update a pending product batch draft's proposed products list
+Future<Map<String, dynamic>> updateProductBatchDraft({
+  required String batchId,
+  required List<Map<String, dynamic>> products,
+}) async {
+  try {
+    final batchRows = await supabase
+        .from('draft_product_batches')
+        .select('id, shop_id, status')
+        .eq('id', batchId)
+        .eq('status', 'PENDING')
+        .single();
+
+    final batchData = Map<String, dynamic>.from(batchRows as Map);
+    final shopId = batchData['shop_id'] as String;
+
+    // Recalculate restock flags/metadata on the updated products list
+    final enrichedProducts = await enrichProposedProductsWithRestock(
+      shopId: shopId,
+      products: products,
+    );
+
+    await supabase
+        .from('draft_product_batches')
+        .update({
+          'proposed_products': enrichedProducts,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', batchId);
+
+    return {
+      'success': true,
+      'products': enrichedProducts,
+    };
+  } catch (e) {
+    print('Error in updateProductBatchDraft: $e');
+    return {'success': false, 'error': 'Failed to update batch: $e'};
   }
 }
 

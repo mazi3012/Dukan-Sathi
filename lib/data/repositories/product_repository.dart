@@ -170,6 +170,60 @@ class ProductRepository {
     return null;
   }
 
+  /// Retrieves a specific product by its ID
+  Future<Product?> getProductById(String id) async {
+    final localMaps = await _localDb.queryAll(
+      'products',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    
+    if (localMaps.isNotEmpty) {
+      final map = Map<String, dynamic>.from(localMaps.first);
+      map['is_service'] = map['is_service'] == 1;
+      
+      final metadataStr = map['metadata'] as String? ?? '{}';
+      final metadataMap = jsonDecode(metadataStr) as Map<String, dynamic>;
+      map['metadata'] = metadataMap;
+      
+      if (metadataMap.containsKey('barcode')) {
+        map['barcode'] = metadataMap['barcode'];
+      }
+      
+      return Product.fromJson(map);
+    }
+    
+    if (_connectivity.isOnline) {
+      try {
+        final cloudMatch = await supabase
+            .from('products')
+            .select('id, shop_id, name, price, stock_quantity, category, description, is_service, gst_rate, hsn_sac_code, barcode, cost_price, metadata')
+            .eq('id', id)
+            .maybeSingle();
+            
+        if (cloudMatch != null) {
+          final mapped = Map<String, dynamic>.from(cloudMatch);
+          mapped['is_service'] = (mapped['is_service'] == true) ? 1 : 0;
+          
+          final metadataMap = Map<String, dynamic>.from(mapped['metadata'] ?? {});
+          if (mapped['barcode'] != null) {
+            metadataMap['barcode'] = mapped['barcode'];
+          }
+          mapped['metadata'] = jsonEncode(metadataMap);
+          
+          final sqliteMapped = Map<String, dynamic>.from(mapped);
+          await _localDb.insert('products', sqliteMapped);
+          
+          return Product.fromJson(mapped);
+        }
+      } catch (e) {
+        debugPrint('[ProductRepository] Product ID cloud lookup failed: $e');
+      }
+    }
+    return null;
+  }
+
   /// Instantly saves product locally and queues background sync.
   /// On web, writes directly to Supabase to avoid AI stale-data issues.
   Future<void> saveProduct(Product product) async {
