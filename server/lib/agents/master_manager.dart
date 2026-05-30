@@ -102,6 +102,14 @@ Write a 1-line natural prefix like "Sure, let me handle that for you!" BEFORE th
     final stopwatch = Stopwatch()..start();
     print('[MasterManager] Processing: "$input"');
 
+    // ─── Step 0: INSTANT local chitchat — no LLM needed ─────────────────
+    final localReply = _tryLocalChitchat(input);
+    if (localReply != null) {
+      _addToHistory(input, localReply);
+      print('[MasterManager] Local chitchat handled in ${stopwatch.elapsedMilliseconds}ms');
+      return {'text': localReply};
+    }
+
     try {
       // Step 1: Ask the Manager LLM to classify intent
       final routingDecision = await _classifyIntent(input, effectiveShopId, effectiveUserId);
@@ -139,6 +147,92 @@ Write a 1-line natural prefix like "Sure, let me handle that for you!" BEFORE th
     }
   }
 
+  // ─── INSTANT LOCAL CHITCHAT DETECTION ─────────────────────────────────
+  /// Returns an instant reply for common greetings, help, identity questions,
+  /// thanks, and farewells WITHOUT calling any LLM. Returns null if the input
+  /// is NOT simple chitchat (i.e., it likely requires tool execution or routing).
+  String? _tryLocalChitchat(String input) {
+    final n = input.toLowerCase().trim();
+    final wordCount = n.split(RegExp(r'\s+')).length;
+
+    // ── Greetings ──
+    final greetingPattern = RegExp(
+      r'^(hi+|hello|hey|namaste|namaskar|hola|salaam|good\s*(morning|afternoon|evening|night)|howdy|yo|sup|kya\s*hal|kaise\s*ho|kem\s*cho)\b',
+      caseSensitive: false,
+    );
+    if (greetingPattern.hasMatch(n) && wordCount <= 5) {
+      final now = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
+      final hour = now.hour;
+      final greeting = hour < 12 ? 'Good morning' : (hour < 17 ? 'Good afternoon' : 'Good evening');
+      return '$greeting! 👋 I\'m Dukan Sathi, your shop assistant. How can I help you today?\n\n'
+          'Here\'s what I can do:\n'
+          '• 📦 Check inventory & stock\n'
+          '• 🧾 Create invoices & bills\n'
+          '• 📊 Show sales & revenue reports\n'
+          '• 💰 Track customer dues & payments\n'
+          '• 📝 Log expenses\n\n'
+          'Just tell me what you need!';
+    }
+
+    // ── Help / Capabilities ──
+    final helpPattern = RegExp(
+      r'^(what\s+can\s+you\s+do|help|help\s+me|what\s+are\s+you|what\s+do\s+you\s+do|features|kya\s+kar\s+sakte|capabilities|how\s+to\s+use|options|commands|menu)',
+      caseSensitive: false,
+    );
+    if (helpPattern.hasMatch(n) && wordCount <= 8) {
+      return 'I\'m **Dukan Sathi**, your AI-powered shop management assistant! Here\'s everything I can help with:\n\n'
+          '🧾 **Billing** — "Make a bill for Rahul with 2 soaps"\n'
+          '📦 **Inventory** — "How much stock of Atta do I have?"\n'
+          '📋 **Product Catalog** — "Show product list"\n'
+          '📊 **Analytics** — "What is my total revenue?"\n'
+          '💰 **Customer Dues** — "Who owes me money?"\n'
+          '💳 **Payments** — "Record payment from Rahul ₹500"\n'
+          '📝 **Expenses** — "Log rent expense ₹5000"\n\n'
+          'Just type naturally — I understand Hindi, English, and Hinglish! 🇮🇳';
+    }
+
+    // ── Identity questions ──
+    final identityPattern = RegExp(
+      r'^(who\s+are\s+you|what\s+is\s+your\s+name|tum\s+kaun\s+ho|aap\s+kaun|your\s+name|apna\s+naam\s+batao|tell\s+me\s+about\s+yourself|introduce\s+yourself)',
+      caseSensitive: false,
+    );
+    if (identityPattern.hasMatch(n) && wordCount <= 8) {
+      return 'I\'m **Dukan Sathi** 🤖 — your AI-powered shop assistant built for Indian small business owners!\n\n'
+          'I help you manage billing, inventory, sales analytics, customer dues, and expenses — all through simple conversation. '
+          'Think of me as your trusted digital partner who never takes a day off! 💪';
+    }
+
+    // ── Thanks ──
+    final thanksPattern = RegExp(
+      r'^(thanks|thank\s*you|thankyou|dhanyawad|dhanyavaad|shukriya|bahut\s+accha|great|awesome|perfect|nice|ok\s+thanks|thx)',
+      caseSensitive: false,
+    );
+    if (thanksPattern.hasMatch(n) && wordCount <= 5) {
+      return 'You\'re welcome! 😊 Let me know if you need anything else.';
+    }
+
+    // ── Farewells ──
+    final farewellPattern = RegExp(
+      r'^(bye|goodbye|good\s*bye|see\s+you|alvida|chalo|ok\s+bye|tata|phir\s+milte|baad\s+mein)',
+      caseSensitive: false,
+    );
+    if (farewellPattern.hasMatch(n) && wordCount <= 5) {
+      return 'Goodbye! 👋 Your shop data is safe with me. Come back anytime you need help!';
+    }
+
+    // ── How are you / status ──
+    final statusPattern = RegExp(
+      r"^(how\s+are\s+you|how\s+r\s+u|kaisa\s+hai|kya\s+haal|whats\s+up|what'?s\s+up|aur\s+bata|all\s+good)",
+      caseSensitive: false,
+    );
+    if (statusPattern.hasMatch(n) && wordCount <= 6) {
+      return 'I\'m running great! ⚡ Ready to help you manage your shop. What would you like to do?';
+    }
+
+    // Not a simple chitchat — needs LLM classification
+    return null;
+  }
+
   // ─── INTENT CLASSIFICATION (LLM-powered) ──────────────────────────────
   Future<RoutingDecision?> _classifyIntent(String input, String shopId, String userId) async {
     try {
@@ -172,7 +266,8 @@ Write a 1-line natural prefix like "Sure, let me handle that for you!" BEFORE th
       print('[MasterManager] LLM classification response: ${reply.substring(0, reply.length > 200 ? 200 : reply.length)}...');
 
       // Try to extract JSON routing block from the response
-      final jsonMatch = RegExp(r'\{[\s]*"route"[\s]*:[\s]*\{[^}]+\}[\s]*\}').firstMatch(reply);
+      // Use a broader regex that handles multi-line and nested JSON
+      final jsonMatch = RegExp(r'\{[\s\S]*?"route"[\s\S]*?:[\s\S]*?\{[\s\S]*?\}[\s\S]*?\}').firstMatch(reply);
 
       if (jsonMatch != null) {
         try {
@@ -181,14 +276,28 @@ Write a 1-line natural prefix like "Sure, let me handle that for you!" BEFORE th
 
           if (routeMap != null && routeMap.isNotEmpty) {
             final agentTasks = <String, String>{};
-            for (final entry in routeMap.entries) {
-              final agentId = entry.key.toString();
-              final task = entry.value.toString();
-              // Only add if the agent actually exists in the registry
+
+            // Format 1 (standard): {"route": {"finance": "task description", "billing": "task description"}}
+            // Format 2 (alternate): {"route": {"agentId": "finance", "task": "task description"}}
+            if (routeMap.containsKey('agentId') && routeMap.containsKey('task')) {
+              // Alternate single-agent format
+              final agentId = routeMap['agentId'].toString();
+              final task = routeMap['task'].toString();
               if (registry.getAgent(agentId) != null) {
                 agentTasks[agentId] = task;
               } else {
                 print('[MasterManager] Warning: LLM routed to unknown agent "$agentId", skipping');
+              }
+            } else {
+              // Standard multi-agent format
+              for (final entry in routeMap.entries) {
+                final agentId = entry.key.toString();
+                final task = entry.value.toString();
+                if (registry.getAgent(agentId) != null) {
+                  agentTasks[agentId] = task;
+                } else {
+                  print('[MasterManager] Warning: LLM routed to unknown agent "$agentId", skipping');
+                }
               }
             }
 
