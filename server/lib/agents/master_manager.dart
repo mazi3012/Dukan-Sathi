@@ -265,7 +265,37 @@ Write a 1-line natural prefix like "Sure, let me handle that for you!" BEFORE th
       switch (response.status) {
         case AgentStatus.success:
           if (response.summaryForManager != null && response.summaryForManager!.isNotEmpty) {
-            textParts.add(response.summaryForManager!);
+            final trimmedSummary = response.summaryForManager!.trim();
+            if (trimmedSummary.startsWith('{') || trimmedSummary.startsWith('[')) {
+              if (response.card != null) {
+                final cardType = response.card!.type;
+                if (cardType == 'invoice') {
+                  textParts.add("I have drafted the invoice for your review. Please see the details below.");
+                } else if (cardType == 'batch') {
+                  textParts.add("I have prepared the bulk product proposal. You can review and import the products below.");
+                } else if (cardType == 'analytics_summary') {
+                  textParts.add("Here is the business performance and insights summary:");
+                } else if (cardType == 'customer_dues_list') {
+                  textParts.add("Here are the customers with outstanding dues:");
+                } else if (cardType == 'customer_due_detail') {
+                  textParts.add("Here are the outstanding dues details for the customer:");
+                } else if (cardType == 'expense_report') {
+                  textParts.add("Here is the requested business expense report:");
+                } else if (cardType == 'invoice_lookup') {
+                  textParts.add("I found the requested invoice. Please review the details below:");
+                } else if (cardType == 'product_catalog') {
+                  textParts.add("Here is the product catalog matching your query:");
+                } else if (cardType == 'payment_confirmation') {
+                  textParts.add("I have successfully recorded the payment transaction:");
+                } else {
+                  textParts.add("I have successfully processed your request:");
+                }
+              } else {
+                textParts.add("I have successfully processed your request.");
+              }
+            } else {
+              textParts.add(trimmedSummary);
+            }
           }
           // Use the first card from any successful agent
           if (firstCard == null && response.card != null) {
