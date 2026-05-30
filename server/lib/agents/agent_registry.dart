@@ -66,6 +66,19 @@ class AgentRegistry {
     return buffer.toString().trimRight();
   }
 
+  /// Generate a minimal routing manifest that only shows agent IDs and descriptions.
+  /// This prevents the Manager LLM from seeing tool names and trying to describe
+  /// tool parameters instead of producing proper routing JSON.
+  String getRoutingManifestMinimal() {
+    if (_agents.isEmpty) return 'No agents registered.';
+
+    final buffer = StringBuffer();
+    for (final agent in _agents.values) {
+      buffer.writeln('- "${agent.id}": ${agent.description}');
+    }
+    return buffer.toString().trimRight();
+  }
+
   /// Validate that all registered agents have unique IDs and non-overlapping tool sets
   List<String> validate() {
     final errors = <String>[];
