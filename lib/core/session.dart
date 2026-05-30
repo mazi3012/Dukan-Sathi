@@ -213,7 +213,7 @@ class UserSession extends ChangeNotifier {
 
       await _storage.saveShop(
         id: _shopId!,
-        name: _shopName,
+        name: _shopName ?? 'xyz company ',
         state: _shopState ?? 'AS',
         gstMode: _shopGstMode ?? 'REGISTERED',
         gstNum: 'gistn2635shshsh',
