@@ -198,26 +198,26 @@ class UserSession extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('ds_debug_bypass', true);
 
-      _userId = 'debug_user_id';
+      _userId = '97f3d4fe-78e4-4d0c-82ff-e83c72f2b390';
       _userName = 'Developer Guest';
       _emailVerified = true;
 
       await _storage.saveUser(_userId!, _userName ?? '');
 
-      // Assign a mock shop so the user immediately lands on MainLayout
-      _shopId = 'debug_shop_id';
-      _shopName = 'Dukan Sathi Demo';
-      _shopState = 'DL';
-      _shopGstMode = 'UNREGISTERED';
-      _shopBusinessType = 'Retail';
+      // Assign a real shop that has products so the user has fully populated local SQLite database and remote AI catalog sync.
+      _shopId = '6b3da8ec-674f-42ac-bae0-1762478b5e0c';
+      _shopName = 'xyz company ';
+      _shopState = 'AS';
+      _shopGstMode = 'REGISTERED';
+      _shopBusinessType = 'retail';
 
       await _storage.saveShop(
         id: _shopId!,
-        name: _shopName ?? 'My Shop',
-        state: _shopState ?? 'DL',
-        gstMode: _shopGstMode ?? 'UNREGISTERED',
-        gstNum: null,
-        businessType: _shopBusinessType ?? 'Retail',
+        name: _shopName,
+        state: _shopState ?? 'AS',
+        gstMode: _shopGstMode ?? 'REGISTERED',
+        gstNum: 'gistn2635shshsh',
+        businessType: _shopBusinessType ?? 'retail',
       );
 
       triggerCacheWarmup();

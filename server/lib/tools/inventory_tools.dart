@@ -146,7 +146,7 @@ final browseCatalogTool =
 
     if (products.isEmpty) {
       return {
-        'message': 'Our catalog is currently being updated.',
+        'message': 'Your catalog is empty. No products are registered in this shop yet.',
         'items': <Map<String, dynamic>>[],
       };
     }
