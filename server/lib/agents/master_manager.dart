@@ -55,9 +55,9 @@ Determine if this is:
 a) Casual conversation (greetings, help, jokes, questions about yourself) → Reply directly
 b) An operational task → Delegate to the appropriate agent(s)
 
-**Step 2: For operational tasks, output a JSON routing block:**
+**Step 2: For operational tasks, output a JSON routing block where the key is the target agent's ID (e.g., "billing" or "retail"):**
 ```json
-{"route": {"agentId": "task description for that agent"}}
+{"route": {"<agent_id>": "detailed task description for that agent"}}
 ```
 
 Examples:
@@ -279,10 +279,14 @@ Write a 1-line natural prefix like "Sure, let me handle that for you!" BEFORE th
 
             // Format 1 (standard): {"route": {"finance": "task description", "billing": "task description"}}
             // Format 2 (alternate): {"route": {"agentId": "finance", "task": "task description"}}
-            if (routeMap.containsKey('agentId') && routeMap.containsKey('task')) {
+            // Format 2b (alternate with taskDescription): {"route": {"agentId": "finance", "taskDescription": "task description"}}
+            final hasAgentId = routeMap.containsKey('agentId');
+            final hasTaskKey = routeMap.containsKey('task') || routeMap.containsKey('taskDescription') || routeMap.containsKey('task_description');
+
+            if (hasAgentId && hasTaskKey) {
               // Alternate single-agent format
               final agentId = routeMap['agentId'].toString();
-              final task = routeMap['task'].toString();
+              final task = (routeMap['task'] ?? routeMap['taskDescription'] ?? routeMap['task_description']).toString();
               if (registry.getAgent(agentId) != null) {
                 agentTasks[agentId] = task;
               } else {
