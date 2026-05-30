@@ -10,6 +10,8 @@ final DotEnv _env = DotEnv(includePlatformEnvironment: true);
 void _loadDotEnv() {
   if (File('.env').existsSync()) {
     _env.load(['.env']);
+  } else if (File('../.env').existsSync()) {
+    _env.load(['../.env']);
   }
 }
 
@@ -65,7 +67,7 @@ Genkit _createGenkit() {
   final defaultModel = (rawModel != null && rawModel.isNotEmpty && !rawModel.contains('llama-4-scout'))
       ? rawModel
       : (isNvidia
-          ? 'mistralai/mistral-nemotron'
+          ? 'meta/llama-3.3-70b-instruct'
           : (isOpenRouter ? 'deepseek/deepseek-v4-flash:free' : 'llama-3.3-70b-versatile'));
 
   final baseUrl = isNvidia
@@ -81,9 +83,9 @@ Genkit _createGenkit() {
         baseUrl: baseUrl,
         models: [
           CustomModelDefinition(
-            name: 'mistralai/mistral-nemotron',
+            name: 'meta/llama-3.3-70b-instruct',
             info: ModelInfo(
-              label: 'Mistral Nemotron',
+              label: 'Llama 3.3 70B (Nvidia)',
               supports: {'multiturn': true, 'tools': true, 'systemRole': true},
             ),
           ),
@@ -111,7 +113,7 @@ Genkit _createGenkit() {
           if (defaultModel != 'llama-3.3-70b-versatile' && 
               defaultModel != 'llama-3.1-8b-instant' && 
               defaultModel != 'deepseek/deepseek-v4-flash:free' &&
-              defaultModel != 'mistralai/mistral-nemotron')
+              defaultModel != 'meta/llama-3.3-70b-instruct')
             CustomModelDefinition(
               name: defaultModel,
               info: ModelInfo(
@@ -142,7 +144,7 @@ String get modelId {
   if (raw != null && raw.isNotEmpty && !raw.contains('llama-4-scout')) {
     return raw;
   }
-  if (isNvidia) return 'mistralai/mistral-nemotron';
+  if (isNvidia) return 'meta/llama-3.3-70b-instruct';
   return isOpenRouter ? 'deepseek/deepseek-v4-flash:free' : (isGroq ? 'llama-3.3-70b-versatile' : 'gemini-1.5-flash');
 }
 

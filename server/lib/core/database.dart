@@ -10,6 +10,8 @@ SupabaseClient get supabase {
   final env = DotEnv(includePlatformEnvironment: true);
   if (File('.env').existsSync()) {
     env.load(['.env']);
+  } else if (File('../.env').existsSync()) {
+    env.load(['../.env']);
   }
   final url = Platform.environment['SUPABASE_URL'] ?? env['SUPABASE_URL'] ?? '';
   // Prioritize service role key on server for RLS bypass
