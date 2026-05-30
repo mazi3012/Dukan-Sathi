@@ -12,6 +12,7 @@ import 'agents/agent_registry.dart';
 import 'agents/retail_agent.dart';
 import 'agents/billing_agent.dart';
 import 'agents/finance_agent.dart';
+import 'agents/utility_agent.dart';
 
 /// Global agent registry — accessible across the server
 final agentRegistry = AgentRegistry();
@@ -38,6 +39,7 @@ void initializeBackend() {
   agentRegistry.register(RetailAgent());
   agentRegistry.register(BillingAgent());
   agentRegistry.register(FinanceAgent());
+  agentRegistry.register(UtilityAgent());
 
   // Validate that no tools overlap across agents
   final errors = agentRegistry.validate();

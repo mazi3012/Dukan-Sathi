@@ -53,7 +53,7 @@ ${registry.getRoutingManifestMinimal()}
 For casual conversation (greetings, help, jokes, questions about yourself):
 → Reply directly in natural language. No JSON needed.
 
-For ANY operational task (revenue, sales, stock, billing, expenses, payments, catalog, products, dues):
+For ANY operational task (revenue, sales, stock, billing, expenses, payments, catalog, products, dues, weather, reminder, forecast):
 → Output EXACTLY this JSON format and NOTHING ELSE besides a brief 1-line acknowledgment before it:
 
 {"route": {"AGENT_ID": "plain English task description"}}
@@ -79,6 +79,22 @@ Response: Here's your catalog!
 User: "today's sales and also show products"
 Response: Let me get both for you!
 {"route": {"finance": "Get business analytics for today", "retail": "Browse product catalog"}}
+
+User: "What's the weather in 781313?"
+Response: Let me check the weather for you!
+{"route": {"utility": "Get weather forecast for PIN code 781313"}}
+
+User: "Remind me to restock at 5pm"
+Response: I'll set that reminder!
+{"route": {"utility": "Set reminder: restock inventory, scheduled at 5:00 PM IST today"}}
+
+User: "Who has pending dues?"
+Response: Let me check your customer ledger!
+{"route": {"billing": "List all customers who have outstanding dues"}}
+
+User: "Log an expense of 500 for electricity"
+Response: I'll record that expense!
+{"route": {"finance": "Log expense of ₹500 for electricity, category: Utility"}}
 
 User: "Hi! How are you?"
 Response: Hello! I'm doing great. How can I help you manage your shop today?
@@ -335,11 +351,21 @@ Response: Hello! I'm doing great. How can I help you manage your shop today?
           replyLower.contains('browsecatalogtool') ||
           replyLower.contains('createdraftinvoice') ||
           replyLower.contains('proposeproducts') ||
+          replyLower.contains('requestproductdeletion') ||
           replyLower.contains('logexpense') ||
+          replyLower.contains('getexpenses') ||
+          replyLower.contains('checkcustomerdue') ||
+          replyLower.contains('listcustomersdue') ||
+          replyLower.contains('recordpayment') ||
+          replyLower.contains('invoicelookup') ||
+          replyLower.contains('getweather') ||
+          replyLower.contains('setreminder') ||
           replyLower.contains('"shopid"') ||
           replyLower.contains('"metric"') ||
           replyLower.contains('"period"') ||
-          (replyLower.contains('"shopid"') && replyLower.contains('"metric"'));
+          replyLower.contains('"pincode"') ||
+          replyLower.contains('"remindertext"') ||
+          replyLower.contains('"scheduledat"');
 
       if (hasToolLeakage) {
         print('[MasterManager] ⚠️ LLM leaked tool schemas instead of routing — falling back to legacy');
