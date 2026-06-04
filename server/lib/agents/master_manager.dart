@@ -10,6 +10,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:genkit/genkit.dart';
+import 'package:schemantic/schemantic.dart';
 
 import 'agent_contracts.dart';
 import 'agent_registry.dart';
@@ -32,115 +33,41 @@ class MasterManager {
 
   // ─── MANAGER'S PERSONALITY PROMPT ─────────────────────────────────────
   String get _managerSystemPrompt => '''
-You are **Dukan Sathi** 🤖 — an intelligent AI assistant for Indian small business shopkeepers, as powerful and versatile as ChatGPT or Gemini, but specialized for running a dukan (shop).
+You are **Dukan Sathi** 🤖 — an intelligent AI assistant for Indian small business shopkeepers.
+Your role is to classify the user's intent and either reply directly (for greetings/advice) or route the request to a specialist agent (for shop database actions).
 
-## YOUR PERSONALITY & CHARACTER
-- You are warm, witty, intelligent, and conversational — like a knowledgeable friend who also runs a business
-- Respond in the SAME LANGUAGE the user writes in (Hindi, English, or Hinglish — auto-detect and match)
-- You are patient, never dismissive, and always helpful — even for off-topic questions
-- Use emojis occasionally to feel friendly and modern, but don't overdo it
-- Show currency as ₹. Use IST (India Standard Time) for all dates and times.
-
-## YOUR CAPABILITIES — You are versatile!
-You can help with ANYTHING a shopkeeper might ask:
-✅ **Shop Operations** → Route to specialist agents (billing, inventory, finance, utility)
-✅ **General Knowledge** → Answer directly (history, science, general advice, how-to questions)
-✅ **Math & Calculations** → Compute directly (GST calculations, profit margins, unit conversions)
-✅ **Business Advice** → Share best practices, pricing strategy, vendor negotiation tips
-✅ **Creative Help** → Write product descriptions, draft supplier emails, marketing copy
-✅ **Language Help** → Translate, explain terms, clarify jargon
-✅ **Casual Conversation** → Be friendly, tell jokes, discuss current events
-
-## YOUR ROLE AS MANAGER
-You are the ROUTING HUB. You CLASSIFY intent and DELEGATE operational shop tasks to specialists.
-You do NOT execute tools yourself. You do NOT describe tool parameters or schemas.
-
-## AVAILABLE SPECIALIST AGENTS
+## SPECIALIST AGENTS AVAILABLE FOR ROUTING
 ${registry.getRoutingManifestMinimal()}
 
-## DECISION FRAMEWORK
+## ROUTING RULE
+If the user's request requires shop database actions, logs, reports, weather forecast, or reminders (e.g. checking stock, sales, creating bills, customer dues, logging expenses/payments), you MUST route it.
+To route, output a 1-line friendly acknowledgment, followed immediately by the route JSON block:
+{"route": {"<AGENT_ID>": "<Task description in plain English>"}}
 
-### → ROUTE TO AGENT (use JSON block) when user asks about:
-- **Revenue / Sales / Profit / Analytics** → finance agent
-- **Invoices / Bills / Drafts / Billing** → billing agent
-- **Customer Dues / Balances / Payments** → billing agent
-- **Inventory / Stock / Products / Catalog** → retail agent
-- **Add Products / Delete Products / Propose Items** → retail agent
-- **Expenses / Spending / Rent / Salary logs** → finance agent
-- **Weather Forecast** → utility agent
-- **Setting Reminders / Alerts** → utility agent
-
-### → ANSWER DIRECTLY (no JSON) when user asks about:
-- Greetings, small talk, thanks, farewells
-- Your identity or capabilities
-- General knowledge (history, science, geography, etc.)
-- Math or calculations not requiring real shop data
-- Business advice or best practices
-- Writing help (emails, descriptions, etc.)
-- Anything that doesn't need real-time shop database access
-
-## ROUTING FORMAT
-For operational shop tasks, output:
-1. A brief 1-line natural acknowledgment
-2. Immediately followed by the routing JSON — no extra text
-
-{"route": {"AGENT_ID": "plain English task description"}}
-
-## ROUTING EXAMPLES
-
+Example:
 User: "what is my total revenue this month"
-Response: Checking your revenue for this month! 📊
+Response: Checking your revenue! 📊
 {"route": {"finance": "Get total business revenue and analytics for this month"}}
 
-User: "bill Rahul 2 soaps and 1 oil"
+Example:
+User: "bill Rahul 2 soaps"
 Response: Creating the invoice right away!
-{"route": {"billing": "Create draft invoice for customer Rahul with items: 2 soaps, 1 oil"}}
+{"route": {"billing": "Create draft invoice for customer Rahul with items: 2 soaps"}}
 
-User: "kitna stock hai atta ka?"
-Response: Check karta hoon abhi!
-{"route": {"retail": "Check inventory stock level for product: Atta"}}
+Example:
+User: "whats the weather now"
+Response: Checking the forecast!
+{"route": {"utility": "Get weather forecast for current location"}}
 
-User: "show all my products"
-Response: Here's your product catalog!
-{"route": {"retail": "Browse and list all products in the catalog"}}
+## DIRECT RESPONSE RULE
+For greetings, casual conversation, general advice, simple math, or capability questions, reply directly in natural language (Hindi, English, or Hinglish as appropriate). Do NOT output any JSON.
 
-User: "aaj ki sale aur products dono dikhao"
-Response: Dono check karta hoon ek saath!
-{"route": {"finance": "Get business analytics for today", "retail": "Browse product catalog"}}
-
-User: "weather for 781313"
-Response: Let me check the forecast!
-{"route": {"utility": "Get weather forecast for PIN code 781313"}}
-
-User: "remind me tomorrow 9am to pay supplier"
-Response: Setting your reminder!
-{"route": {"utility": "Set reminder: pay supplier, scheduled at 9:00 AM IST tomorrow"}}
-
-User: "who owes me money?"
-Response: Checking your customer ledger!
-{"route": {"billing": "List all customers with outstanding dues"}}
-
-User: "log rent expense 8000"
-Response: Logging that expense!
-{"route": {"finance": "Log expense: ₹8000 for rent, category: Rent"}}
-
-User: "what is GST on 18% for ₹500?"
-Response: That's straightforward! 18% GST on ₹500 = ₹90. So the total would be ₹590. 💡 If you want me to create an actual invoice with GST calculations, just tell me the customer name and items!
-
-User: "how do I price my products?"
-Response: Great question! A common approach for retail is the **Cost-Plus method**: take your purchase cost, add a target margin (typically 20-40% for kirana items), then adjust based on market prices. For example, if Atta costs you ₹30/kg, selling at ₹38-42/kg gives a healthy margin. Want me to check your current product margins?
-
+Example:
 User: "Hi!"
-Response: Hi there! 👋 I'm Dukan Sathi — your AI shop assistant. I can help you with billing, inventory, sales reports, customer dues, and much more. What would you like to do today?
+Response: Hello! 👋 I am Dukan Sathi. How can I help you manage your shop today?
 
-## ABSOLUTE RULES — NEVER VIOLATE
-1. For operational shop tasks → ALWAYS output the {"route": {...}} JSON block. No exceptions.
-2. NEVER output internal tool names (businessInsightsTool, checkInventory, etc.) to the user.
-3. NEVER output tool parameter JSON like {"shopId": "...", "metric": "..."} — that is NOT your job.
-4. NEVER make up shop data (product names, prices, revenue, stock levels, customer names). Always route and let tools fetch real data.
-5. NEVER refuse to answer general knowledge questions — you are versatile and helpful.
-6. The task description inside "route" must be plain English — NOT tool parameters or schemas.
-7. For compound requests (billing + analytics, etc.) → route to MULTIPLE agents in one JSON block.
+## CRITICAL RESTRICTION
+Do NOT output any other JSON format. Only output raw text or the `{"route": ...}` JSON block.
 ''';
 
   // ─── MAIN ENTRY POINT ─────────────────────────────────────────────────
@@ -316,98 +243,80 @@ Response: Hi there! 👋 I'm Dukan Sathi — your AI shop assistant. I can help 
       final response = await ai.generate(
         model: appModel(),
         messages: messages,
-        toolNames: [],  // Manager has NO tools — it only routes
+        outputFormat: 'json',
+        outputSchema: SchemanticType.from<Map<String, dynamic>>(
+          jsonSchema: {
+            'type': 'object',
+            'properties': {
+              'isChitchat': {
+                'type': 'boolean',
+                'description': 'True if the request is casual small talk, greetings, general advice, simple math, or capability questions. False if it requires querying the shop databases or taking database action (checking stock, sales, creating bills, dues, weather, reminders).',
+              },
+              'directReply': {
+                'type': 'string',
+                'description': 'The natural language reply if isChitchat is true. Set to empty string if false.',
+              },
+              'agentId': {
+                'type': 'string',
+                'description': 'The target agent ID ("retail", "billing", "finance", or "utility") if isChitchat is false. Set to empty string if true.',
+              },
+              'taskDescription': {
+                'type': 'string',
+                'description': 'Description of the task to perform in plain English if isChitchat is false. Set to empty string if true.',
+              },
+            },
+            'required': ['isChitchat', 'directReply', 'agentId', 'taskDescription'],
+          },
+          parse: (json) => Map<String, dynamic>.from(json as Map),
+        ),
+        config: const {
+          'temperature': 0.1,
+        },
       ).timeout(
         const Duration(seconds: 30),
         onTimeout: () => throw TimeoutException('Manager classification timed out'),
       );
 
-      final reply = response.text.trim();
-      print('[MasterManager] LLM classification response: ${reply.substring(0, reply.length > 200 ? 200 : reply.length)}...');
-
-      // Try to extract JSON routing block from the response
-      // Use a broader regex that handles multi-line and nested JSON
-      final jsonMatch = RegExp(r'\{[\s\S]*?"route"[\s\S]*?:[\s\S]*?\{[\s\S]*?\}[\s\S]*?\}').firstMatch(reply);
-
-      if (jsonMatch != null) {
-        try {
-          final parsed = jsonDecode(jsonMatch.group(0)!) as Map<String, dynamic>;
-          final routeMap = parsed['route'] as Map<String, dynamic>?;
-
-          if (routeMap != null && routeMap.isNotEmpty) {
-            final agentTasks = <String, String>{};
-
-            // Format 1 (standard): {"route": {"finance": "task description", "billing": "task description"}}
-            // Format 2 (alternate): {"route": {"agentId": "finance", "task": "task description"}}
-            // Format 2b (alternate with taskDescription): {"route": {"agentId": "finance", "taskDescription": "task description"}}
-            final hasAgentId = routeMap.containsKey('agentId');
-            final hasTaskKey = routeMap.containsKey('task') || routeMap.containsKey('taskDescription') || routeMap.containsKey('task_description');
-
-            if (hasAgentId && hasTaskKey) {
-              // Alternate single-agent format
-              final agentId = routeMap['agentId'].toString();
-              final task = (routeMap['task'] ?? routeMap['taskDescription'] ?? routeMap['task_description']).toString();
-              if (registry.getAgent(agentId) != null) {
-                agentTasks[agentId] = task;
-              } else {
-                print('[MasterManager] Warning: LLM routed to unknown agent "$agentId", skipping');
-              }
-            } else {
-              // Standard multi-agent format
-              for (final entry in routeMap.entries) {
-                final agentId = entry.key.toString();
-                final task = entry.value.toString();
-                if (registry.getAgent(agentId) != null) {
-                  agentTasks[agentId] = task;
-                } else {
-                  print('[MasterManager] Warning: LLM routed to unknown agent "$agentId", skipping');
-                }
-              }
-            }
-
-            if (agentTasks.isNotEmpty) {
-              // Extract the natural language prefix (everything before the JSON block)
-              final naturalPrefix = reply.substring(0, jsonMatch.start).trim();
-              return RoutingDecision(agentTasks: agentTasks, chitchatReply: naturalPrefix.isNotEmpty ? naturalPrefix : null);
-            }
-          }
-        } catch (e) {
-          print('[MasterManager] Failed to parse routing JSON: $e');
+      Map<String, dynamic>? data;
+      if (response.output != null) {
+        data = response.output;
+      } else {
+        final text = response.text.trim();
+        print('[MasterManager] Warning: response.output was null, fallback to parsing response.text: $text');
+        final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(text);
+        if (jsonMatch != null) {
+          data = jsonDecode(jsonMatch.group(0)!) as Map<String, dynamic>?;
         }
       }
 
-      // No JSON routing found — check if the LLM leaked tool schemas instead of routing
-      // This happens when the LLM outputs tool parameter JSON or tool names
-      // instead of the proper {"route": {...}} format
-      final replyLower = reply.toLowerCase();
-      final hasToolLeakage = replyLower.contains('businessinsightstool') ||
-          replyLower.contains('checkinventory') ||
-          replyLower.contains('browsecatalogtool') ||
-          replyLower.contains('createdraftinvoice') ||
-          replyLower.contains('proposeproducts') ||
-          replyLower.contains('requestproductdeletion') ||
-          replyLower.contains('logexpense') ||
-          replyLower.contains('getexpenses') ||
-          replyLower.contains('checkcustomerdue') ||
-          replyLower.contains('listcustomersdue') ||
-          replyLower.contains('recordpayment') ||
-          replyLower.contains('invoicelookup') ||
-          replyLower.contains('getweather') ||
-          replyLower.contains('setreminder') ||
-          replyLower.contains('"shopid"') ||
-          replyLower.contains('"metric"') ||
-          replyLower.contains('"period"') ||
-          replyLower.contains('"pincode"') ||
-          replyLower.contains('"remindertext"') ||
-          replyLower.contains('"scheduledat"');
-
-      if (hasToolLeakage) {
-        print('[MasterManager] ⚠️ LLM leaked tool schemas instead of routing — falling back to legacy');
-        return null; // Will trigger legacy fallback which has proper keyword routing
+      if (data == null) {
+        print('[MasterManager] Error: No valid JSON output structure found.');
+        return null;
       }
 
-      // Genuine chitchat/direct response
-      return RoutingDecision(isChitchat: true, chitchatReply: reply);
+      print('[MasterManager] LLM structured response: $data');
+
+      final isChitchat = data['isChitchat'] == true;
+      if (isChitchat) {
+        final directReply = data['directReply']?.toString() ?? '';
+        return RoutingDecision(isChitchat: true, chitchatReply: directReply);
+      } else {
+        final agentId = data['agentId']?.toString();
+        final taskDescription = data['taskDescription']?.toString();
+        if (agentId != null && agentId.isNotEmpty && taskDescription != null && taskDescription.isNotEmpty) {
+          if (registry.getAgent(agentId) != null) {
+            final directReplyStr = data['directReply']?.toString();
+            return RoutingDecision(
+              agentTasks: {agentId: taskDescription},
+              chitchatReply: (directReplyStr != null && directReplyStr.isNotEmpty) ? directReplyStr : null,
+            );
+          } else {
+            print('[MasterManager] Warning: LLM routed to unknown agent "$agentId", skipping');
+          }
+        }
+      }
+
+      return null;
     } catch (e) {
       print('[MasterManager] Classification error: $e');
       return null; // Will trigger legacy fallback

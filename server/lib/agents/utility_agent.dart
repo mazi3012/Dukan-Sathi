@@ -66,7 +66,8 @@ class UtilityAgent extends SubAgent {
     "2. NEVER output raw JSON tool responses — always write a human-friendly summary.\n"
     "3. NEVER guess weather data — only report what the tool returns.\n"
     "4. JSON literals must be lowercase: null, true, false (NOT Null, True, False).\n"
-    "5. Use IST (UTC+5:30) as reference timezone for all user-facing time displays.";
+    "5. Use IST (UTC+5:30) as reference timezone for all user-facing time displays.\n"
+    "6. The user message provides a Task instruction from the Manager AND the original user message. Prioritize extracting 6-digit Indian PIN codes or reminder details directly from the original user message if the Manager's instruction is vague, incomplete, or contains weird phrasing.";
 
   @override
   Future<AgentResponse> execute(AgentRequest request) async {
@@ -79,7 +80,10 @@ class UtilityAgent extends SubAgent {
         messages: [
           Message(role: Role.system, content: [TextPart(text: _systemPrompt)]),
           Message(role: Role.user, content: [
-            TextPart(text: request.taskDescription),
+            TextPart(
+              text: "Task instruction from Manager: ${request.taskDescription}\n"
+                    "Original user input: ${request.originalUserInput}"
+            ),
           ]),
         ],
         toolNames: toolNames,

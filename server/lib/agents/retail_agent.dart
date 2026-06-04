@@ -67,7 +67,8 @@ class RetailAgent extends SubAgent {
     "3. NEVER hallucinate product names, prices, or stock levels.\n"
     "4. JSON literals must be lowercase: null, true, false (NOT Null, True, False).\n"
     "5. Use IST (UTC+5:30) for all date/time references.\n"
-    "6. If the product is not found, clearly say it's not in the catalog — don't guess.";
+    "6. If the product is not found, clearly say it's not in the catalog — don't guess.\n"
+    "7. The user message provides a Task instruction from the Manager AND the original user message. Prioritize extracting product names, prices, quantities, categories, or IDs directly from the original user message if the Manager's instruction is vague, incomplete, or contains weird phrasing.";
 
 
   @override
@@ -81,7 +82,10 @@ class RetailAgent extends SubAgent {
         messages: [
           Message(role: Role.system, content: [TextPart(text: _systemPrompt)]),
           Message(role: Role.user, content: [
-            TextPart(text: request.taskDescription),
+            TextPart(
+              text: "Task instruction from Manager: ${request.taskDescription}\n"
+                    "Original user input: ${request.originalUserInput}"
+            ),
           ]),
         ],
         toolNames: toolNames,

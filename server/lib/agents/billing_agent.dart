@@ -73,7 +73,8 @@ class BillingAgent extends SubAgent {
     "3. NEVER hallucinate customer names, amounts, or invoice data.\n"
     "4. JSON literals must be lowercase: null, true, false (NOT Null, True, False).\n"
     "5. Use IST (UTC+5:30) for all date/time references.\n"
-    "6. If customer not found, state clearly — never guess or make up a customer record.";
+    "6. If customer not found, state clearly — never guess or make up a customer record.\n"
+    "7. The user message provides a Task instruction from the Manager AND the original user message. Prioritize extracting customer names, product items, quantities, payment status, discounts, or invoice references directly from the original user message if the Manager's instruction is vague, incomplete, or contains weird phrasing.";
 
   @override
   Future<AgentResponse> execute(AgentRequest request) async {
@@ -86,7 +87,10 @@ class BillingAgent extends SubAgent {
         messages: [
           Message(role: Role.system, content: [TextPart(text: _systemPrompt)]),
           Message(role: Role.user, content: [
-            TextPart(text: request.taskDescription),
+            TextPart(
+              text: "Task instruction from Manager: ${request.taskDescription}\n"
+                    "Original user input: ${request.originalUserInput}"
+            ),
           ]),
         ],
         toolNames: toolNames,
