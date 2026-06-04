@@ -15,5 +15,5 @@ services:
       - key: MODEL_ID
         value: llama-3.3-70b-versatile
       - key: PORT
-        value: "3100"
+        value: "10000"
     autoDeploy: true

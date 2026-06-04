@@ -125,7 +125,11 @@ Future<void> main(List<String> arguments) async {
   final port = int.tryParse(Platform.environment['PORT'] ?? '3100') ?? 3100;
   
   // Create a simple HTTP server for Genkit reflection API
-  final server = await HttpServer.bind(InternetAddress.anyIPv4, port);
+  final server = await HttpServer.bind(
+    InternetAddress.anyIPv6,
+    port,
+    v6Only: false,
+  );
   
   print('🚀 Genkit Reflection Server Started!');
   print('');

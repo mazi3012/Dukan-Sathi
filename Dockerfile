@@ -15,7 +15,7 @@ RUN cd server && dart compile exe bin/genkit_server.dart -o bin/server
 # Ensure executable permission
 RUN chmod +x /app/server/bin/server
 
-EXPOSE 3100
+EXPOSE 10000
 
 # Default command to run
 CMD ["/app/server/bin/server"]
