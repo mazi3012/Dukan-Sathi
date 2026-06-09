@@ -66,12 +66,7 @@ Genkit _createGenkit() {
     );
   }
 
-  final rawModel = _envValue('MODEL_ID') ?? _envValue('OPENROUTER_MODEL_ID');
-  final defaultModel = (rawModel != null && rawModel.isNotEmpty && !rawModel.contains('llama-4-scout'))
-      ? rawModel
-      : (isNvidia
-          ? 'meta/llama-3.3-70b-instruct'
-          : (isOpenRouter ? 'deepseek/deepseek-v4-flash:free' : 'llama-3.3-70b-versatile'));
+  final defaultModel = modelId;
 
   final baseUrl = isNvidia
       ? 'https://integrate.api.nvidia.com/v1'
@@ -135,11 +130,42 @@ Genkit get ai {
 
 String get modelId {
   final raw = _envValue('MODEL_ID') ?? _envValue('OPENROUTER_MODEL_ID');
-  if (raw != null && raw.isNotEmpty && !raw.contains('llama-4-scout')) {
-    return raw;
+  final targetModel = (raw != null && raw.isNotEmpty && !raw.contains('llama-4-scout'))
+      ? raw
+      : '';
+
+  if (isNvidia) {
+    if (targetModel.isEmpty || 
+        targetModel == 'llama-3.3-70b-versatile' || 
+        targetModel == 'deepseek/deepseek-v4-flash:free') {
+      return 'meta/llama-3.3-70b-instruct';
+    }
+    if (targetModel == 'llama-3.1-8b-instant') {
+      return 'meta/llama-3.1-8b-instruct';
+    }
+    return targetModel;
   }
-  if (isNvidia) return 'meta/llama-3.3-70b-instruct';
-  return isOpenRouter ? 'deepseek/deepseek-v4-flash:free' : (isGroq ? 'llama-3.3-70b-versatile' : 'gemini-1.5-flash');
+
+  if (isOpenRouter) {
+    if (targetModel.isEmpty || 
+        targetModel == 'meta/llama-3.3-70b-instruct' || 
+        targetModel == 'llama-3.3-70b-versatile' || 
+        targetModel == 'llama-3.1-8b-instant') {
+      return 'deepseek/deepseek-v4-flash:free';
+    }
+    return targetModel;
+  }
+
+  // Groq / default
+  if (targetModel.isEmpty || 
+      targetModel == 'meta/llama-3.3-70b-instruct' || 
+      targetModel == 'deepseek/deepseek-v4-flash:free') {
+    return 'llama-3.3-70b-versatile';
+  }
+  if (targetModel == 'meta/llama-3.1-8b-instruct') {
+    return 'llama-3.1-8b-instant';
+  }
+  return targetModel;
 }
 
 String get aiProvider {
