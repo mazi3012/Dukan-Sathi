@@ -32,7 +32,10 @@ String? _envValue(String key) {
 String? getEnv(String key) => _envValue(key);
 
 String? _getApiKey() {
-  return _envValue('NVIDIA_API_KEY') ?? _envValue('OPENROUTER_API_KEY') ?? _envValue('GROQ_API_KEY');
+  // Priority: NVIDIA (free) > OpenRouter > Groq
+  // NOTE: GROQ_API_KEY is intentionally excluded from the LLM provider chain
+  // because it's used separately for Whisper transcription only.
+  return _envValue('NVIDIA_API_KEY') ?? _envValue('OPENROUTER_API_KEY');
 }
 
 bool get isNvidia {
@@ -76,52 +79,43 @@ Genkit _createGenkit() {
           ? 'https://openrouter.ai/api/v1' 
           : 'https://api.groq.com/openai/v1');
 
+  print('[GenkitRuntime] Provider: ${isNvidia ? "NVIDIA" : (isOpenRouter ? "OpenRouter" : "Groq")}');
+  print('[GenkitRuntime] Model: $defaultModel');
+  print('[GenkitRuntime] Base URL: $baseUrl');
+
+  // All known free models across providers
+  final knownModels = <String>{
+    // NVIDIA free models
+    'meta/llama-3.3-70b-instruct',
+    'meta/llama-3.1-70b-instruct',
+    'meta/llama-3.1-8b-instruct',
+    'meta/llama-4-maverick-17b-128e-instruct',
+    'deepseek-ai/deepseek-v4-flash',
+    'google/gemma-4-31b-it',
+    'qwen/qwen3.5-122b-a10b',
+    'nvidia/nemotron-3-super-120b-a12b',
+    // OpenRouter free models
+    'deepseek/deepseek-v4-flash:free',
+    // Groq models
+    'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant',
+  };
+
+  // Always include the defaultModel
+  knownModels.add(defaultModel);
+
   return Genkit(
     plugins: [
       openAI(
         apiKey: apiKey,
         baseUrl: baseUrl,
-        models: [
-          CustomModelDefinition(
-            name: 'meta/llama-3.3-70b-instruct',
-            info: ModelInfo(
-              label: 'Llama 3.3 70B (Nvidia)',
-              supports: {'multiturn': true, 'tools': true, 'systemRole': true},
-            ),
+        models: knownModels.map((name) => CustomModelDefinition(
+          name: name,
+          info: ModelInfo(
+            label: name,
+            supports: {'multiturn': true, 'tools': true, 'systemRole': true},
           ),
-          CustomModelDefinition(
-            name: 'deepseek/deepseek-v4-flash:free',
-            info: ModelInfo(
-              label: 'DeepSeek V4 Flash (Free)',
-              supports: {'multiturn': true, 'tools': true, 'systemRole': true},
-            ),
-          ),
-          CustomModelDefinition(
-            name: 'llama-3.3-70b-versatile',
-            info: ModelInfo(
-              label: 'Llama 3.3 70B',
-              supports: {'multiturn': true, 'tools': true, 'systemRole': true},
-            ),
-          ),
-          CustomModelDefinition(
-            name: 'llama-3.1-8b-instant',
-            info: ModelInfo(
-              label: 'Llama 3.1 8B',
-              supports: {'multiturn': true, 'tools': true, 'systemRole': true},
-            ),
-          ),
-          if (defaultModel != 'llama-3.3-70b-versatile' && 
-              defaultModel != 'llama-3.1-8b-instant' && 
-              defaultModel != 'deepseek/deepseek-v4-flash:free' &&
-              defaultModel != 'meta/llama-3.3-70b-instruct')
-            CustomModelDefinition(
-              name: defaultModel,
-              info: ModelInfo(
-                label: 'Custom OpenAI Model',
-                supports: {'multiturn': true, 'tools': true, 'systemRole': true},
-              ),
-            ),
-        ],
+        )).toList(),
       ),
     ],
   );

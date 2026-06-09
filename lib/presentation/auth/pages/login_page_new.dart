@@ -188,7 +188,6 @@ class _LoginPageState extends State<LoginPage> {
                 ],
               ),
       ),
-      ),
     ).animate().fadeIn(delay: 300.ms);
   }
 

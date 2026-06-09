@@ -10,7 +10,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:genkit/genkit.dart';
-import 'package:schemantic/schemantic.dart';
 
 import 'agent_contracts.dart';
 import 'agent_registry.dart';
@@ -33,41 +32,60 @@ class MasterManager {
 
   // ─── MANAGER'S PERSONALITY PROMPT ─────────────────────────────────────
   String get _managerSystemPrompt => '''
-You are **Dukan Sathi** 🤖 — an intelligent AI assistant for Indian small business shopkeepers.
-Your role is to classify the user's intent and either reply directly (for greetings/advice) or route the request to a specialist agent (for shop database actions).
+You are Dukan Sathi, an AI assistant for Indian shop owners.
+Your ONLY job is to classify intent and output a JSON object.
 
-## SPECIALIST AGENTS AVAILABLE FOR ROUTING
+AGENTS:
 ${registry.getRoutingManifestMinimal()}
 
-## ROUTING RULE
-If the user's request requires shop database actions, logs, reports, weather forecast, or reminders (e.g. checking stock, sales, creating bills, customer dues, logging expenses/payments), you MUST route it.
-To route, output a 1-line friendly acknowledgment, followed immediately by the route JSON block:
-{"route": {"<AGENT_ID>": "<Task description in plain English>"}}
+VALID agentId VALUES: "retail", "billing", "finance", "utility"
 
-Example:
+## STRICT OUTPUT FORMAT
+You MUST respond with ONLY this JSON structure — nothing else:
+{"isChitchat": BOOL, "directReply": "STRING", "agentId": "STRING", "taskDescription": "STRING"}
+
+DO NOT use any other JSON format. DO NOT use {"name":...} or {"tool":...} or {"function":...} format.
+
+## WHEN isChitchat = false (routing to agent):
+- agentId must be one of: "retail", "billing", "finance", "utility"
+- taskDescription must describe the task in plain English
+- directReply can be a short acknowledgment or empty string
+
+## WHEN isChitchat = true (direct reply):
+- directReply contains your natural language response
+- agentId must be ""
+- taskDescription must be ""
+
+## EXAMPLES:
+
+User: "how many products do i have"
+{"isChitchat": false, "directReply": "Let me check your catalog!", "agentId": "retail", "taskDescription": "Browse the product catalog and count total products"}
+
+User: "check stock of atta"
+{"isChitchat": false, "directReply": "Checking stock!", "agentId": "retail", "taskDescription": "Check inventory stock level for product atta"}
+
 User: "what is my total revenue this month"
-Response: Checking your revenue! 📊
-{"route": {"finance": "Get total business revenue and analytics for this month"}}
+{"isChitchat": false, "directReply": "Checking your revenue! 📊", "agentId": "finance", "taskDescription": "Get total business revenue and analytics for this month"}
 
-Example:
 User: "bill Rahul 2 soaps"
-Response: Creating the invoice right away!
-{"route": {"billing": "Create draft invoice for customer Rahul with items: 2 soaps"}}
+{"isChitchat": false, "directReply": "Creating the invoice!", "agentId": "billing", "taskDescription": "Create draft invoice for customer Rahul with items: 2 soaps"}
 
-Example:
-User: "whats the weather now"
-Response: Checking the forecast!
-{"route": {"utility": "Get weather forecast for current location"}}
+User: "who owes me money"
+{"isChitchat": false, "directReply": "Let me check!", "agentId": "billing", "taskDescription": "List all customers with outstanding dues"}
 
-## DIRECT RESPONSE RULE
-For greetings, casual conversation, general advice, simple math, or capability questions, reply directly in natural language (Hindi, English, or Hinglish as appropriate). Do NOT output any JSON.
+User: "whats the weather"
+{"isChitchat": false, "directReply": "Checking!", "agentId": "utility", "taskDescription": "Get weather forecast for current location"}
 
-Example:
 User: "Hi!"
-Response: Hello! 👋 I am Dukan Sathi. How can I help you manage your shop today?
+{"isChitchat": true, "directReply": "Hello! 👋 How can I help you manage your shop today?", "agentId": "", "taskDescription": ""}
 
-## CRITICAL RESTRICTION
-Do NOT output any other JSON format. Only output raw text or the `{"route": ...}` JSON block.
+User: "tell me a joke"
+{"isChitchat": true, "directReply": "Why did the shopkeeper close early? Because he ran out of stock... and patience! 😄", "agentId": "", "taskDescription": ""}
+
+User: "what can you do"
+{"isChitchat": true, "directReply": "I can help with inventory, billing, analytics, customer dues, expenses, and more!", "agentId": "", "taskDescription": ""}
+
+REMEMBER: Your ENTIRE response must be ONLY the JSON object. No markdown, no explanation, no tool calls.
 ''';
 
   // ─── MAIN ENTRY POINT ─────────────────────────────────────────────────
@@ -240,35 +258,13 @@ Do NOT output any other JSON format. Only output raw text or the `{"route": ...}
         Message(role: Role.user, content: [TextPart(text: input)]),
       ];
 
+      // NOTE: We do NOT use outputFormat/outputSchema here because NVIDIA NIM API
+      // does not support response_format: json_schema, which causes requests to
+      // hang and timeout. Instead, the system prompt instructs JSON output and
+      // we parse the JSON from the text response.
       final response = await ai.generate(
         model: appModel(),
         messages: messages,
-        outputFormat: 'json',
-        outputSchema: SchemanticType.from<Map<String, dynamic>>(
-          jsonSchema: {
-            'type': 'object',
-            'properties': {
-              'isChitchat': {
-                'type': 'boolean',
-                'description': 'True if the request is casual small talk, greetings, general advice, simple math, or capability questions. False if it requires querying the shop databases or taking database action (checking stock, sales, creating bills, dues, weather, reminders).',
-              },
-              'directReply': {
-                'type': 'string',
-                'description': 'The natural language reply if isChitchat is true. Set to empty string if false.',
-              },
-              'agentId': {
-                'type': 'string',
-                'description': 'The target agent ID ("retail", "billing", "finance", or "utility") if isChitchat is false. Set to empty string if true.',
-              },
-              'taskDescription': {
-                'type': 'string',
-                'description': 'Description of the task to perform in plain English if isChitchat is false. Set to empty string if true.',
-              },
-            },
-            'required': ['isChitchat', 'directReply', 'agentId', 'taskDescription'],
-          },
-          parse: (json) => Map<String, dynamic>.from(json as Map),
-        ),
         config: const {
           'temperature': 0.1,
         },
@@ -278,14 +274,16 @@ Do NOT output any other JSON format. Only output raw text or the `{"route": ...}
       );
 
       Map<String, dynamic>? data;
-      if (response.output != null) {
-        data = response.output;
-      } else {
-        final text = response.text.trim();
-        print('[MasterManager] Warning: response.output was null, fallback to parsing response.text: $text');
-        final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(text);
-        if (jsonMatch != null) {
+      final text = response.text.trim();
+      print('[MasterManager] Raw LLM response: ${text.length > 200 ? text.substring(0, 200) : text}...');
+      
+      // Parse JSON from the response text
+      final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(text);
+      if (jsonMatch != null) {
+        try {
           data = jsonDecode(jsonMatch.group(0)!) as Map<String, dynamic>?;
+        } catch (parseErr) {
+          print('[MasterManager] JSON parse error: $parseErr');
         }
       }
 
