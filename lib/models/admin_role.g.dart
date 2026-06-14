@@ -6,15 +6,16 @@ part of 'admin_role.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_AdminRole _$AdminRoleFromJson(Map<String, dynamic> json) => _AdminRole(
-  id: json['id'] as String,
-  roleName: json['role_name'] as String,
-  description: json['description'] as String?,
-  createdAt: json['created_at'] as String,
-  updatedAt: json['updated_at'] as String,
-);
+_$AdminRoleImpl _$$AdminRoleImplFromJson(Map<String, dynamic> json) =>
+    _$AdminRoleImpl(
+      id: json['id'] as String,
+      roleName: json['role_name'] as String,
+      description: json['description'] as String?,
+      createdAt: json['created_at'] as String,
+      updatedAt: json['updated_at'] as String,
+    );
 
-Map<String, dynamic> _$AdminRoleToJson(_AdminRole instance) =>
+Map<String, dynamic> _$$AdminRoleImplToJson(_$AdminRoleImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'role_name': instance.roleName,

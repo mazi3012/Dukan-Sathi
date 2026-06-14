@@ -85,7 +85,7 @@ class ProductRepository {
     try {
       final cloudProducts = await supabase
           .from('products')
-          .select('id, shop_id, name, price, stock_quantity, category, description, is_service, gst_rate, hsn_sac_code, barcode, cost_price, metadata')
+          .select('id, shop_id, name, price, stock_quantity, category, description, is_service, gst_rate, hsn_sac_code, barcode, cost_price, metadata, unit')
           .eq('shop_id', shopId);
 
       await _localDb.executeInTransaction((txn) async {
@@ -142,7 +142,7 @@ class ProductRepository {
       try {
         final cloudMatch = await supabase
             .from('products')
-            .select('id, shop_id, name, price, stock_quantity, category, description, is_service, gst_rate, hsn_sac_code, barcode, cost_price, metadata')
+            .select('id, shop_id, name, price, stock_quantity, category, description, is_service, gst_rate, hsn_sac_code, barcode, cost_price, metadata, unit')
             .eq('shop_id', shopId)
             .eq('barcode', barcode)
             .maybeSingle();
@@ -198,7 +198,7 @@ class ProductRepository {
       try {
         final cloudMatch = await supabase
             .from('products')
-            .select('id, shop_id, name, price, stock_quantity, category, description, is_service, gst_rate, hsn_sac_code, barcode, cost_price, metadata')
+            .select('id, shop_id, name, price, stock_quantity, category, description, is_service, gst_rate, hsn_sac_code, barcode, cost_price, metadata, unit')
             .eq('id', id)
             .maybeSingle();
             

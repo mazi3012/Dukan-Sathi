@@ -6,8 +6,8 @@ part of 'draft_invoice.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_DraftInvoice _$DraftInvoiceFromJson(Map<String, dynamic> json) =>
-    _DraftInvoice(
+_$DraftInvoiceImpl _$$DraftInvoiceImplFromJson(Map<String, dynamic> json) =>
+    _$DraftInvoiceImpl(
       id: json['id'] as String,
       shopId: json['shop_id'] as String,
       customerId: json['customer_id'] as String?,
@@ -18,7 +18,7 @@ _DraftInvoice _$DraftInvoiceFromJson(Map<String, dynamic> json) =>
       status: json['status'] as String? ?? 'draft',
     );
 
-Map<String, dynamic> _$DraftInvoiceToJson(_DraftInvoice instance) =>
+Map<String, dynamic> _$$DraftInvoiceImplToJson(_$DraftInvoiceImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'shop_id': instance.shopId,

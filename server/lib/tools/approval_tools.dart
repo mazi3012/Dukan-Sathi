@@ -999,6 +999,8 @@ Future<Map<String, dynamic>> approveProductBatch({
             'cost_price': (data['cost_price'] as num?)?.toDouble() ?? 0.0,
           if (data['category'] != null)
             'category': data['category'],
+          if (data['unit'] != null)
+            'unit': data['unit'],
         });
       } else {
         // New Product
@@ -1016,6 +1018,7 @@ Future<Map<String, dynamic>> approveProductBatch({
           'metadata': data['metadata'] ?? {},
           if (data['cost_price'] != null)
             'cost_price': (data['cost_price'] as num?)?.toDouble() ?? 0.0,
+          'unit': data['unit'] ?? 'pcs',
         });
       }
     }

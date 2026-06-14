@@ -8,6 +8,7 @@ class InventoryState {
   final List<Product> allProducts;
   final List<Product> displayedProducts;
   final double totalValue;
+  final double totalRetailValue;
   final List<String> categories;
   final String selectedCategory;
   final bool isLoading;
@@ -19,6 +20,7 @@ class InventoryState {
     required this.allProducts,
     required this.displayedProducts,
     required this.totalValue,
+    required this.totalRetailValue,
     required this.categories,
     required this.selectedCategory,
     required this.isLoading,
@@ -32,6 +34,7 @@ class InventoryState {
       allProducts: [],
       displayedProducts: [],
       totalValue: 0.0,
+      totalRetailValue: 0.0,
       categories: ['All', 'Low Stock'],
       selectedCategory: 'All',
       isLoading: true,
@@ -45,6 +48,7 @@ class InventoryState {
     List<Product>? allProducts,
     List<Product>? displayedProducts,
     double? totalValue,
+    double? totalRetailValue,
     List<String>? categories,
     String? selectedCategory,
     bool? isLoading,
@@ -56,6 +60,7 @@ class InventoryState {
       allProducts: allProducts ?? this.allProducts,
       displayedProducts: displayedProducts ?? this.displayedProducts,
       totalValue: totalValue ?? this.totalValue,
+      totalRetailValue: totalRetailValue ?? this.totalRetailValue,
       categories: categories ?? this.categories,
       selectedCategory: selectedCategory ?? this.selectedCategory,
       isLoading: isLoading ?? this.isLoading,
@@ -88,11 +93,14 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
 
     try {
       final allLocalProducts = await _productRepo.getProducts(shopId, forceRefresh: forceRefresh);
-      double value = 0;
+      double costValue = 0;
+      double retailValue = 0;
       final Set<String> cats = {};
 
       for (var p in allLocalProducts) {
-        value += p.price * p.stockQuantity;
+        final cp = p.costPrice > 0 ? p.costPrice : p.price;
+        costValue += cp * p.stockQuantity;
+        retailValue += p.price * p.stockQuantity;
         if (p.category.isNotEmpty) {
           cats.add(p.category);
         }
@@ -100,7 +108,8 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
 
       state = state.copyWith(
         allProducts: allLocalProducts,
-        totalValue: value,
+        totalValue: costValue,
+        totalRetailValue: retailValue,
         categories: ['All', 'Low Stock', ...cats],
         isLoading: false,
       );

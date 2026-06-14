@@ -35,6 +35,8 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
   final List<TextEditingController> _costPriceControllers = [];
   final List<TextEditingController> _qtyControllers = [];
   final List<TextEditingController> _categoryControllers = [];
+  final List<TextEditingController> _profitPercentControllers = [];
+  final List<String> _selectedUnits = [];
 
   @override
   void initState() {
@@ -59,22 +61,35 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
     _qtyControllers.clear();
     for (final c in _categoryControllers) c.dispose();
     _categoryControllers.clear();
+    for (final c in _profitPercentControllers) c.dispose();
+    _profitPercentControllers.clear();
+    _selectedUnits.clear();
   }
 
   void _initControllers() {
     _disposeControllers();
     for (final p in _editableProducts) {
       final name = p['name'] ?? p['item_name'] ?? '';
-      final price = p['price'] ?? p['price_per_unit'] ?? 0.0;
-      final costPrice = p['cost_price'] ?? p['cp'] ?? 0.0;
+      final price = (p['price'] ?? p['price_per_unit'] ?? 0.0).toDouble();
+      final costPrice = (p['cost_price'] ?? p['cp'] ?? 0.0).toDouble();
       final stock = p['stock_quantity'] ?? p['quantity'] ?? 0;
       final category = p['category'] ?? 'General';
+      final unit = p['unit']?.toString() ?? 'pcs';
 
       _nameControllers.add(TextEditingController(text: name.toString()));
       _priceControllers.add(TextEditingController(text: price.toString()));
       _costPriceControllers.add(TextEditingController(text: costPrice.toString()));
       _qtyControllers.add(TextEditingController(text: stock.toString()));
       _categoryControllers.add(TextEditingController(text: category.toString()));
+
+      double profitPercent = 0.0;
+      if (costPrice > 0) {
+        profitPercent = ((price - costPrice) / costPrice) * 100.0;
+      }
+      _profitPercentControllers.add(TextEditingController(
+        text: costPrice > 0 ? profitPercent.toStringAsFixed(1) : '0.0',
+      ));
+      _selectedUnits.add(unit);
     }
   }
 
@@ -117,6 +132,7 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
       p['cost_price'] = double.tryParse(_costPriceControllers[i].text) ?? 0.0;
       p['stock_quantity'] = int.tryParse(_qtyControllers[i].text) ?? 0;
       p['category'] = _categoryControllers[i].text.trim();
+      p['unit'] = _selectedUnits[i];
     }
 
     if (_batchId == null) {
@@ -233,6 +249,7 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
               barcode: pData['barcode']?.toString() ?? existingProduct.barcode,
               costPrice: (pData['cost_price'] as num?)?.toDouble() ?? existingProduct.costPrice,
               metadata: existingProduct.metadata,
+              unit: pData['unit']?.toString() ?? existingProduct.unit,
             );
             await productRepo.saveProduct(updatedProduct);
             continue;
@@ -264,6 +281,8 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
         
         final rawCostPrice = pData['cost_price'] ?? pData['cp'] ?? 0.0;
         cleanMap['cost_price'] = rawCostPrice is num ? rawCostPrice.toDouble() : double.tryParse(rawCostPrice.toString()) ?? 0.0;
+        
+        cleanMap['unit'] = pData['unit']?.toString() ?? 'pcs';
         
         if (pData['metadata'] is Map) {
           cleanMap['metadata'] = Map<String, dynamic>.from(pData['metadata']);
@@ -503,17 +522,31 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
                       Row(
                         children: [
                           Expanded(
-                            child: TextFormField(
-                              controller: _priceControllers[index],
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            child: DropdownButtonFormField<String>(
+                              value: _selectedUnits[index],
                               decoration: const InputDecoration(
-                                labelText: "Selling Price",
-                                prefixText: "₹ ",
+                                labelText: "Unit",
+                                prefixIcon: Icon(Iconsax.weight, size: 18),
                               ),
+                              items: const [
+                                DropdownMenuItem(value: 'pcs', child: Text('pcs')),
+                                DropdownMenuItem(value: 'box', child: Text('box')),
+                                DropdownMenuItem(value: 'dozen', child: Text('dozen')),
+                                DropdownMenuItem(value: 'kg', child: Text('kg')),
+                                DropdownMenuItem(value: 'g', child: Text('g')),
+                                DropdownMenuItem(value: 'l', child: Text('l')),
+                                DropdownMenuItem(value: 'ml', child: Text('ml')),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() {
+                                    _selectedUnits[index] = val;
+                                  });
+                                }
+                              },
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -525,6 +558,52 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
                                 labelText: "Cost Price",
                                 prefixText: "₹ ",
                               ),
+                              onChanged: (val) {
+                                final cp = double.tryParse(val) ?? 0.0;
+                                final pct = double.tryParse(_profitPercentControllers[index].text) ?? 0.0;
+                                final sp = cp * (1 + pct / 100.0);
+                                _priceControllers[index].text = sp.toStringAsFixed(2);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _profitPercentControllers[index],
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: const InputDecoration(
+                                labelText: "Profit %",
+                                suffixText: "%",
+                              ),
+                              onChanged: (val) {
+                                final pct = double.tryParse(val) ?? 0.0;
+                                final cp = double.tryParse(_costPriceControllers[index].text) ?? 0.0;
+                                final sp = cp * (1 + pct / 100.0);
+                                _priceControllers[index].text = sp.toStringAsFixed(2);
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _priceControllers[index],
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: const InputDecoration(
+                                labelText: "Selling Price",
+                                prefixText: "₹ ",
+                              ),
+                              onChanged: (val) {
+                                final sp = double.tryParse(val) ?? 0.0;
+                                final cp = double.tryParse(_costPriceControllers[index].text) ?? 0.0;
+                                if (cp > 0) {
+                                  final pct = ((sp - cp) / cp) * 100.0;
+                                  _profitPercentControllers[index].text = pct.toStringAsFixed(1);
+                                }
+                              },
                             ),
                           ),
                         ],
@@ -594,7 +673,9 @@ class _InventoryDraftCardState extends State<InventoryDraftCard> {
                                     ),
                                     child: Text(
                                       stock > 0 
-                                          ? (isRestock ? "+$stock stock" : "$stock proposed")
+                                          ? (isRestock 
+                                              ? "+$stock ${product['unit'] ?? 'pcs'} stock" 
+                                              : "$stock ${product['unit'] ?? 'pcs'} proposed")
                                           : "No stock",
                                       style: TextStyle(
                                         color: stock > 0 ? themeColor : AppColors.error,

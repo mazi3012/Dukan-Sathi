@@ -1,5 +1,5 @@
-// GENERATED CODE - DO NOT MODIFY BY HAND
 // coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
@@ -9,281 +9,257 @@ part of 'customer.dart';
 // FreezedGenerator
 // **************************************************************************
 
-// dart format off
 T _$identity<T>(T value) => value;
+
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+
+Customer _$CustomerFromJson(Map<String, dynamic> json) {
+  return _Customer.fromJson(json);
+}
 
 /// @nodoc
 mixin _$Customer {
-
- String get id;@JsonKey(name: 'shop_id') String get shopId; String get name; String get phone;@JsonKey(name: 'current_balance') double get currentBalance;
-/// Create a copy of Customer
-/// with the given fields replaced by the non-null parameter values.
-@JsonKey(includeFromJson: false, includeToJson: false)
-@pragma('vm:prefer-inline')
-$CustomerCopyWith<Customer> get copyWith => _$CustomerCopyWithImpl<Customer>(this as Customer, _$identity);
+  String get id => throw _privateConstructorUsedError;
+  @JsonKey(name: 'shop_id')
+  String get shopId => throw _privateConstructorUsedError;
+  String get name => throw _privateConstructorUsedError;
+  String get phone => throw _privateConstructorUsedError;
+  @JsonKey(name: 'current_balance')
+  double get currentBalance => throw _privateConstructorUsedError;
 
   /// Serializes this Customer to a JSON map.
-  Map<String, dynamic> toJson();
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
-
-@override
-bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Customer&&(identical(other.id, id) || other.id == id)&&(identical(other.shopId, shopId) || other.shopId == shopId)&&(identical(other.name, name) || other.name == name)&&(identical(other.phone, phone) || other.phone == phone)&&(identical(other.currentBalance, currentBalance) || other.currentBalance == currentBalance));
-}
-
-@JsonKey(includeFromJson: false, includeToJson: false)
-@override
-int get hashCode => Object.hash(runtimeType,id,shopId,name,phone,currentBalance);
-
-@override
-String toString() {
-  return 'Customer(id: $id, shopId: $shopId, name: $name, phone: $phone, currentBalance: $currentBalance)';
-}
-
-
+  /// Create a copy of Customer
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $CustomerCopyWith<Customer> get copyWith =>
+      throw _privateConstructorUsedError;
 }
 
 /// @nodoc
-abstract mixin class $CustomerCopyWith<$Res>  {
-  factory $CustomerCopyWith(Customer value, $Res Function(Customer) _then) = _$CustomerCopyWithImpl;
-@useResult
-$Res call({
- String id,@JsonKey(name: 'shop_id') String shopId, String name, String phone,@JsonKey(name: 'current_balance') double currentBalance
-});
-
-
-
-
+abstract class $CustomerCopyWith<$Res> {
+  factory $CustomerCopyWith(Customer value, $Res Function(Customer) then) =
+      _$CustomerCopyWithImpl<$Res, Customer>;
+  @useResult
+  $Res call({
+    String id,
+    @JsonKey(name: 'shop_id') String shopId,
+    String name,
+    String phone,
+    @JsonKey(name: 'current_balance') double currentBalance,
+  });
 }
+
 /// @nodoc
-class _$CustomerCopyWithImpl<$Res>
+class _$CustomerCopyWithImpl<$Res, $Val extends Customer>
     implements $CustomerCopyWith<$Res> {
-  _$CustomerCopyWithImpl(this._self, this._then);
+  _$CustomerCopyWithImpl(this._value, this._then);
 
-  final Customer _self;
-  final $Res Function(Customer) _then;
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
 
-/// Create a copy of Customer
-/// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? shopId = null,Object? name = null,Object? phone = null,Object? currentBalance = null,}) {
-  return _then(_self.copyWith(
-id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
-as String,shopId: null == shopId ? _self.shopId : shopId // ignore: cast_nullable_to_non_nullable
-as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
-as String,phone: null == phone ? _self.phone : phone // ignore: cast_nullable_to_non_nullable
-as String,currentBalance: null == currentBalance ? _self.currentBalance : currentBalance // ignore: cast_nullable_to_non_nullable
-as double,
-  ));
+  /// Create a copy of Customer
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? shopId = null,
+    Object? name = null,
+    Object? phone = null,
+    Object? currentBalance = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            id: null == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                      as String,
+            shopId: null == shopId
+                ? _value.shopId
+                : shopId // ignore: cast_nullable_to_non_nullable
+                      as String,
+            name: null == name
+                ? _value.name
+                : name // ignore: cast_nullable_to_non_nullable
+                      as String,
+            phone: null == phone
+                ? _value.phone
+                : phone // ignore: cast_nullable_to_non_nullable
+                      as String,
+            currentBalance: null == currentBalance
+                ? _value.currentBalance
+                : currentBalance // ignore: cast_nullable_to_non_nullable
+                      as double,
+          )
+          as $Val,
+    );
+  }
 }
 
+/// @nodoc
+abstract class _$$CustomerImplCopyWith<$Res>
+    implements $CustomerCopyWith<$Res> {
+  factory _$$CustomerImplCopyWith(
+    _$CustomerImpl value,
+    $Res Function(_$CustomerImpl) then,
+  ) = __$$CustomerImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String id,
+    @JsonKey(name: 'shop_id') String shopId,
+    String name,
+    String phone,
+    @JsonKey(name: 'current_balance') double currentBalance,
+  });
 }
 
+/// @nodoc
+class __$$CustomerImplCopyWithImpl<$Res>
+    extends _$CustomerCopyWithImpl<$Res, _$CustomerImpl>
+    implements _$$CustomerImplCopyWith<$Res> {
+  __$$CustomerImplCopyWithImpl(
+    _$CustomerImpl _value,
+    $Res Function(_$CustomerImpl) _then,
+  ) : super(_value, _then);
 
-/// Adds pattern-matching-related methods to [Customer].
-extension CustomerPatterns on Customer {
-/// A variant of `map` that fallback to returning `orElse`.
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case final Subclass value:
-///     return ...;
-///   case _:
-///     return orElse();
-/// }
-/// ```
-
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _Customer value)?  $default,{required TResult orElse(),}){
-final _that = this;
-switch (_that) {
-case _Customer() when $default != null:
-return $default(_that);case _:
-  return orElse();
-
-}
-}
-/// A `switch`-like method, using callbacks.
-///
-/// Callbacks receives the raw object, upcasted.
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case final Subclass value:
-///     return ...;
-///   case final Subclass2 value:
-///     return ...;
-/// }
-/// ```
-
-@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _Customer value)  $default,){
-final _that = this;
-switch (_that) {
-case _Customer():
-return $default(_that);case _:
-  throw StateError('Unexpected subclass');
-
-}
-}
-/// A variant of `map` that fallback to returning `null`.
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case final Subclass value:
-///     return ...;
-///   case _:
-///     return null;
-/// }
-/// ```
-
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _Customer value)?  $default,){
-final _that = this;
-switch (_that) {
-case _Customer() when $default != null:
-return $default(_that);case _:
-  return null;
-
-}
-}
-/// A variant of `when` that fallback to an `orElse` callback.
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case Subclass(:final field):
-///     return ...;
-///   case _:
-///     return orElse();
-/// }
-/// ```
-
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id, @JsonKey(name: 'shop_id')  String shopId,  String name,  String phone, @JsonKey(name: 'current_balance')  double currentBalance)?  $default,{required TResult orElse(),}) {final _that = this;
-switch (_that) {
-case _Customer() when $default != null:
-return $default(_that.id,_that.shopId,_that.name,_that.phone,_that.currentBalance);case _:
-  return orElse();
-
-}
-}
-/// A `switch`-like method, using callbacks.
-///
-/// As opposed to `map`, this offers destructuring.
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case Subclass(:final field):
-///     return ...;
-///   case Subclass2(:final field2):
-///     return ...;
-/// }
-/// ```
-
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id, @JsonKey(name: 'shop_id')  String shopId,  String name,  String phone, @JsonKey(name: 'current_balance')  double currentBalance)  $default,) {final _that = this;
-switch (_that) {
-case _Customer():
-return $default(_that.id,_that.shopId,_that.name,_that.phone,_that.currentBalance);case _:
-  throw StateError('Unexpected subclass');
-
-}
-}
-/// A variant of `when` that fallback to returning `null`
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case Subclass(:final field):
-///     return ...;
-///   case _:
-///     return null;
-/// }
-/// ```
-
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id, @JsonKey(name: 'shop_id')  String shopId,  String name,  String phone, @JsonKey(name: 'current_balance')  double currentBalance)?  $default,) {final _that = this;
-switch (_that) {
-case _Customer() when $default != null:
-return $default(_that.id,_that.shopId,_that.name,_that.phone,_that.currentBalance);case _:
-  return null;
-
-}
-}
-
+  /// Create a copy of Customer
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? shopId = null,
+    Object? name = null,
+    Object? phone = null,
+    Object? currentBalance = null,
+  }) {
+    return _then(
+      _$CustomerImpl(
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+        shopId: null == shopId
+            ? _value.shopId
+            : shopId // ignore: cast_nullable_to_non_nullable
+                  as String,
+        name: null == name
+            ? _value.name
+            : name // ignore: cast_nullable_to_non_nullable
+                  as String,
+        phone: null == phone
+            ? _value.phone
+            : phone // ignore: cast_nullable_to_non_nullable
+                  as String,
+        currentBalance: null == currentBalance
+            ? _value.currentBalance
+            : currentBalance // ignore: cast_nullable_to_non_nullable
+                  as double,
+      ),
+    );
+  }
 }
 
 /// @nodoc
 @JsonSerializable()
+class _$CustomerImpl implements _Customer {
+  const _$CustomerImpl({
+    required this.id,
+    @JsonKey(name: 'shop_id') required this.shopId,
+    required this.name,
+    required this.phone,
+    @JsonKey(name: 'current_balance') required this.currentBalance,
+  });
 
-class _Customer implements Customer {
-  const _Customer({required this.id, @JsonKey(name: 'shop_id') required this.shopId, required this.name, required this.phone, @JsonKey(name: 'current_balance') required this.currentBalance});
-  factory _Customer.fromJson(Map<String, dynamic> json) => _$CustomerFromJson(json);
+  factory _$CustomerImpl.fromJson(Map<String, dynamic> json) =>
+      _$$CustomerImplFromJson(json);
 
-@override final  String id;
-@override@JsonKey(name: 'shop_id') final  String shopId;
-@override final  String name;
-@override final  String phone;
-@override@JsonKey(name: 'current_balance') final  double currentBalance;
+  @override
+  final String id;
+  @override
+  @JsonKey(name: 'shop_id')
+  final String shopId;
+  @override
+  final String name;
+  @override
+  final String phone;
+  @override
+  @JsonKey(name: 'current_balance')
+  final double currentBalance;
 
-/// Create a copy of Customer
-/// with the given fields replaced by the non-null parameter values.
-@override @JsonKey(includeFromJson: false, includeToJson: false)
-@pragma('vm:prefer-inline')
-_$CustomerCopyWith<_Customer> get copyWith => __$CustomerCopyWithImpl<_Customer>(this, _$identity);
+  @override
+  String toString() {
+    return 'Customer(id: $id, shopId: $shopId, name: $name, phone: $phone, currentBalance: $currentBalance)';
+  }
 
-@override
-Map<String, dynamic> toJson() {
-  return _$CustomerToJson(this, );
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$CustomerImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.shopId, shopId) || other.shopId == shopId) &&
+            (identical(other.name, name) || other.name == name) &&
+            (identical(other.phone, phone) || other.phone == phone) &&
+            (identical(other.currentBalance, currentBalance) ||
+                other.currentBalance == currentBalance));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode =>
+      Object.hash(runtimeType, id, shopId, name, phone, currentBalance);
+
+  /// Create a copy of Customer
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$CustomerImplCopyWith<_$CustomerImpl> get copyWith =>
+      __$$CustomerImplCopyWithImpl<_$CustomerImpl>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$CustomerImplToJson(this);
+  }
 }
 
-@override
-bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Customer&&(identical(other.id, id) || other.id == id)&&(identical(other.shopId, shopId) || other.shopId == shopId)&&(identical(other.name, name) || other.name == name)&&(identical(other.phone, phone) || other.phone == phone)&&(identical(other.currentBalance, currentBalance) || other.currentBalance == currentBalance));
+abstract class _Customer implements Customer {
+  const factory _Customer({
+    required final String id,
+    @JsonKey(name: 'shop_id') required final String shopId,
+    required final String name,
+    required final String phone,
+    @JsonKey(name: 'current_balance') required final double currentBalance,
+  }) = _$CustomerImpl;
+
+  factory _Customer.fromJson(Map<String, dynamic> json) =
+      _$CustomerImpl.fromJson;
+
+  @override
+  String get id;
+  @override
+  @JsonKey(name: 'shop_id')
+  String get shopId;
+  @override
+  String get name;
+  @override
+  String get phone;
+  @override
+  @JsonKey(name: 'current_balance')
+  double get currentBalance;
+
+  /// Create a copy of Customer
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$CustomerImplCopyWith<_$CustomerImpl> get copyWith =>
+      throw _privateConstructorUsedError;
 }
-
-@JsonKey(includeFromJson: false, includeToJson: false)
-@override
-int get hashCode => Object.hash(runtimeType,id,shopId,name,phone,currentBalance);
-
-@override
-String toString() {
-  return 'Customer(id: $id, shopId: $shopId, name: $name, phone: $phone, currentBalance: $currentBalance)';
-}
-
-
-}
-
-/// @nodoc
-abstract mixin class _$CustomerCopyWith<$Res> implements $CustomerCopyWith<$Res> {
-  factory _$CustomerCopyWith(_Customer value, $Res Function(_Customer) _then) = __$CustomerCopyWithImpl;
-@override @useResult
-$Res call({
- String id,@JsonKey(name: 'shop_id') String shopId, String name, String phone,@JsonKey(name: 'current_balance') double currentBalance
-});
-
-
-
-
-}
-/// @nodoc
-class __$CustomerCopyWithImpl<$Res>
-    implements _$CustomerCopyWith<$Res> {
-  __$CustomerCopyWithImpl(this._self, this._then);
-
-  final _Customer _self;
-  final $Res Function(_Customer) _then;
-
-/// Create a copy of Customer
-/// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? shopId = null,Object? name = null,Object? phone = null,Object? currentBalance = null,}) {
-  return _then(_Customer(
-id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
-as String,shopId: null == shopId ? _self.shopId : shopId // ignore: cast_nullable_to_non_nullable
-as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
-as String,phone: null == phone ? _self.phone : phone // ignore: cast_nullable_to_non_nullable
-as String,currentBalance: null == currentBalance ? _self.currentBalance : currentBalance // ignore: cast_nullable_to_non_nullable
-as double,
-  ));
-}
-
-
-}
-
-// dart format on

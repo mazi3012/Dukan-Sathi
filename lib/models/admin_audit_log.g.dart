@@ -6,8 +6,8 @@ part of 'admin_audit_log.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_AdminAuditLog _$AdminAuditLogFromJson(Map<String, dynamic> json) =>
-    _AdminAuditLog(
+_$AdminAuditLogImpl _$$AdminAuditLogImplFromJson(Map<String, dynamic> json) =>
+    _$AdminAuditLogImpl(
       id: json['id'] as String,
       userId: json['user_id'] as String?,
       action: json['action'] as String,
@@ -20,7 +20,7 @@ _AdminAuditLog _$AdminAuditLogFromJson(Map<String, dynamic> json) =>
       createdAt: json['created_at'] as String,
     );
 
-Map<String, dynamic> _$AdminAuditLogToJson(_AdminAuditLog instance) =>
+Map<String, dynamic> _$$AdminAuditLogImplToJson(_$AdminAuditLogImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'user_id': instance.userId,

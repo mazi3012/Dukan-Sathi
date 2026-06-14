@@ -6,9 +6,9 @@ part of 'draft_approval.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_DraftApproval _$DraftApprovalFromJson(
+_$DraftApprovalImpl _$$DraftApprovalImplFromJson(
   Map<String, dynamic> json,
-) => _DraftApproval(
+) => _$DraftApprovalImpl(
   approvalId: json['approval_id'] as String,
   draftInvoiceId: json['draft_invoice_id'] as String?,
   shopId: json['shop_id'] as String,
@@ -44,7 +44,7 @@ _DraftApproval _$DraftApprovalFromJson(
   customerState: json['customer_state'] as String?,
 );
 
-Map<String, dynamic> _$DraftApprovalToJson(_DraftApproval instance) =>
+Map<String, dynamic> _$$DraftApprovalImplToJson(_$DraftApprovalImpl instance) =>
     <String, dynamic>{
       'approval_id': instance.approvalId,
       'draft_invoice_id': instance.draftInvoiceId,

@@ -19,6 +19,8 @@ abstract class Product with _$Product {
     String? barcode,
     @JsonKey(name: 'cost_price') @Default(0) double costPrice,
     @Default({}) Map<String, dynamic> metadata,
+    /// Selling unit: e.g. 'pcs', 'box', 'dozen', 'crt', 'kg', 'ltr'
+    @Default('pcs') String unit,
   }) = _Product;
 
   factory Product.fromJson(Map<String, dynamic> json) => _$ProductFromJson(json);

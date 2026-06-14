@@ -38,7 +38,7 @@ class LocalDatabase {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -60,7 +60,8 @@ class LocalDatabase {
         hsn_sac_code TEXT,
         barcode TEXT,
         cost_price REAL NOT NULL DEFAULT 0.0,
-        metadata TEXT NOT NULL DEFAULT '{}'
+        metadata TEXT NOT NULL DEFAULT '{}',
+        unit TEXT DEFAULT 'pcs'
       )
     ''');
 
@@ -171,6 +172,12 @@ class LocalDatabase {
       try {
         await db.execute('ALTER TABLE products ADD COLUMN barcode TEXT');
         await db.execute('CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(shop_id, barcode)');
+      } catch (_) {}
+    }
+
+    if (oldVersion < 5) {
+      try {
+        await db.execute("ALTER TABLE products ADD COLUMN unit TEXT DEFAULT 'pcs'");
       } catch (_) {}
     }
   }

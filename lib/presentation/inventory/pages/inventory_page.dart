@@ -67,7 +67,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                 _buildAppBar(),
                 state.isLoading 
                     ? const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: SkeletonSummaryCard()) 
-                    : _buildValuationCard(state.totalValue),
+                    : _buildValuationCard(state.totalValue, state.totalRetailValue),
                 if (!state.isLoading && state.allProducts.isNotEmpty) _buildCategoryFilters(state),
                 const SizedBox(height: 10),
                 Expanded(
@@ -186,7 +186,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     );
   }
 
-  Widget _buildValuationCard(double totalValue) {
+  Widget _buildValuationCard(double totalValue, double totalRetailValue) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
@@ -197,25 +197,61 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Total Stock Value", 
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+              Expanded(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Total Asset (Cost)", 
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            "₹${totalValue.toStringAsFixed(0)}",
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              color: AppColors.success,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    "₹${totalValue.toStringAsFixed(0)}",
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: AppColors.success,
-                      fontWeight: FontWeight.w900,
+                    Container(
+                      width: 1,
+                      height: 40,
+                      color: isDark ? Colors.white10 : Colors.black10,
+                      margin: const EdgeInsets.symmetric(horizontal: 15),
                     ),
-                  ),
-                ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Retail Value", 
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            "₹${totalRetailValue.toStringAsFixed(0)}",
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.8),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -450,7 +486,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                   style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 Text(
-                  "Stock: $stock",
+                  "Stock: $stock ${product.unit}",
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: isLowStock ? AppColors.error : Theme.of(context).textTheme.bodySmall?.color,
                     fontWeight: isLowStock ? FontWeight.bold : FontWeight.normal,
@@ -473,6 +509,15 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     final stockController = TextEditingController(text: isEdit ? product.stockQuantity.toString() : '');
     final barcodeController = TextEditingController(text: isEdit ? product.barcode ?? '' : '');
     double selectedGst = isEdit ? product.gstRate : 0.0;
+    String selectedUnit = isEdit ? product.unit : 'pcs';
+
+    double initialProfit = 0.0;
+    if (isEdit && product.costPrice > 0) {
+      initialProfit = ((product.price - product.costPrice) / product.costPrice) * 100.0;
+    }
+    final profitPercentController = TextEditingController(
+      text: initialProfit > 0 ? initialProfit.toStringAsFixed(1) : '0.0',
+    );
     
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -535,29 +580,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text("Selling Price (INR) *", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 8),
-                            GlassBox(
-                              child: TextField(
-                                controller: priceController,
-                                keyboardType: TextInputType.number,
-                                style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface),
-                                decoration: InputDecoration(
-                                  hintText: "0.00",
-                                  hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
-                                  border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 15),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
                             Text("Cost Price (INR) *", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 8),
                             GlassBox(
@@ -571,6 +593,72 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                                   border: InputBorder.none,
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                                 ),
+                                onChanged: (val) {
+                                  final cp = double.tryParse(val) ?? 0.0;
+                                  final pct = double.tryParse(profitPercentController.text) ?? 0.0;
+                                  final sp = cp * (1 + pct / 100.0);
+                                  priceController.text = sp.toStringAsFixed(2);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Profit Margin (%)", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            GlassBox(
+                              child: TextField(
+                                controller: profitPercentController,
+                                keyboardType: TextInputType.number,
+                                style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface),
+                                decoration: InputDecoration(
+                                  hintText: "0.0",
+                                  hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                                ),
+                                onChanged: (val) {
+                                  final pct = double.tryParse(val) ?? 0.0;
+                                  final cp = double.tryParse(costPriceController.text) ?? 0.0;
+                                  final sp = cp * (1 + pct / 100.0);
+                                  priceController.text = sp.toStringAsFixed(2);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Selling Price (INR) *", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            GlassBox(
+                              child: TextField(
+                                controller: priceController,
+                                keyboardType: TextInputType.number,
+                                style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface),
+                                decoration: InputDecoration(
+                                  hintText: "0.00",
+                                  hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                                ),
+                                onChanged: (val) {
+                                  final sp = double.tryParse(val) ?? 0.0;
+                                  final cp = double.tryParse(costPriceController.text) ?? 0.0;
+                                  if (cp > 0) {
+                                    final pct = ((sp - cp) / cp) * 100.0;
+                                    profitPercentController.text = pct.toStringAsFixed(1);
+                                  }
+                                },
                               ),
                             ),
                           ],
@@ -597,6 +685,47 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                                   hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
                                   border: InputBorder.none,
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Unit *", style: TextStyle(color: isDark ? Colors.white70 : AppColors.lightOnSurface.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 15),
+                              height: 52,
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: isDark ? AppColors.darkGlassBorder : AppColors.lightGlassBorder),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: selectedUnit,
+                                  dropdownColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+                                  style: TextStyle(color: isDark ? Colors.white : AppColors.lightOnSurface, fontSize: 16),
+                                  icon: Icon(Icons.arrow_drop_down, color: isDark ? Colors.white70 : Colors.black54),
+                                  isExpanded: true,
+                                  items: ['pcs', 'box', 'dozen', 'kg', 'g', 'l', 'ml'].map((u) {
+                                    return DropdownMenuItem<String>(
+                                      value: u,
+                                      child: Text(u),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setSheetState(() {
+                                        selectedUnit = val;
+                                      });
+                                    }
+                                  },
                                 ),
                               ),
                             ),
@@ -638,6 +767,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                             const SizedBox(height: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 15),
+                              height: 52,
                               decoration: BoxDecoration(
                                 color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
                                 borderRadius: BorderRadius.circular(12),
@@ -743,6 +873,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                               costPrice: costPrice,
                               gstRate: selectedGst,
                               barcode: barcode,
+                              unit: selectedUnit,
                             );
 
                             if (isEdit) {

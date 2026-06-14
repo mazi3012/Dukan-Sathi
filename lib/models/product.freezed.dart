@@ -1,5 +1,5 @@
-// GENERATED CODE - DO NOT MODIFY BY HAND
 // coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
@@ -9,95 +9,54 @@ part of 'product.dart';
 // FreezedGenerator
 // **************************************************************************
 
-// dart format off
 T _$identity<T>(T value) => value;
+
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+
+Product _$ProductFromJson(Map<String, dynamic> json) {
+  return _Product.fromJson(json);
+}
 
 /// @nodoc
 mixin _$Product {
-  String get id;
+  String get id => throw _privateConstructorUsedError;
   @JsonKey(name: 'shop_id')
-  String get shopId;
-  String get name;
-  double get price;
+  String get shopId => throw _privateConstructorUsedError;
+  String get name => throw _privateConstructorUsedError;
+  double get price => throw _privateConstructorUsedError;
   @JsonKey(name: 'stock_quantity')
-  int get stockQuantity;
-  String get category;
-  String? get description;
+  int get stockQuantity => throw _privateConstructorUsedError;
+  String get category => throw _privateConstructorUsedError;
+  String? get description => throw _privateConstructorUsedError;
   @JsonKey(name: 'is_service')
-  bool get isService;
+  bool get isService => throw _privateConstructorUsedError;
   @JsonKey(name: 'gst_rate')
-  double get gstRate;
+  double get gstRate => throw _privateConstructorUsedError;
   @JsonKey(name: 'hsn_sac_code')
-  String? get hsnSacCode;
-  String? get barcode;
+  String? get hsnSacCode => throw _privateConstructorUsedError;
+  String? get barcode => throw _privateConstructorUsedError;
   @JsonKey(name: 'cost_price')
-  double get costPrice;
-  Map<String, dynamic> get metadata;
+  double get costPrice => throw _privateConstructorUsedError;
+  Map<String, dynamic> get metadata => throw _privateConstructorUsedError;
+
+  /// Selling unit: e.g. 'pcs', 'box', 'dozen', 'crt', 'kg', 'ltr'
+  String get unit => throw _privateConstructorUsedError;
+
+  /// Serializes this Product to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
   /// Create a copy of Product
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
-  @pragma('vm:prefer-inline')
-  $ProductCopyWith<Product> get copyWith =>
-      _$ProductCopyWithImpl<Product>(this as Product, _$identity);
-
-  /// Serializes this Product to a JSON map.
-  Map<String, dynamic> toJson();
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other.runtimeType == runtimeType &&
-            other is Product &&
-            (identical(other.id, id) || other.id == id) &&
-            (identical(other.shopId, shopId) || other.shopId == shopId) &&
-            (identical(other.name, name) || other.name == name) &&
-            (identical(other.price, price) || other.price == price) &&
-            (identical(other.stockQuantity, stockQuantity) ||
-                other.stockQuantity == stockQuantity) &&
-            (identical(other.category, category) ||
-                other.category == category) &&
-            (identical(other.description, description) ||
-                other.description == description) &&
-            (identical(other.isService, isService) ||
-                other.isService == isService) &&
-            (identical(other.gstRate, gstRate) || other.gstRate == gstRate) &&
-            (identical(other.hsnSacCode, hsnSacCode) ||
-                other.hsnSacCode == hsnSacCode) &&
-            (identical(other.barcode, barcode) || other.barcode == barcode) &&
-            (identical(other.costPrice, costPrice) ||
-                other.costPrice == costPrice) &&
-            const DeepCollectionEquality().equals(other.metadata, metadata));
-  }
-
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @override
-  int get hashCode => Object.hash(
-      runtimeType,
-      id,
-      shopId,
-      name,
-      price,
-      stockQuantity,
-      category,
-      description,
-      isService,
-      gstRate,
-      hsnSacCode,
-      barcode,
-      costPrice,
-      const DeepCollectionEquality().hash(metadata));
-
-  @override
-  String toString() {
-    return 'Product(id: $id, shopId: $shopId, name: $name, price: $price, stockQuantity: $stockQuantity, category: $category, description: $description, isService: $isService, gstRate: $gstRate, hsnSacCode: $hsnSacCode, barcode: $barcode, costPrice: $costPrice, metadata: $metadata)';
-  }
+  $ProductCopyWith<Product> get copyWith => throw _privateConstructorUsedError;
 }
 
 /// @nodoc
-abstract mixin class $ProductCopyWith<$Res> {
-  factory $ProductCopyWith(Product value, $Res Function(Product) _then) =
-      _$ProductCopyWithImpl;
+abstract class $ProductCopyWith<$Res> {
+  factory $ProductCopyWith(Product value, $Res Function(Product) then) =
+      _$ProductCopyWithImpl<$Res, Product>;
   @useResult
   $Res call({
     String id,
@@ -113,15 +72,19 @@ abstract mixin class $ProductCopyWith<$Res> {
     String? barcode,
     @JsonKey(name: 'cost_price') double costPrice,
     Map<String, dynamic> metadata,
+    String unit,
   });
 }
 
 /// @nodoc
-class _$ProductCopyWithImpl<$Res> implements $ProductCopyWith<$Res> {
-  _$ProductCopyWithImpl(this._self, this._then);
+class _$ProductCopyWithImpl<$Res, $Val extends Product>
+    implements $ProductCopyWith<$Res> {
+  _$ProductCopyWithImpl(this._value, this._then);
 
-  final Product _self;
-  final $Res Function(Product) _then;
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
 
   /// Create a copy of Product
   /// with the given fields replaced by the non-null parameter values.
@@ -141,238 +104,194 @@ class _$ProductCopyWithImpl<$Res> implements $ProductCopyWith<$Res> {
     Object? barcode = freezed,
     Object? costPrice = null,
     Object? metadata = null,
+    Object? unit = null,
   }) {
-    return _then(_self.copyWith(
-      id: null == id
-          ? _self.id
-          : id // ignore: cast_nullable_to_non_nullable
-              as String,
-      shopId: null == shopId
-          ? _self.shopId
-          : shopId // ignore: cast_nullable_to_non_nullable
-              as String,
-      name: null == name
-          ? _self.name
-          : name // ignore: cast_nullable_to_non_nullable
-              as String,
-      price: null == price
-          ? _self.price
-          : price // ignore: cast_nullable_to_non_nullable
-              as double,
-      stockQuantity: null == stockQuantity
-          ? _self.stockQuantity
-          : stockQuantity // ignore: cast_nullable_to_non_nullable
-              as int,
-      category: null == category
-          ? _self.category
-          : category // ignore: cast_nullable_to_non_nullable
-              as String,
-      description: freezed == description
-          ? _self.description
-          : description // ignore: cast_nullable_to_non_nullable
-              as String?,
-      isService: null == isService
-          ? _self.isService
-          : isService // ignore: cast_nullable_to_non_nullable
-              as bool,
-      gstRate: null == gstRate
-          ? _self.gstRate
-          : gstRate // ignore: cast_nullable_to_non_nullable
-              as double,
-      hsnSacCode: freezed == hsnSacCode
-          ? _self.hsnSacCode
-          : hsnSacCode // ignore: cast_nullable_to_non_nullable
-              as String?,
-      barcode: freezed == barcode
-          ? _self.barcode
-          : barcode // ignore: cast_nullable_to_non_nullable
-              as String?,
-      costPrice: null == costPrice
-          ? _self.costPrice
-          : costPrice // ignore: cast_nullable_to_non_nullable
-              as double,
-      metadata: null == metadata
-          ? _self.metadata
-          : metadata // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>,
-    ));
+    return _then(
+      _value.copyWith(
+            id: null == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                      as String,
+            shopId: null == shopId
+                ? _value.shopId
+                : shopId // ignore: cast_nullable_to_non_nullable
+                      as String,
+            name: null == name
+                ? _value.name
+                : name // ignore: cast_nullable_to_non_nullable
+                      as String,
+            price: null == price
+                ? _value.price
+                : price // ignore: cast_nullable_to_non_nullable
+                      as double,
+            stockQuantity: null == stockQuantity
+                ? _value.stockQuantity
+                : stockQuantity // ignore: cast_nullable_to_non_nullable
+                      as int,
+            category: null == category
+                ? _value.category
+                : category // ignore: cast_nullable_to_non_nullable
+                      as String,
+            description: freezed == description
+                ? _value.description
+                : description // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            isService: null == isService
+                ? _value.isService
+                : isService // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            gstRate: null == gstRate
+                ? _value.gstRate
+                : gstRate // ignore: cast_nullable_to_non_nullable
+                      as double,
+            hsnSacCode: freezed == hsnSacCode
+                ? _value.hsnSacCode
+                : hsnSacCode // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            barcode: freezed == barcode
+                ? _value.barcode
+                : barcode // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            costPrice: null == costPrice
+                ? _value.costPrice
+                : costPrice // ignore: cast_nullable_to_non_nullable
+                      as double,
+            metadata: null == metadata
+                ? _value.metadata
+                : metadata // ignore: cast_nullable_to_non_nullable
+                      as Map<String, dynamic>,
+            unit: null == unit
+                ? _value.unit
+                : unit // ignore: cast_nullable_to_non_nullable
+                      as String,
+          )
+          as $Val,
+    );
   }
 }
 
-/// Adds pattern-matching-related methods to [Product].
-extension ProductPatterns on Product {
-  /// A variant of `map` that fallback to returning `orElse`.
-  @optionalTypeArgs
-  TResult maybeMap<TResult extends Object?>(
-    TResult Function(_Product value)? $default, {
-    required TResult orElse(),
+/// @nodoc
+abstract class _$$ProductImplCopyWith<$Res> implements $ProductCopyWith<$Res> {
+  factory _$$ProductImplCopyWith(
+    _$ProductImpl value,
+    $Res Function(_$ProductImpl) then,
+  ) = __$$ProductImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String id,
+    @JsonKey(name: 'shop_id') String shopId,
+    String name,
+    double price,
+    @JsonKey(name: 'stock_quantity') int stockQuantity,
+    String category,
+    String? description,
+    @JsonKey(name: 'is_service') bool isService,
+    @JsonKey(name: 'gst_rate') double gstRate,
+    @JsonKey(name: 'hsn_sac_code') String? hsnSacCode,
+    String? barcode,
+    @JsonKey(name: 'cost_price') double costPrice,
+    Map<String, dynamic> metadata,
+    String unit,
+  });
+}
+
+/// @nodoc
+class __$$ProductImplCopyWithImpl<$Res>
+    extends _$ProductCopyWithImpl<$Res, _$ProductImpl>
+    implements _$$ProductImplCopyWith<$Res> {
+  __$$ProductImplCopyWithImpl(
+    _$ProductImpl _value,
+    $Res Function(_$ProductImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of Product
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? shopId = null,
+    Object? name = null,
+    Object? price = null,
+    Object? stockQuantity = null,
+    Object? category = null,
+    Object? description = freezed,
+    Object? isService = null,
+    Object? gstRate = null,
+    Object? hsnSacCode = freezed,
+    Object? barcode = freezed,
+    Object? costPrice = null,
+    Object? metadata = null,
+    Object? unit = null,
   }) {
-    final _that = this;
-    switch (_that) {
-      case _Product() when $default != null:
-        return $default(_that);
-      case _:
-        return orElse();
-    }
-  }
-
-  /// A `switch`-like method, using callbacks.
-  @optionalTypeArgs
-  TResult map<TResult extends Object?>(
-    TResult Function(_Product value) $default,
-  ) {
-    final _that = this;
-    switch (_that) {
-      case _Product():
-        return $default(_that);
-      case _:
-        throw StateError('Unexpected subclass');
-    }
-  }
-
-  /// A variant of `map` that fallback to returning `null`.
-  @optionalTypeArgs
-  TResult? mapOrNull<TResult extends Object?>(
-    TResult? Function(_Product value)? $default,
-  ) {
-    final _that = this;
-    switch (_that) {
-      case _Product() when $default != null:
-        return $default(_that);
-      case _:
-        return null;
-    }
-  }
-
-  /// A variant of `when` that fallback to an `orElse` callback.
-  @optionalTypeArgs
-  TResult maybeWhen<TResult extends Object?>(
-    TResult Function(
-            String id,
-            @JsonKey(name: 'shop_id') String shopId,
-            String name,
-            double price,
-            @JsonKey(name: 'stock_quantity') int stockQuantity,
-            String category,
-            String? description,
-            @JsonKey(name: 'is_service') bool isService,
-            @JsonKey(name: 'gst_rate') double gstRate,
-            @JsonKey(name: 'hsn_sac_code') String? hsnSacCode,
-            String? barcode,
-            @JsonKey(name: 'cost_price') double costPrice,
-            Map<String, dynamic> metadata)?
-        $default, {
-    required TResult orElse(),
-  }) {
-    final _that = this;
-    switch (_that) {
-      case _Product() when $default != null:
-        return $default(
-            _that.id,
-            _that.shopId,
-            _that.name,
-            _that.price,
-            _that.stockQuantity,
-            _that.category,
-            _that.description,
-            _that.isService,
-            _that.gstRate,
-            _that.hsnSacCode,
-            _that.barcode,
-            _that.costPrice,
-            _that.metadata);
-      case _:
-        return orElse();
-    }
-  }
-
-  /// A `switch`-like method, using callbacks.
-  @optionalTypeArgs
-  TResult when<TResult extends Object?>(
-    TResult Function(
-            String id,
-            @JsonKey(name: 'shop_id') String shopId,
-            String name,
-            double price,
-            @JsonKey(name: 'stock_quantity') int stockQuantity,
-            String category,
-            String? description,
-            @JsonKey(name: 'is_service') bool isService,
-            @JsonKey(name: 'gst_rate') double gstRate,
-            @JsonKey(name: 'hsn_sac_code') String? hsnSacCode,
-            String? barcode,
-            @JsonKey(name: 'cost_price') double costPrice,
-            Map<String, dynamic> metadata)
-        $default,
-  ) {
-    final _that = this;
-    switch (_that) {
-      case _Product():
-        return $default(
-            _that.id,
-            _that.shopId,
-            _that.name,
-            _that.price,
-            _that.stockQuantity,
-            _that.category,
-            _that.description,
-            _that.isService,
-            _that.gstRate,
-            _that.hsnSacCode,
-            _that.barcode,
-            _that.costPrice,
-            _that.metadata);
-      case _:
-        throw StateError('Unexpected subclass');
-    }
-  }
-
-  /// A variant of `when` that fallback to returning `null`
-  @optionalTypeArgs
-  TResult? whenOrNull<TResult extends Object?>(
-    TResult? Function(
-            String id,
-            @JsonKey(name: 'shop_id') String shopId,
-            String name,
-            double price,
-            @JsonKey(name: 'stock_quantity') int stockQuantity,
-            String category,
-            String? description,
-            @JsonKey(name: 'is_service') bool isService,
-            @JsonKey(name: 'gst_rate') double gstRate,
-            @JsonKey(name: 'hsn_sac_code') String? hsnSacCode,
-            String? barcode,
-            @JsonKey(name: 'cost_price') double costPrice,
-            Map<String, dynamic> metadata)?
-        $default,
-  ) {
-    final _that = this;
-    switch (_that) {
-      case _Product() when $default != null:
-        return $default(
-            _that.id,
-            _that.shopId,
-            _that.name,
-            _that.price,
-            _that.stockQuantity,
-            _that.category,
-            _that.description,
-            _that.isService,
-            _that.gstRate,
-            _that.hsnSacCode,
-            _that.barcode,
-            _that.costPrice,
-            _that.metadata);
-      case _:
-        return null;
-    }
+    return _then(
+      _$ProductImpl(
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+        shopId: null == shopId
+            ? _value.shopId
+            : shopId // ignore: cast_nullable_to_non_nullable
+                  as String,
+        name: null == name
+            ? _value.name
+            : name // ignore: cast_nullable_to_non_nullable
+                  as String,
+        price: null == price
+            ? _value.price
+            : price // ignore: cast_nullable_to_non_nullable
+                  as double,
+        stockQuantity: null == stockQuantity
+            ? _value.stockQuantity
+            : stockQuantity // ignore: cast_nullable_to_non_nullable
+                  as int,
+        category: null == category
+            ? _value.category
+            : category // ignore: cast_nullable_to_non_nullable
+                  as String,
+        description: freezed == description
+            ? _value.description
+            : description // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        isService: null == isService
+            ? _value.isService
+            : isService // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        gstRate: null == gstRate
+            ? _value.gstRate
+            : gstRate // ignore: cast_nullable_to_non_nullable
+                  as double,
+        hsnSacCode: freezed == hsnSacCode
+            ? _value.hsnSacCode
+            : hsnSacCode // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        barcode: freezed == barcode
+            ? _value.barcode
+            : barcode // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        costPrice: null == costPrice
+            ? _value.costPrice
+            : costPrice // ignore: cast_nullable_to_non_nullable
+                  as double,
+        metadata: null == metadata
+            ? _value._metadata
+            : metadata // ignore: cast_nullable_to_non_nullable
+                  as Map<String, dynamic>,
+        unit: null == unit
+            ? _value.unit
+            : unit // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
   }
 }
 
 /// @nodoc
 @JsonSerializable()
-class _Product implements Product {
-  const _Product({
+class _$ProductImpl implements _Product {
+  const _$ProductImpl({
     required this.id,
     @JsonKey(name: 'shop_id') required this.shopId,
     required this.name,
@@ -386,10 +305,11 @@ class _Product implements Product {
     this.barcode,
     @JsonKey(name: 'cost_price') this.costPrice = 0,
     final Map<String, dynamic> metadata = const {},
+    this.unit = 'pcs',
   }) : _metadata = metadata;
 
-  factory _Product.fromJson(Map<String, dynamic> json) =>
-      _$ProductFromJson(json);
+  factory _$ProductImpl.fromJson(Map<String, dynamic> json) =>
+      _$$ProductImplFromJson(json);
 
   @override
   final String id;
@@ -430,24 +350,21 @@ class _Product implements Product {
     return EqualUnmodifiableMapView(_metadata);
   }
 
-  /// Create a copy of Product
-  /// with the given fields replaced by the non-null parameter values.
+  /// Selling unit: e.g. 'pcs', 'box', 'dozen', 'crt', 'kg', 'ltr'
   @override
-  @JsonKey(includeFromJson: false, includeToJson: false)
-  @pragma('vm:prefer-inline')
-  _$ProductCopyWith<_Product> get copyWith =>
-      __$ProductCopyWithImpl<_Product>(this, _$identity);
+  @JsonKey()
+  final String unit;
 
   @override
-  Map<String, dynamic> toJson() {
-    return _$ProductToJson(this);
+  String toString() {
+    return 'Product(id: $id, shopId: $shopId, name: $name, price: $price, stockQuantity: $stockQuantity, category: $category, description: $description, isService: $isService, gstRate: $gstRate, hsnSacCode: $hsnSacCode, barcode: $barcode, costPrice: $costPrice, metadata: $metadata, unit: $unit)';
   }
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is _Product &&
+            other is _$ProductImpl &&
             (identical(other.id, id) || other.id == id) &&
             (identical(other.shopId, shopId) || other.shopId == shopId) &&
             (identical(other.name, name) || other.name == name) &&
@@ -466,137 +383,105 @@ class _Product implements Product {
             (identical(other.barcode, barcode) || other.barcode == barcode) &&
             (identical(other.costPrice, costPrice) ||
                 other.costPrice == costPrice) &&
-            const DeepCollectionEquality().equals(other._metadata, _metadata));
+            const DeepCollectionEquality().equals(other._metadata, _metadata) &&
+            (identical(other.unit, unit) || other.unit == unit));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
-      runtimeType,
-      id,
-      shopId,
-      name,
-      price,
-      stockQuantity,
-      category,
-      description,
-      isService,
-      gstRate,
-      hsnSacCode,
-      barcode,
-      costPrice,
-      const DeepCollectionEquality().hash(_metadata));
+    runtimeType,
+    id,
+    shopId,
+    name,
+    price,
+    stockQuantity,
+    category,
+    description,
+    isService,
+    gstRate,
+    hsnSacCode,
+    barcode,
+    costPrice,
+    const DeepCollectionEquality().hash(_metadata),
+    unit,
+  );
+
+  /// Create a copy of Product
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ProductImplCopyWith<_$ProductImpl> get copyWith =>
+      __$$ProductImplCopyWithImpl<_$ProductImpl>(this, _$identity);
 
   @override
-  String toString() {
-    return 'Product(id: $id, shopId: $shopId, name: $name, price: $price, stockQuantity: $stockQuantity, category: $category, description: $description, isService: $isService, gstRate: $gstRate, hsn_sac_code: $hsnSacCode, barcode: $barcode, costPrice: $costPrice, metadata: $metadata)';
+  Map<String, dynamic> toJson() {
+    return _$$ProductImplToJson(this);
   }
 }
 
-/// @nodoc
-abstract mixin class _$ProductCopyWith<$Res> implements $ProductCopyWith<$Res> {
-  factory _$ProductCopyWith(_Product value, $Res Function(_Product) _then) =
-      __$ProductCopyWithImpl;
+abstract class _Product implements Product {
+  const factory _Product({
+    required final String id,
+    @JsonKey(name: 'shop_id') required final String shopId,
+    required final String name,
+    required final double price,
+    @JsonKey(name: 'stock_quantity') required final int stockQuantity,
+    required final String category,
+    final String? description,
+    @JsonKey(name: 'is_service') final bool isService,
+    @JsonKey(name: 'gst_rate') final double gstRate,
+    @JsonKey(name: 'hsn_sac_code') final String? hsnSacCode,
+    final String? barcode,
+    @JsonKey(name: 'cost_price') final double costPrice,
+    final Map<String, dynamic> metadata,
+    final String unit,
+  }) = _$ProductImpl;
+
+  factory _Product.fromJson(Map<String, dynamic> json) = _$ProductImpl.fromJson;
+
   @override
-  @useResult
-  $Res call({
-    String id,
-    @JsonKey(name: 'shop_id') String shopId,
-    String name,
-    double price,
-    @JsonKey(name: 'stock_quantity') int stockQuantity,
-    String category,
-    String? description,
-    @JsonKey(name: 'is_service') bool isService,
-    @JsonKey(name: 'gst_rate') double gstRate,
-    @JsonKey(name: 'hsn_sac_code') String? hsnSacCode,
-    String? barcode,
-    @JsonKey(name: 'cost_price') double costPrice,
-    Map<String, dynamic> metadata,
-  });
-}
+  String get id;
+  @override
+  @JsonKey(name: 'shop_id')
+  String get shopId;
+  @override
+  String get name;
+  @override
+  double get price;
+  @override
+  @JsonKey(name: 'stock_quantity')
+  int get stockQuantity;
+  @override
+  String get category;
+  @override
+  String? get description;
+  @override
+  @JsonKey(name: 'is_service')
+  bool get isService;
+  @override
+  @JsonKey(name: 'gst_rate')
+  double get gstRate;
+  @override
+  @JsonKey(name: 'hsn_sac_code')
+  String? get hsnSacCode;
+  @override
+  String? get barcode;
+  @override
+  @JsonKey(name: 'cost_price')
+  double get costPrice;
+  @override
+  Map<String, dynamic> get metadata;
 
-/// @nodoc
-class __$ProductCopyWithImpl<$Res> implements _$ProductCopyWith<$Res> {
-  __$ProductCopyWithImpl(this._self, this._then);
-
-  final _Product _self;
-  final $Res Function(_Product) _then;
+  /// Selling unit: e.g. 'pcs', 'box', 'dozen', 'crt', 'kg', 'ltr'
+  @override
+  String get unit;
 
   /// Create a copy of Product
   /// with the given fields replaced by the non-null parameter values.
   @override
-  @pragma('vm:prefer-inline')
-  $Res call({
-    Object? id = null,
-    Object? shopId = null,
-    Object? name = null,
-    Object? price = null,
-    Object? stockQuantity = null,
-    Object? category = null,
-    Object? description = freezed,
-    Object? isService = null,
-    Object? gstRate = null,
-    Object? hsnSacCode = freezed,
-    Object? barcode = freezed,
-    Object? costPrice = null,
-    Object? metadata = null,
-  }) {
-    return _then(_Product(
-      id: null == id
-          ? _self.id
-          : id // ignore: cast_nullable_to_non_nullable
-              as String,
-      shopId: null == shopId
-          ? _self.shopId
-          : shopId // ignore: cast_nullable_to_non_nullable
-              as String,
-      name: null == name
-          ? _self.name
-          : name // ignore: cast_nullable_to_non_nullable
-              as String,
-      price: null == price
-          ? _self.price
-          : price // ignore: cast_nullable_to_non_nullable
-              as double,
-      stockQuantity: null == stockQuantity
-          ? _self.stockQuantity
-          : stockQuantity // ignore: cast_nullable_to_non_nullable
-              as int,
-      category: null == category
-          ? _self.category
-          : category // ignore: cast_nullable_to_non_nullable
-              as String,
-      description: freezed == description
-          ? _self.description
-          : description // ignore: cast_nullable_to_non_nullable
-              as String?,
-      isService: null == isService
-          ? _self.isService
-          : isService // ignore: cast_nullable_to_non_nullable
-              as bool,
-      gstRate: null == gstRate
-          ? _self.gstRate
-          : gstRate // ignore: cast_nullable_to_non_nullable
-              as double,
-      hsnSacCode: freezed == hsnSacCode
-          ? _self.hsnSacCode
-          : hsnSacCode // ignore: cast_nullable_to_non_nullable
-              as String?,
-      barcode: freezed == barcode
-          ? _self.barcode
-          : barcode // ignore: cast_nullable_to_non_nullable
-              as String?,
-      costPrice: null == costPrice
-          ? _self.costPrice
-          : costPrice // ignore: cast_nullable_to_non_nullable
-              as double,
-      metadata: null == metadata
-          ? _self._metadata
-          : metadata // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>,
-    ));
-  }
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ProductImplCopyWith<_$ProductImpl> get copyWith =>
+      throw _privateConstructorUsedError;
 }
-
-// dart format on

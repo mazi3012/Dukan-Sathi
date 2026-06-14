@@ -81,4 +81,5 @@ test/
 artifacts/
 *.md
 !README.md
+*.hprof
 

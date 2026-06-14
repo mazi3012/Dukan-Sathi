@@ -6,8 +6,8 @@ part of 'admin_session.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_AdminSession _$AdminSessionFromJson(Map<String, dynamic> json) =>
-    _AdminSession(
+_$AdminSessionImpl _$$AdminSessionImplFromJson(Map<String, dynamic> json) =>
+    _$AdminSessionImpl(
       id: json['id'] as String,
       userId: json['user_id'] as String,
       tokenHash: json['token_hash'] as String,
@@ -17,7 +17,7 @@ _AdminSession _$AdminSessionFromJson(Map<String, dynamic> json) =>
       createdAt: json['created_at'] as String,
     );
 
-Map<String, dynamic> _$AdminSessionToJson(_AdminSession instance) =>
+Map<String, dynamic> _$$AdminSessionImplToJson(_$AdminSessionImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
       'user_id': instance.userId,

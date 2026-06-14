@@ -6,8 +6,8 @@ part of 'tax_breakdown.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_TaxBreakdown _$TaxBreakdownFromJson(Map<String, dynamic> json) =>
-    _TaxBreakdown(
+_$TaxBreakdownImpl _$$TaxBreakdownImplFromJson(Map<String, dynamic> json) =>
+    _$TaxBreakdownImpl(
       subtotal: (json['subtotal'] as num).toDouble(),
       cgstAmount: (json['cgst_amount'] as num).toDouble(),
       sgstAmount: (json['sgst_amount'] as num).toDouble(),
@@ -26,7 +26,7 @@ _TaxBreakdown _$TaxBreakdownFromJson(Map<String, dynamic> json) =>
           const [],
     );
 
-Map<String, dynamic> _$TaxBreakdownToJson(_TaxBreakdown instance) =>
+Map<String, dynamic> _$$TaxBreakdownImplToJson(_$TaxBreakdownImpl instance) =>
     <String, dynamic>{
       'subtotal': instance.subtotal,
       'cgst_amount': instance.cgstAmount,

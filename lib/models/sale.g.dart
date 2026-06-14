@@ -6,7 +6,7 @@ part of 'sale.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_Sale _$SaleFromJson(Map<String, dynamic> json) => _Sale(
+_$SaleImpl _$$SaleImplFromJson(Map<String, dynamic> json) => _$SaleImpl(
   id: json['id'] as String,
   shopId: json['shop_id'] as String,
   invoiceId: json['invoice_id'] as String,
@@ -14,10 +14,11 @@ _Sale _$SaleFromJson(Map<String, dynamic> json) => _Sale(
   paymentMethod: json['payment_method'] as String,
 );
 
-Map<String, dynamic> _$SaleToJson(_Sale instance) => <String, dynamic>{
-  'id': instance.id,
-  'shop_id': instance.shopId,
-  'invoice_id': instance.invoiceId,
-  'timestamp': instance.timestamp.toIso8601String(),
-  'payment_method': instance.paymentMethod,
-};
+Map<String, dynamic> _$$SaleImplToJson(_$SaleImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'shop_id': instance.shopId,
+      'invoice_id': instance.invoiceId,
+      'timestamp': instance.timestamp.toIso8601String(),
+      'payment_method': instance.paymentMethod,
+    };

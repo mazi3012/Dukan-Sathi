@@ -6,19 +6,20 @@ part of 'shop_config.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_ShopConfig _$ShopConfigFromJson(Map<String, dynamic> json) => _ShopConfig(
-  shopId: json['shopId'] as String,
-  gstRegistrationNumber: json['gst_registration_number'] as String?,
-  state: json['state'] as String,
-  gstMode: $enumDecode(_$GSTModeEnumMap, json['gst_mode']),
-  businessType: json['business_type'] as String,
-  createdAt: DateTime.parse(json['created_at'] as String),
-  updatedAt: json['updated_at'] == null
-      ? null
-      : DateTime.parse(json['updated_at'] as String),
-);
+_$ShopConfigImpl _$$ShopConfigImplFromJson(Map<String, dynamic> json) =>
+    _$ShopConfigImpl(
+      shopId: json['shopId'] as String,
+      gstRegistrationNumber: json['gst_registration_number'] as String?,
+      state: json['state'] as String,
+      gstMode: $enumDecode(_$GSTModeEnumMap, json['gst_mode']),
+      businessType: json['business_type'] as String,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: json['updated_at'] == null
+          ? null
+          : DateTime.parse(json['updated_at'] as String),
+    );
 
-Map<String, dynamic> _$ShopConfigToJson(_ShopConfig instance) =>
+Map<String, dynamic> _$$ShopConfigImplToJson(_$ShopConfigImpl instance) =>
     <String, dynamic>{
       'shopId': instance.shopId,
       'gst_registration_number': instance.gstRegistrationNumber,
