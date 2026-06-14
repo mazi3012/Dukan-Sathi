@@ -4,7 +4,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import '../../../core/session.dart';
@@ -1055,7 +1054,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
               try {
                 // Step 1: Read & encode image
                 setDialogState(() { currentStep = "Encoding image for AI..."; progress = 0.2; });
-                final bytes = await File(imageFile.path).readAsBytes();
+                final bytes = await imageFile.readAsBytes();
                 final base64Image = base64Encode(bytes);
                 final mimeType = imageFile.mimeType ?? 'image/jpeg';
 
