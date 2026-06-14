@@ -618,6 +618,185 @@ Future<void> main(List<String> arguments) async {
         } catch (e) {
           request.response..statusCode = 500..write("Server Error: ${e.toString()}")..close();
         }
+      } else if (request.method == 'POST' && request.uri.path == '/api/extract-bill-image') {
+        // ─── AI VISION: EXTRACT BILL IMAGE → PRODUCT LIST ───────────────
+        var body = await utf8.decodeStream(request);
+        try {
+          final data = jsonDecode(body) as Map<String, dynamic>;
+          final imageBase64 = data['imageBase64'] as String?;
+          final mimeType = (data['mimeType'] as String?) ?? 'image/jpeg';
+
+          if (imageBase64 == null || imageBase64.isEmpty) {
+            request.response
+              ..statusCode = 400
+              ..headers.contentType = ContentType.json
+              ..write(jsonEncode({'error': 'imageBase64 is required'}))
+              ..close();
+            return;
+          }
+
+          final nvidiaKey = Platform.environment['NVIDIA_API_KEY'] ?? '';
+          if (nvidiaKey.isEmpty) {
+            request.response
+              ..statusCode = 500
+              ..headers.contentType = ContentType.json
+              ..write(jsonEncode({'error': 'NVIDIA_API_KEY not configured'}))
+              ..close();
+            return;
+          }
+
+          print('🔍 AI Bill Extraction: processing image (${imageBase64.length} chars base64)...');
+
+          // Build the vision prompt for bill extraction
+          const systemPrompt = '''You are an expert Indian retail bill parser. 
+Your task is to extract product line items from a vendor/wholesale invoice or bill photo.
+
+Extract each product and return a JSON array ONLY — no explanation, no markdown fences.
+
+For each product, extract:
+- "name": product name (string, clean it up, remove codes/batch numbers)
+- "price": selling price per unit in INR (number, use Rate/Price column; if tax-inclusive, extract base rate)
+- "cost_price": cost/purchase price per unit in INR (number, same as "rate" from the bill — this IS the cost to the shop owner)
+- "stock_quantity": quantity purchased/received (integer, use Quantity column — boxes × units per box if needed, else just box count)
+- "category": best-guess category like "Ice Cream", "Grocery", "Beverages", "Dairy", "Snacks", "Hygiene", "General" (string)
+- "gst_rate": GST percentage as a number (e.g. 5, 12, 18, 28 — from the bill's GST Rate column)
+
+Rules:
+- Return ONLY a valid JSON array, no other text
+- If a field cannot be determined, use sensible defaults (price: 0, stock_quantity: 1, category: "General", gst_rate: 5)
+- "cost_price" = the rate on the bill (what shop owner pays)
+- "price" = cost_price × 1.15 rounded (suggested selling price with ~15% margin) if no selling price listed
+- Clean product names: remove codes like "30PR10C10", batch numbers, but keep brand/flavor names
+- If boxes are mentioned (e.g. "13.00 Box"), use that as stock_quantity
+- Include ALL products listed on the bill''';
+
+          final nvidiaRequest = {
+            'model': 'meta/llama-3.2-90b-vision-instruct',
+            'messages': [
+              {
+                'role': 'user',
+                'content': [
+                  {
+                    'type': 'text',
+                    'text': systemPrompt,
+                  },
+                  {
+                    'type': 'image_url',
+                    'image_url': {
+                      'url': 'data:$mimeType;base64,$imageBase64',
+                    },
+                  },
+                ],
+              },
+            ],
+            'temperature': 0.1,
+            'top_p': 0.95,
+            'max_tokens': 4096,
+          };
+
+          final nvidiaResponse = await http.post(
+            Uri.parse('https://integrate.api.nvidia.com/v1/chat/completions'),
+            headers: {
+              'Authorization': 'Bearer $nvidiaKey',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(nvidiaRequest),
+          );
+
+          if (nvidiaResponse.statusCode != 200) {
+            print('❌ NVIDIA API Error: ${nvidiaResponse.body}');
+            request.response
+              ..statusCode = 502
+              ..headers.contentType = ContentType.json
+              ..write(jsonEncode({
+                'error': 'AI model error',
+                'details': nvidiaResponse.body,
+              }))
+              ..close();
+            return;
+          }
+
+          final nvidiaData = jsonDecode(nvidiaResponse.body) as Map<String, dynamic>;
+          final rawContent = (nvidiaData['choices'] as List?)?.first?['message']?['content'] as String? ?? '';
+          print('🤖 NVIDIA Vision raw response:\n$rawContent');
+
+          // Parse the JSON array from the AI response
+          List<Map<String, dynamic>> extractedProducts = [];
+          try {
+            // Strip markdown code fences if present
+            var cleaned = rawContent.trim();
+            cleaned = cleaned.replaceAll(RegExp(r'^```(?:json)?\s*', multiLine: true), '');
+            cleaned = cleaned.replaceAll(RegExp(r'\s*```\s*$', multiLine: true), '');
+            cleaned = cleaned.trim();
+
+            // Find the JSON array boundaries
+            final startIdx = cleaned.indexOf('[');
+            final endIdx = cleaned.lastIndexOf(']');
+            if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
+              cleaned = cleaned.substring(startIdx, endIdx + 1);
+            }
+
+            final parsed = jsonDecode(cleaned) as List<dynamic>;
+            extractedProducts = parsed
+                .map((item) => Map<String, dynamic>.from(item as Map))
+                .toList();
+
+            // Normalize fields
+            for (final p in extractedProducts) {
+              p['price'] = (p['price'] as num?)?.toDouble() ?? 0.0;
+              p['cost_price'] = (p['cost_price'] as num?)?.toDouble() ?? 0.0;
+              p['stock_quantity'] = (p['stock_quantity'] as num?)?.toInt() ?? 1;
+              p['gst_rate'] = (p['gst_rate'] as num?)?.toDouble() ?? 5.0;
+              p['category'] = (p['category'] as String?) ?? 'General';
+              if (p['name'] == null || (p['name'] as String).isEmpty) {
+                p.remove('name');
+              }
+            }
+            extractedProducts.removeWhere((p) => p['name'] == null);
+
+            print('✅ Extracted ${extractedProducts.length} products from bill image');
+          } catch (e) {
+            print('❌ Failed to parse AI response as JSON: $e\nRaw: $rawContent');
+            request.response
+              ..statusCode = 422
+              ..headers.contentType = ContentType.json
+              ..write(jsonEncode({
+                'error': 'Could not parse products from bill image. AI response was not valid JSON.',
+                'raw': rawContent,
+              }))
+              ..close();
+            return;
+          }
+
+          if (extractedProducts.isEmpty) {
+            request.response
+              ..statusCode = 422
+              ..headers.contentType = ContentType.json
+              ..write(jsonEncode({
+                'error': 'No products could be extracted from this image. Please ensure the image is a clear bill or invoice photo.',
+              }))
+              ..close();
+            return;
+          }
+
+          request.response
+            ..statusCode = 200
+            ..headers.contentType = ContentType.json
+            ..write(jsonEncode({
+              'success': true,
+              'products': extractedProducts,
+              'count': extractedProducts.length,
+            }))
+            ..close();
+        } catch (e) {
+          print('❌ Bill extraction error: $e');
+          request.response
+            ..statusCode = 500
+            ..headers.contentType = ContentType.json
+            ..write(jsonEncode({'error': 'Server error during bill extraction: ${e.toString()}'}))
+            ..close();
+        }
+
       } else if (request.method == 'POST' && request.uri.path == '/api/propose-batch') {
         // ─── PROPOSE PRODUCT BATCH ──────────────────────────────────────
         var body = await utf8.decodeStream(request);

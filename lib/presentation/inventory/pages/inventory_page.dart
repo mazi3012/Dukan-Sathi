@@ -4,7 +4,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import '../../../core/session.dart';
 import '../../main/pages/main_layout.dart';
 import '../../../core/theme/app_colors.dart';
@@ -950,6 +952,32 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
               ),
             ),
             const SizedBox(height: 24),
+            // ── REAL: AI Photo Scan (Camera) ──────────────────────────────
+            _buildImportOption(
+              icon: Iconsax.camera,
+              title: "Scan Bill with Camera",
+              subtitle: "Point camera at a wholesale invoice — AI extracts all products instantly.",
+              color: AppColors.success,
+              badge: "AI",
+              onTap: () {
+                Navigator.pop(context);
+                _scanInvoicePhoto(ImageSource.camera);
+              },
+            ),
+            const SizedBox(height: 14),
+            // ── REAL: AI Photo Scan (Gallery) ─────────────────────────────
+            _buildImportOption(
+              icon: Iconsax.gallery,
+              title: "Import Bill from Gallery",
+              subtitle: "Pick a saved photo of a vendor bill to auto-fill your inventory.",
+              color: AppColors.primary,
+              badge: "AI",
+              onTap: () {
+                Navigator.pop(context);
+                _scanInvoicePhoto(ImageSource.gallery);
+              },
+            ),
+            const SizedBox(height: 14),
             _buildImportOption(
               icon: Iconsax.document_text,
               title: "Import Excel / CSV Sheets",
@@ -965,36 +993,233 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
               icon: Iconsax.document,
               title: "Import PDF Invoices",
               subtitle: "Ingest products directly from structured vendor bills.",
-              color: AppColors.primary,
+              color: Colors.grey,
               onTap: () {
                 Navigator.pop(context);
                 _showImportPresetSelection("PDF Invoice");
               },
             ),
-            const SizedBox(height: 14),
-            _buildImportOption(
-              icon: Iconsax.camera,
-              title: "Scan Photo of Invoice",
-              subtitle: "Extract product records from physical printed bills.",
-              color: AppColors.success,
-              onTap: () {
-                Navigator.pop(context);
-                _showImportPresetSelection("Wholesale Bill Photo");
-              },
-            ),
-            const SizedBox(height: 14),
-            _buildImportOption(
-              icon: Iconsax.folder_open,
-              title: "Browse Local Storage...",
-              subtitle: "Select files directly from your physical device storage.",
-              color: Colors.grey,
-              onTap: () {
-                Navigator.pop(context);
-                _showImportPresetSelection("Custom Device File");
-              },
-            ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Opens camera or gallery, sends image to AI vision API, then proposes batch.
+  Future<void> _scanInvoicePhoto(ImageSource source) async {
+    final picker = ImagePicker();
+    XFile? pickedFile;
+
+    try {
+      pickedFile = await picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 2048,
+        maxHeight: 2048,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not access camera/gallery: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (pickedFile == null) return; // user cancelled
+
+    // Show extraction loading dialog
+    if (!mounted) return;
+    _showAiExtractionDialog(pickedFile);
+  }
+
+  void _showAiExtractionDialog(XFile imageFile) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    String currentStep = "Reading invoice image...";
+    double progress = 0.1;
+    String? errorMessage;
+    bool _started = false; // closure guard — ensures pipeline runs exactly once
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          // Kick off the real async pipeline exactly once
+          if (!_started) {
+            _started = true;
+            Future.microtask(() async {
+              try {
+                // Step 1: Read & encode image
+                setDialogState(() { currentStep = "Encoding image for AI..."; progress = 0.2; });
+                final bytes = await File(imageFile.path).readAsBytes();
+                final base64Image = base64Encode(bytes);
+                final mimeType = imageFile.mimeType ?? 'image/jpeg';
+
+                // Step 2: Call NVIDIA vision API
+                setDialogState(() { currentStep = "AI is reading your bill...\n(Llama Vision Model)"; progress = 0.45; });
+                final extractResponse = await http.post(
+                  AppConfig.getApiUri('/api/extract-bill-image'),
+                  headers: {'Content-Type': 'application/json'},
+                  body: jsonEncode({
+                    'imageBase64': base64Image,
+                    'mimeType': mimeType,
+                  }),
+                ).timeout(const Duration(seconds: 90));
+
+                if (extractResponse.statusCode != 200) {
+                  final errBody = jsonDecode(extractResponse.body);
+                  throw Exception(errBody['error'] ?? 'AI extraction failed (${extractResponse.statusCode})');
+                }
+
+                final extractData = jsonDecode(extractResponse.body) as Map<String, dynamic>;
+                final products = (extractData['products'] as List<dynamic>)
+                    .map((p) => Map<String, dynamic>.from(p as Map))
+                    .toList();
+
+                if (products.isEmpty) {
+                  throw Exception('No products found in this image. Try a clearer photo.');
+                }
+
+                // Step 3: Propose batch
+                setDialogState(() { currentStep = "Creating inventory draft...\n${products.length} products found!"; progress = 0.8; });
+                final proposeResponse = await http.post(
+                  AppConfig.getApiUri('/api/propose-batch'),
+                  headers: {'Content-Type': 'application/json'},
+                  body: jsonEncode({
+                    'products': products,
+                    'userIdentifier': UserSession().userId ?? 'web-user',
+                    'shopId': UserSession().shopId ?? '',
+                  }),
+                );
+
+                if (proposeResponse.statusCode != 200) {
+                  throw Exception('Failed to create draft batch');
+                }
+
+                final proposeData = jsonDecode(proposeResponse.body) as Map<String, dynamic>;
+                if (proposeData['success'] != true) {
+                  throw Exception(proposeData['message'] ?? 'Failed to propose batch');
+                }
+
+                setDialogState(() { currentStep = "Draft ready!"; progress = 1.0; });
+
+                await Future.delayed(const Duration(milliseconds: 400));
+
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+                if (mounted) _showConfirmationDraftSheet(proposeData);
+
+              } catch (e) {
+                setDialogState(() {
+                  errorMessage = e.toString().replaceFirst('Exception: ', '');
+                  progress = 0.0;
+                });
+              }
+            });
+          }
+
+          return AlertDialog(
+            backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightBackground,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            content: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (errorMessage == null) ...[
+                    Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.success),
+                            strokeWidth: 3,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      "AI Bill Scanner",
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.lightOnSurface,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      "Powered by Llama Vision",
+                      style: const TextStyle(
+                        color: AppColors.success,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    LinearProgressIndicator(
+                      value: progress,
+                      backgroundColor: isDark ? Colors.white10 : Colors.black12,
+                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.success),
+                      minHeight: 6,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      currentStep,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isDark ? Colors.white70 : Colors.black54,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                  ] else ...[
+                    const Icon(Iconsax.warning_2, color: AppColors.error, size: 48),
+                    const SizedBox(height: 16),
+                    Text(
+                      "Extraction Failed",
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.lightOnSurface,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isDark ? Colors.white60 : Colors.black54,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.error,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                      child: const Text("Close", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -1004,6 +1229,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     required String title,
     required String subtitle,
     required Color color,
+    String? badge,
     required VoidCallback onTap,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1035,13 +1261,33 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: isDark ? Colors.white : AppColors.lightOnSurface,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            title,
+                            style: TextStyle(
+                              color: isDark ? Colors.white : AppColors.lightOnSurface,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                        if (badge != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              badge,
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
