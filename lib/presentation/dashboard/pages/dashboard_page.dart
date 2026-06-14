@@ -579,6 +579,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   Widget _buildSalesChart() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isDesktop = ResponsiveLayout.isDesktop(context) || ResponsiveLayout.isTablet(context);
+    final bool hasSales = _past7DaysSales.any((v) => v > 0.0);
 
     Widget chartContent = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -605,81 +606,118 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               ),
             ),
             // Legend
-            Row(
-              children: [
-                _buildLegendItem("Past 7d", const Color(0xFF10B981), isDashed: false),
-                const SizedBox(width: 12),
-                _buildLegendItem("AI Forecast", const Color(0xFF06B6D4), isDashed: true),
-              ],
-            ),
+            if (hasSales)
+              Row(
+                children: [
+                  _buildLegendItem("Past 7d", const Color(0xFF10B981), isDashed: false),
+                  const SizedBox(width: 12),
+                  _buildLegendItem("AI Forecast", const Color(0xFF06B6D4), isDashed: true),
+                ],
+              ),
           ],
         ),
         const SizedBox(height: 20),
         Expanded(
           child: SizedBox(
             width: double.infinity,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final double width = constraints.maxWidth;
-                const double leftPadding = 20.0;
-                const double rightPadding = 45.0;
-                final double drawableWidth = width - leftPadding - rightPadding;
-                final int totalPoints = _past7DaysSales.length + _predicted7DaysSales.length;
-                final double dx = drawableWidth / (totalPoints - 1);
-
-                return GestureDetector(
-                  onTapDown: (details) {
-                    final double localX = details.localPosition.dx;
-                    final int index = ((localX - leftPadding) / dx).round().clamp(0, totalPoints - 1);
-                    setState(() {
-                      _selectedChartIndex = index;
-                    });
-                  },
-                  onPanDown: (details) {
-                    final double localX = details.localPosition.dx;
-                    final int index = ((localX - leftPadding) / dx).round().clamp(0, totalPoints - 1);
-                    setState(() {
-                      _selectedChartIndex = index;
-                    });
-                  },
-                  onPanUpdate: (details) {
-                    final double localX = details.localPosition.dx;
-                    final int index = ((localX - leftPadding) / dx).round().clamp(0, totalPoints - 1);
-                    setState(() {
-                      _selectedChartIndex = index;
-                    });
-                  },
-                  onPanEnd: (_) {
-                    Future.delayed(const Duration(seconds: 3), () {
-                      if (mounted) {
-                        setState(() {
-                          _selectedChartIndex = null;
-                        });
-                      }
-                    });
-                  },
-                  onTapUp: (_) {
-                    Future.delayed(const Duration(seconds: 3), () {
-                      if (mounted) {
-                        setState(() {
-                          _selectedChartIndex = null;
-                        });
-                      }
-                    });
-                  },
-                  child: CustomPaint(
-                    painter: ProfessionalMLComboPainter(
-                      currentData: _past7DaysSales,
-                      predictedData: _predicted7DaysSales,
-                      currentColor: const Color(0xFF10B981),
-                      predictedColor: const Color(0xFF06B6D4),
-                      isDark: isDark,
-                      selectedIndex: _selectedChartIndex,
+            child: !hasSales
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF06B6D4).withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Iconsax.chart_1, color: Color(0xFF06B6D4), size: 28),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          "Awaiting Sales Activity",
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 40),
+                          child: Text(
+                            "Create invoices in the Billing page to unlock real-time revenue trends and AI-driven forecasting.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.grey.shade500,
+                              fontSize: 11,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+                  )
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      final double width = constraints.maxWidth;
+                      const double leftPadding = 20.0;
+                      const double rightPadding = 45.0;
+                      final double drawableWidth = width - leftPadding - rightPadding;
+                      final int totalPoints = _past7DaysSales.length + _predicted7DaysSales.length;
+                      final double dx = drawableWidth / (totalPoints - 1);
+
+                      return GestureDetector(
+                        onTapDown: (details) {
+                          final double localX = details.localPosition.dx;
+                          final int index = ((localX - leftPadding) / dx).round().clamp(0, totalPoints - 1);
+                          setState(() {
+                            _selectedChartIndex = index;
+                          });
+                        },
+                        onPanDown: (details) {
+                          final double localX = details.localPosition.dx;
+                          final int index = ((localX - leftPadding) / dx).round().clamp(0, totalPoints - 1);
+                          setState(() {
+                            _selectedChartIndex = index;
+                          });
+                        },
+                        onPanUpdate: (details) {
+                          final double localX = details.localPosition.dx;
+                          final int index = ((localX - leftPadding) / dx).round().clamp(0, totalPoints - 1);
+                          setState(() {
+                            _selectedChartIndex = index;
+                          });
+                        },
+                        onPanEnd: (_) {
+                          Future.delayed(const Duration(seconds: 3), () {
+                            if (mounted) {
+                              setState(() {
+                                _selectedChartIndex = null;
+                              });
+                            }
+                          });
+                        },
+                        onTapUp: (_) {
+                          Future.delayed(const Duration(seconds: 3), () {
+                            if (mounted) {
+                              setState(() {
+                                _selectedChartIndex = null;
+                              });
+                            }
+                          });
+                        },
+                        child: CustomPaint(
+                          painter: ProfessionalMLComboPainter(
+                            currentData: _past7DaysSales,
+                            predictedData: _predicted7DaysSales,
+                            currentColor: const Color(0xFF10B981),
+                            predictedColor: const Color(0xFF06B6D4),
+                            isDark: isDark,
+                            selectedIndex: _selectedChartIndex,
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -697,7 +735,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  "AI Projected: Sales revenue is expected to grow by 9.4% this week. Optimal inventory restock threshold is solid.",
+                  hasSales
+                      ? "AI Projected: Sales revenue is expected to grow by 9.4% this week. Optimal inventory restock threshold is solid."
+                      : "AI Forecast: Waiting for transaction data. Real-time predictive models activate after your first sales invoice.",
                   style: TextStyle(
                     color: isDark ? Colors.cyan.shade200 : Colors.cyan.shade900,
                     fontSize: 9.5,

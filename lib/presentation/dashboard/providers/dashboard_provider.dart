@@ -213,16 +213,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         }
       }
 
-      // If past 7 days sales is completely empty, populate with realistic progressive mock data for smooth aesthetic baseline curves
-      if (past7DaysSales.every((val) => val == 0.0)) {
-        final mockSales = [1200.0, 2500.0, 1800.0, 3100.0, 2400.0, 4200.0, 0.0];
-        for (int i = 0; i < 7; i++) {
-          past7DaysSales[i] = mockSales[i];
-        }
-        if (invoiceCountToday > 0) {
-          past7DaysSales[6] = netRevenueToday;
-        }
-      }
+      // We do not mock sales to ensure a true representation of the shop's transactions.
 
       // 3. Fetch products to perform Live Catalog Profit Margin Analysis
       final productsRes = await _localDb.queryAll(
@@ -266,34 +257,41 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
 
       // 4. Linear Regression Trend Forecast (Machine Learning Regression)
       final predicted7DaysSales = List<double>.filled(7, 0.0);
-      double sumX = 0;
-      double sumY = 0;
-      double sumXY = 0;
-      double sumXX = 0;
+      
+      if (salesRes.isNotEmpty) {
+        double sumX = 0;
+        double sumY = 0;
+        double sumXY = 0;
+        double sumXX = 0;
 
-      for (int i = 0; i < 7; i++) {
-        sumX += i;
-        sumY += past7DaysSales[i];
-        sumXY += i * past7DaysSales[i];
-        sumXX += i * i;
-      }
+        for (int i = 0; i < 7; i++) {
+          sumX += i;
+          sumY += past7DaysSales[i];
+          sumXY += i * past7DaysSales[i];
+          sumXX += i * i;
+        }
 
-      double m = (7 * sumXY - sumX * sumY) / (7 * sumXX - sumX * sumX);
-      double c = (sumY - m * sumX) / 7;
+        double m = (7 * sumXY - sumX * sumY) / (7 * sumXX - sumX * sumX);
+        double c = (sumY - m * sumX) / 7;
 
-      if (m.isNaN || c.isNaN || (m == 0 && c == 0)) {
-        double avg = sumY / 7;
-        if (avg <= 0) avg = 1500.0;
-        m = avg * 0.035; // default 3.5% organic daily slope
-        c = avg;
-      }
+        if (m.isNaN || c.isNaN || (m == 0 && c == 0)) {
+          double avg = sumY / 7;
+          if (avg > 0) {
+            m = avg * 0.035; // default 3.5% organic daily slope
+            c = avg;
+          } else {
+            m = 0.0;
+            c = 0.0;
+          }
+        }
 
-      for (int i = 0; i < 7; i++) {
-        final double projectedDay = 7.0 + i;
-        double predictedVal = m * projectedDay + c;
-        final double seasonality = 1.0 + (i % 2 == 0 ? 0.05 : -0.03); // add natural wave variation
-        predictedVal *= seasonality;
-        predicted7DaysSales[i] = predictedVal.clamp(100.0, 1000000.0);
+        for (int i = 0; i < 7; i++) {
+          final double projectedDay = 7.0 + i;
+          double predictedVal = m * projectedDay + c;
+          final double seasonality = 1.0 + (i % 2 == 0 ? 0.05 : -0.03); // add natural wave variation
+          predictedVal *= seasonality;
+          predicted7DaysSales[i] = predictedVal.clamp(0.0, 1000000.0);
+        }
       }
 
       // 5. Fetch Online-only data (Pending Approvals)
