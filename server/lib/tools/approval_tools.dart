@@ -122,8 +122,14 @@ Future<void> _deductInventoryStock({
     });
   }
 
-  // Batch update stock quantities in a single O(1) network operation
-  await supabase.from('products').upsert(updates);
+  // Update each product's stock using individual UPDATE (not upsert — no INSERT needed)
+  for (final update in updates) {
+    await supabase
+        .from('products')
+        .update({'stock_quantity': update['stock_quantity']})
+        .eq('id', update['id'] as String)
+        .eq('shop_id', shopId);
+  }
 }
 
 Future<void> _updateCustomerBalance({
