@@ -225,7 +225,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                     Container(
                       width: 1,
                       height: 40,
-                      color: isDark ? Colors.white10 : Colors.black10,
+                      color: isDark ? Colors.white10 : Colors.black12,
                       margin: const EdgeInsets.symmetric(horizontal: 15),
                     ),
                     Expanded(
